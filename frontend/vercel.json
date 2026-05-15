@@ -8,5 +8,11 @@
     "src/app/api/extract/route.ts": {
       "maxDuration": 60
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/backend/:path*",
+      "destination": "https://filebrsr-api.onrender.com/:path*"
+    }
+  ]
 }
