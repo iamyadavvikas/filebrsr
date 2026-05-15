@@ -1,0 +1,380 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { Loader2 } from "lucide-react";
+
+declare global {
+  interface Window {
+    Razorpay: new (options: RazorpayOptions) => RazorpayInstance;
+  }
+}
+
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id?: string;
+  subscription_id?: string;
+  handler: (response: RazorpayResponse) => void;
+  theme: { color: string };
+}
+
+interface RazorpayInstance {
+  open: () => void;
+}
+
+interface RazorpayResponse {
+  razorpay_order_id?: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  razorpay_subscription_id?: string;
+}
+
+const plans = [
+  {
+    key: "free",
+    name: "Free Trial",
+    price: "₹0",
+    period: "forever",
+    desc: "Try the extraction engine",
+    reports: "3 reports total",
+    features: ["3 free extractions", "Basic gap analysis", "CSV download", "All 9 NGRBC Principles"],
+    cta: "Start Free",
+    popular: false,
+    ctaBg: "white", ctaColor: "#1B4D3E", ctaBorder: "1px solid #E5E7DF",
+  },
+  {
+    key: "starter",
+    name: "Starter",
+    price: "₹25,000",
+    period: "/year",
+    monthlyEquiv: "₹2,083/month",
+    desc: "For individual compliance managers",
+    reports: "5 reports/month",
+    features: [
+      "5 reports per month",
+      "Full gap analysis + ESRS mapping",
+      "NIFTY 50 sector benchmarks",
+      "PDF compliance reports",
+      "CSV + XBRL-JSON export",
+      "Extraction history",
+      "Email support",
+    ],
+    cta: "Subscribe",
+    popular: false,
+    ctaBg: "white", ctaColor: "#1B4D3E", ctaBorder: "1px solid #E5E7DF",
+  },
+  {
+    key: "professional",
+    name: "Professional",
+    price: "₹1,50,000",
+    period: "/year",
+    monthlyEquiv: "₹12,500/month",
+    desc: "For consulting firms & compliance teams",
+    reports: "50 reports/month",
+    features: [
+      "50 reports per month",
+      "Everything in Starter +",
+      "Multi-user (10 seats)",
+      "Organization dashboard",
+      "Priority support + onboarding",
+      "Year-over-year comparison",
+      "Branded PDF reports",
+      "API access",
+      "Value chain supplier portal",
+    ],
+    cta: "Subscribe",
+    popular: true,
+    ctaBg: "#1B4D3E", ctaColor: "white", ctaBorder: "none",
+  },
+  {
+    key: "enterprise",
+    name: "Enterprise",
+    price: "₹5,00,000+",
+    period: "/year",
+    desc: "Group companies, multi-entity orgs",
+    reports: "Unlimited",
+    features: [
+      "Unlimited reports",
+      "Everything in Professional +",
+      "Unlimited users + SSO",
+      "Custom integrations",
+      "White-label option",
+      "Dedicated account manager",
+      "SLA guarantee",
+      "On-prem deployment available",
+    ],
+    cta: "Contact Sales",
+    popular: false,
+    ctaBg: "#E8B931", ctaColor: "#1B4D3E", ctaBorder: "none",
+  },
+];
+
+const comparisonData = [
+  { feature: "Reports per month", free: "3 total", starter: "5", pro: "50", enterprise: "Unlimited" },
+  { feature: "Gap analysis", free: "Basic", starter: "Full", pro: "Full", enterprise: "Full" },
+  { feature: "NIFTY 50 benchmarks", free: "—", starter: "✓", pro: "✓", enterprise: "✓" },
+  { feature: "ESRS cross-reference", free: "—", starter: "✓", pro: "✓", enterprise: "✓" },
+  { feature: "PDF reports", free: "—", starter: "✓", pro: "Branded", enterprise: "White-label" },
+  { feature: "Export formats", free: "CSV", starter: "CSV, XBRL, PDF", pro: "All", enterprise: "All + Custom" },
+  { feature: "Users", free: "1", starter: "1", pro: "10", enterprise: "Unlimited" },
+  { feature: "API access", free: "—", starter: "—", pro: "✓", enterprise: "✓" },
+  { feature: "Support", free: "Email", starter: "Email", pro: "Priority", enterprise: "Dedicated" },
+];
+
+export default function PricingPage() {
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  const handlePurchase = async (planKey: string) => {
+    if (planKey === "free") {
+      window.location.href = "/upload";
+      return;
+    }
+    if (planKey === "enterprise") {
+      window.location.href = "mailto:sales@filebrsr.com?subject=Enterprise%20Plan%20Inquiry";
+      return;
+    }
+
+    setLoadingPlan(planKey);
+    try {
+      const isSubscription = ["starter", "professional"].includes(planKey);
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const endpoint = isSubscription
+        ? `${backendUrl}/api/billing/create-subscription`
+        : `${backendUrl}/api/billing/create-order`;
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: planKey, billing_period: "yearly", user_id: "guest" }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.detail || "Failed to create order");
+        setLoadingPlan(null);
+        return;
+      }
+
+      const options: RazorpayOptions = {
+        key: data.key_id,
+        amount: data.amount,
+        currency: data.currency || "INR",
+        name: "FileBRSR",
+        description: `${planKey.charAt(0).toUpperCase() + planKey.slice(1)} Plan`,
+        handler: async (response: RazorpayResponse) => {
+          await fetch(`${backendUrl}/api/billing/verify-payment`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id || "",
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              user_id: "guest",
+              plan: planKey,
+            }),
+          });
+          window.location.href = "/dashboard";
+        },
+        theme: { color: "#1B4D3E" },
+      };
+
+      if (data.type === "subscription") {
+        options.subscription_id = data.subscription_id;
+      } else {
+        options.order_id = data.order_id;
+      }
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch {
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
+  return (
+    <>
+      <Navbar />
+      <main className="flex-1">
+        {/* Header */}
+        <section style={{ padding: "72px 28px 48px", background: "linear-gradient(180deg, #FAFBF9 0%, white 100%)" }}>
+          <div className="max-w-[960px] mx-auto text-center">
+            <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#2D7A5F", marginBottom: 8 }}>
+              Pricing
+            </p>
+            <h1 style={{ fontSize: 38, fontWeight: 800, marginBottom: 12, letterSpacing: -1 }}>
+              Replace ₹15L consultants with one tool
+            </h1>
+            <p className="text-muted" style={{ fontSize: 16, maxWidth: 520, margin: "0 auto 8px", lineHeight: 1.6 }}>
+              Companies pay ₹5-15 lakhs annually for manual BRSR compilation. FileBRSR does it in seconds.
+            </p>
+            <div className="flex justify-center gap-6 mt-6" style={{ fontSize: 13, color: "#6B7280" }}>
+              <span>✓ No credit card for free tier</span>
+              <span>✓ Cancel anytime</span>
+              <span>✓ GST invoice included</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Plans Grid */}
+        <section style={{ padding: "0 28px 64px" }}>
+          <div className="max-w-[1100px] mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5" style={{ alignItems: "start" }}>
+              {plans.map((p) => (
+                <div
+                  key={p.key}
+                  className="relative flex flex-col bg-white"
+                  style={{
+                    borderRadius: 20,
+                    border: p.popular ? "2px solid #1B4D3E" : "1px solid #E5E7DF",
+                    padding: "28px 24px",
+                    boxShadow: p.popular ? "0 12px 40px rgba(27,77,62,0.12)" : "0 2px 8px rgba(0,0,0,0.04)",
+                  }}
+                >
+                  {p.popular && (
+                    <div
+                      className="absolute"
+                      style={{
+                        top: -13, left: "50%", transform: "translateX(-50%)",
+                        background: "#1B4D3E", color: "white",
+                        fontSize: 11, fontWeight: 700, padding: "5px 16px",
+                        borderRadius: 20, letterSpacing: 0.5,
+                      }}
+                    >
+                      Most Popular
+                    </div>
+                  )}
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{p.name}</h3>
+                  <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>{p.desc}</p>
+                  <div style={{ marginBottom: 8 }}>
+                    <span style={{ fontSize: 32, fontWeight: 800, letterSpacing: -1 }}>{p.price}</span>
+                    {p.period && <span className="text-muted" style={{ fontSize: 14, marginLeft: 4 }}>{p.period}</span>}
+                  </div>
+                  {"monthlyEquiv" in p && p.monthlyEquiv && (
+                    <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 12 }}>{p.monthlyEquiv}</p>
+                  )}
+                  <div style={{ background: "#F0FDF4", borderRadius: 10, padding: "8px 12px", marginBottom: 20, fontSize: 13, fontWeight: 600, color: "#166534" }}>
+                    {p.reports}
+                  </div>
+                  <button
+                    onClick={() => handlePurchase(p.key)}
+                    disabled={loadingPlan === p.key}
+                    className="flex items-center justify-center gap-2 transition-all w-full"
+                    style={{
+                      padding: "12px 20px", borderRadius: 12, fontSize: 14, fontWeight: 700,
+                      border: p.ctaBorder, background: p.ctaBg, color: p.ctaColor,
+                      cursor: "pointer", marginBottom: 20,
+                    }}
+                  >
+                    {loadingPlan === p.key && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {p.cta}
+                  </button>
+                  <div className="flex flex-col gap-2.5 flex-1">
+                    {p.features.map((f) => (
+                      <div key={f} className="flex items-start gap-2 text-muted" style={{ fontSize: 13 }}>
+                        <span style={{ color: "#059669", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>✓</span>
+                        {f}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pay-per-report callout */}
+            <div
+              className="mt-8 flex flex-col md:flex-row items-center justify-between gap-6 bg-white"
+              style={{ border: "1px solid #E5E7DF", borderRadius: 20, padding: "28px 32px" }}
+            >
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
+                  Just need one report? <span style={{ color: "#2D7A5F" }}>₹2,500 per report</span>
+                </h3>
+                <p className="text-muted" style={{ fontSize: 14 }}>
+                  Full analysis with NIFTY 50 benchmarks, ESRS mapping, and branded PDF — no subscription needed.
+                </p>
+              </div>
+              <button
+                onClick={() => handlePurchase("pay_per_report")}
+                disabled={loadingPlan === "pay_per_report"}
+                className="flex items-center gap-2 whitespace-nowrap"
+                style={{
+                  padding: "12px 28px", borderRadius: 12, fontSize: 14, fontWeight: 700,
+                  border: "2px solid #2D7A5F", background: "white", color: "#2D7A5F", cursor: "pointer",
+                }}
+              >
+                {loadingPlan === "pay_per_report" && <Loader2 className="w-4 h-4 animate-spin" />}
+                Buy Single Report
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Comparison Table */}
+        <section style={{ padding: "48px 28px 72px", background: "#F9F6EF" }}>
+          <div className="max-w-[960px] mx-auto">
+            <h2 className="text-center" style={{ fontSize: 26, fontWeight: 800, marginBottom: 32 }}>
+              Compare plans
+            </h2>
+            <div className="overflow-x-auto" style={{ borderRadius: 16, border: "1px solid #E5E7DF" }}>
+              <table className="w-full" style={{ background: "white", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#F9FAFB" }}>
+                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: 13, fontWeight: 600 }}>Feature</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600 }}>Free</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600 }}>Starter</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "#1B4D3E" }}>Professional</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600 }}>Enterprise</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonData.map((row, i) => (
+                    <tr key={i} style={{ borderTop: "1px solid #F3F4F6" }}>
+                      <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500 }}>{row.feature}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "#6B7280" }}>{row.free}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "#6B7280" }}>{row.starter}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", fontWeight: 600, color: "#1B4D3E" }}>{row.pro}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "#6B7280" }}>{row.enterprise}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        {/* BRSR Deadline CTA */}
+        <section className="text-center" style={{ padding: "56px 28px", background: "linear-gradient(135deg, #1B4D3E, #2D7A5F)" }}>
+          <div className="max-w-[600px] mx-auto text-white">
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", opacity: 0.7, marginBottom: 12 }}>
+              Compliance Deadline
+            </div>
+            <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 12 }}>
+              BRSR Core + Assurance mandatory from FY 2026-27
+            </h2>
+            <p style={{ fontSize: 15, opacity: 0.8, lineHeight: 1.65, marginBottom: 28 }}>
+              SEBI mandates BRSR Core with third-party assurance for the top 250 companies. 
+              All 1,000 listed companies by 2027-28. Start your compliance journey today.
+            </p>
+            <Link
+              href="/upload"
+              className="inline-block"
+              style={{ fontSize: 15, fontWeight: 700, padding: "14px 36px", borderRadius: 14, background: "#E8B931", color: "#1B4D3E" }}
+            >
+              Start Compliance Check →
+            </Link>
+          </div>
+        </section>
+      </main>
+      <Footer />
+      <script src="https://checkout.razorpay.com/v1/checkout.js" async />
+    </>
+  );
+}

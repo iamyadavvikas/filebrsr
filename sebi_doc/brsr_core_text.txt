@@ -1,0 +1,368 @@
+Annexure I - Format of BRSR Core
+Sr. Cross – reference
+Attribute Parameter Measurement Data & Assurance Approach
+No. to the BRSR
+1. Absolute Fossil Fuel (Coal, Natural Principle 6,
+Gas, Diesel, FO etc.) Consumption Question 7 of
+(Mn MT / KT / MT / MM BTU etc.) Essential Indicators
+2. Emission Factor (GHG in CO e / Unit
+2
+of Measure) - IPCC or Actual Testing
+GHG (CO e) Emission in from Accredited Test Lab
+2
+Mn MT / KT / MT 3. Quantity of Carbon Capture (Mn MT /
+Total Scope 1 emissions (Break-up
+Green-house gas Direct emissions from KT / MT)
+of the GHG into CO2, CH4, N2O,
+(GHG) footprint organization’s owned- or 4. GHG emissions in CO2 equivalent by
+HFCs, PFCs, SF6, NF3, if available)
+controlled sources process (Non-Fuel Source) (Mn MT /
+Greenhouse gas KT / MT / MM BTU)
+emissions may be 5. Fugitive emissions
+measured in 6. Total Scope 1 GHG Emissions: Point
+1 accordance with 2 x Point 1 - Point 3 + Point 4 + Point
+the Greenhouse 5
+Gas Protocol: A
+Corporate 1. Total Consumption of Purchased Principle 6,
+Accounting and Energy (MW), Steam (MT), Question 7 of
+Reporting Refrigeration (MMBTU) Essential Indicators
+GHG (CO e) Emission in
+Standard 2
+Total Scope 2 emissions (Break-up of Mn MT / KT / MT
+2. GHG (CO e) Emission Factor across
+the GHG (CO e) into CO2, CH4, Indirect emissions from 2
+2 all purchased energy sources - IPCC
+N2O, HFCs, PFCs, SF6, NF3, if the generation of energy
+or actual from the supplier (audited
+available) that is purchased from a
+certificates)
+utility provider
+3. Total Scope 2 GHG Emissions: Total
+Consumption x Emission Factor
+Page 1 of 8
+Sr. Cross – reference
+Attribute Parameter Measurement Data & Assurance Approach
+No. to the BRSR
+Total Scope 1 and Scope 1.Total Emission (Scope 1 & 2)
+Principle 6,
+2 emissions (MT) / Total 2. Total Revenue from Operations - From
+Question 7 of
+GHG Emission Intensity Revenue from Operations Audited P&L Statement
+Essential Indicators
+(Scope 1 +2) adjusted for PPP 3. PPP (USD / INR)
+1. Total Emission (Scope 1 & 2) as above
+Total Scope 1 and Scope
+2. Company & Sector Specific (i.e., No. of Principle 6,
+2 emissions (MT) / Total
+Vehicles Produced, MT of Material Question 7 of
+Output of Product or
+Produced, Data in Mn TB, No. of Seats / Essential Indicators
+Services
+Travel Class, Room-nights etc.)
+Water consumed is water that it is no
+longer available for use by the ecosystem
+Principle 6,
+or local community, such as water that
+Question 3 of
+has been withdrawn and incorporated
+Essential Indicators
+into products or has evaporated or is
+polluted to the point of being unusable by
+other users, and is therefore not released
+back to surface water, groundwater,
+seawater, or a third party. It also includes
+water that has been stored during the
+reporting period for use or discharge in a
+Water footprint Total water consumption
+2 Mn Lt or KL subsequent reporting period.
+If the entity cannot directly measure its
+water consumption, it may calculate this
+using the following:
+1. Input water flow meter logs (Calibrated
+Meters)
+2. Output water flow meter logs
+(Calibrated Meters)
+3. Water consumption = Input Water -
+Output Water
+Page 2 of 8
+Sr. Cross – reference
+Attribute Parameter Measurement Data & Assurance Approach
+No. to the BRSR
+Principle 6,
+1. Total water consumed
+Question 3 of
+Mn Lt or KL / Rupee 2. Total Revenue from Operations (from
+Essential Indicators
+adjusted for PPP audited P&L)
+3. PPP (USD / INR)
+Water consumption intensity Principle 6,
+1. Consumption as above
+Question 3 of
+2. Company & Sector Specific (i.e., No.
+Mn Lt or KL / Product or Essential Indicators
+of Vehicles Produced, MT of Material
+Service
+Produced, Data in Mn TB, No. of Seats /
+Travel Class etc)
+1. Untreated Water Principle 6,
+2. Primary Treatment (Removal of Question 4 of
+material that floats or settle out i.e Essential Indicators
+Filtration, Screening, Sedimentation
+etc.)
+Water Discharge by destination and
+Mn Lt or KL 3. Secondary Treatment (Removal of
+levels of Treatment
+Dissolved organic Matter i.e.
+Oxidation, Digestion etc.)
+4. Tertiary Treatment (Disinfecting Water
+i.e. removal of pathogens,
+Phosphorous, Nitrogen etc.)
+Total energy consumption = non- Principle 6,
+Total energy consumed In Joules or multiples renewable fuel consumed + renewable Question 1 of
+fuel consumed + purchased electricity, Essential Indicators
+heating, cooling, steam + self-generated
+electricity, heating, cooling, steam
+(If the entity generates electricity from a
+Energy footprint
+non-renewable or renewable fuel source
+3
+and then consumes the generated
+electricity, the energy consumption shall
+be counted only once)
+% of energy consumed from In % terms Energy consumed through renewable
+renewable sources sources / total energy consumed
+Page 3 of 8
+Sr. Cross – reference
+Attribute Parameter Measurement Data & Assurance Approach
+No. to the BRSR
+1. Total energy consumed Principle 6,
+2. Total Revenue from Operations (from Question 1 of
+Joules or multiples /
+audited P&L) Essential Indicators
+Rupee adjusted for PPP
+3. PPP (USD / INR)
+Energy intensity 1.Consumption as above Principle 6,
+2. Company & Sector Specific (i.e., No. of Question 1 of
+Joules or multiples / Vehicles Produced, MT of Material Essential Indicators
+Product or Service Produced, Data in Mn TB, No. of Seats /
+Travel Class etc)
+Absolute weight of the packaging material Principle 6,
+(Bags, Bottles, Pallets etc.) discarded as Question 9 of
+Plastic waste (A) Kg / MT defined under the plastic waste Essential Indicators
+management rules 2016 and
+amendments thereof
+Discarded Computers, televisions, cell Principle 6,
+phones, VCRs, stereos, DVD players, Question 9 of
+E-waste (B) Kg / MT copiers, and fax machines etc. as listed Essential Indicators
+under e-waste management rules 2016
+and amendments thereof
+Solids and liquid waste including its Principle 6,
+Embracing container and any intermediate product, Question 9 of
+circularity - details which is generated during the diagnosis, Essential Indicators
+4 related to waste treatment or immunization of human
+Bio-medical waste (C) Kg / MT
+management by beings or animals or research activities
+the entity as listed under Bio-medical waste
+management rules 2016 and
+amendments thereof
+Construction waste as per C&D waste Principle 6,
+management Rules 2016 and Question 9 of
+Construction and demolition waste
+Kg / MT amendments thereof like concrete, Essential Indicators
+(D)
+plaster, metal rods / wires, wood, plastics
+etc.
+Discarded batteries i.e., Li-ion, Alkaline, Principle 6,
+Lead Acid etc used in vehicles, Question 9 of
+Battery waste (E) Kg / MT
+computers & laptops, mobiles other Essential Indicators
+electronics, UPS, Power Back up etc. as
+Page 4 of 8
+Sr. Cross – reference
+Attribute Parameter Measurement Data & Assurance Approach
+No. to the BRSR
+per Battery Waste management Rules
+2016 and amendments thereof
+Discarded material such as paper, plastic, Principle 6,
+clothes, equipment, machine parts etc Question 9 of
+having exposure to radiation across Essential Indicators
+Radioactive waste (F) Kg / MT
+Nuclear Power Plants, Hospitals,
+Research Laboratories, Industrial
+Applications etc.)
+Principle 6,
+Other Hazardous waste. Please As per hazardous waste management
+Kg / MT Question 9 of
+specify, if any. (G) rules of CPCB
+Essential Indicators
+Other Non-hazardous waste Principle 6,
+generated (H). Please specify, if any. Waste not identified as Hazardous as Question 9 of
+Kg / MT
+(Break-up by composition i.e., by per CPCB Essential Indicators
+materials relevant to the sector)
+Principle 6,
+Total waste generated ((A+B + C +
+Kg / MT self-explanatory Question 9 of
+D + E + F + G + H)
+Essential Indicators
+1. Total waste generated Principle 6,
+Kg or MT / Rupee 2. Total Revenue from Operations (from Question 9 of
+adjusted for PPP audited P&L) Essential Indicators
+3. PPP (USD / INR)
+Waste intensity 1. Total waste generated Principle 6,
+2. Company & Sector Specific (i.e., No. Question 9 of
+Kg or MT / Unit of
+of Vehicles Produced, MT of Material Essential Indicators
+Product or Service
+Produced, Data in Mn TB, No. of Seats /
+Travel Class etc)
+Principle 6,
+Kg or MT Absolute quantity
+Question 9 of
+Each category of waste generated, Kg of Waste Recycled Recovered /Total Essential Indicators
+total waste recovered through Waste generated
+recycling, re-using or other recovery
+Intensity
+operations Disclosure may be provided if certificates
+from vendors have been relied upon for
+assurance of KPIs on waste management
+Page 5 of 8
+Sr. Cross – reference
+Attribute Parameter Measurement Data & Assurance Approach
+No. to the BRSR
+Kg or MT 1. Amount of material in MT disposed Principle 6,
+through Incineration Question 9 of
+For each category of waste
+2. Amount of Material to Landfill Essential Indicators
+generated, total waste disposed by
+3. Any other method
+nature of disposal method
+Kg of Waste Recycled Recovered /Total
+Intensity Waste generated
+To check sources including – Principle 3,
+ Insurance Policies & Premium Paid Question 1(c) of
+Details Essential Indicators
+Spending on measures towards well-  Infant Care Policy
+In % terms
+being of employees and workers –  Amount billed/invoices towards
+cost incurred as a % of total revenue providing such facilities
+of the company (The following measures may be included
+– health insurance, accident insurance,
+maternity benefits, paternity benefits, day
+Enhancing
+care facilities, health & safety measures
+Employee
+including access to mental health)
+5 Wellbeing and
+Principle 3,
+Safety Number of Permanent
+To check on the basis of claims Question 11 of
+Disabilities
+Essential Indicators
+1. Total number of lost time injuries Principle 3,
+Details of safety related incidents for Lost Time Injury
+2. Total No. of working hours Question 11 of
+employees and workers (including Frequency Rate (LTIFR)
+3. LTIFR = (Total number of lost time Essential Indicators
+contract-workforce e.g. workers in (per one million-person
+injuries *10,00,000) / Total No. of
+the company's construction sites) hours worked)
+working hours
+Principle 3,
+To check on the basis of claims as
+No. of fatalities Question 11 of
+reported to the Factory Inspector
+Essential Indicators
+Principle 5,
+Gross wages paid to females as % of
+In % terms Employee Master / Register Question 3(b) of
+wages paid
+Essential Indicators
+Enabling Gender  Total Complaints on Principle 5,
+6 Diversity in Sexual Harassment Question 7 of
+Business (POSH) reported Essential Indicators
+Complaints on POSH
+ Complaints on POSH
+as a % of female
+employees / workers
+Page 6 of 8
+Sr. Cross – reference
+Attribute Parameter Measurement Data & Assurance Approach
+No. to the BRSR
+ Complaints on POSH
+upheld
+Principle 8,
+Question 4 of
+Input material sourced from following Essential Indicators
+self-explanatory
+sources as % of total purchases – In % terms – As % of total
+‘Input material’ - includes all types of
+Directly sourced from MSMEs/ small purchases by value
+procurement such as raw material,
+producers and from within India
+spares, services, capex procurement
+items etc.
+Enabling Inclusive
+7
+Development
+Place of employment of employees Principle 8,
+Job creation in smaller towns –
+/workers (Place to be categorised based Question 5 of
+Wages paid to persons employed in In % terms – As % of total
+on with RBI classification system on rural Essential Indicators
+smaller towns (permanent or non- wage cost
+/ semi-urban / urban / metropolitan)
+permanent /on contract) as % of total
+wage cost
+Principle 9,
+Question 7 of
+Essential Indicators
+Instances involving loss / breach of
+data of customers as a percentage of
+Fairness in In % terms
+total data breaches or cyber security
+Engaging with
+8 events
+Customers and
+Suppliers
+(Accounts payable *365) / Principle 1,
+Number of days of accounts payable Cost of goods/services Question 8 of
+To check from financial statements
+procured Essential Indicators
+ Purchases from Principle 1,
+Concentration of purchases & sales
+trading houses as % 1. RPT audited by Financial Auditors Question 9 of
+done with trading houses, dealers,
+of total purchases (Refer Financial Audit Report) Essential Indicators
+Open-ness of and related parties
+9  Number of trading 2. Financial statements / invoices
+business Loans and advances & investments
+houses where
+with related parties
+purchases are made
+from
+Page 7 of 8
+Sr. Cross – reference
+Attribute Parameter Measurement Data & Assurance Approach
+No. to the BRSR
+ Purchases from top
+10 trading houses as
+% of total purchases
+from trading houses
+ Sales to dealers /
+distributors as % of
+total sales
+ Number of dealers /
+distributors to whom
+sales are made
+ Sales to top 10
+dealers / distributors
+as % of total sales to
+dealers / distributors
+Share of RPTs (as
+respective %age) in -
+ Purchases
+ Sales
+ Loans & advances
+ Investments
+Page 8 of 8
