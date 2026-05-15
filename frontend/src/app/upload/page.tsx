@@ -56,34 +56,41 @@ export default function UploadPage() {
 
     try {
       setProgress("AI is analyzing your report...");
-      const res = await fetch("/api/extract", {
+
+      // Call backend directly to avoid Vercel's 4.5MB body limit
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://filebrsr-api.onrender.com";
+      const res = await fetch(`${backendUrl}/api/guest-extract`, {
         method: "POST",
         body: formData,
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        setError(data.error || "Upload failed");
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || errData.detail || "Upload failed");
         setUploading(false);
         setProgress("");
         return;
       }
 
-      setSuccess(data.message);
+      const data = await res.json();
+
+      const data = await res.json();
+
+      if (data.status === "failed") {
+        setError(data.error || "Extraction failed");
+        setUploading(false);
+        setProgress("");
+        return;
+      }
+
+      setSuccess("Extraction complete!");
       setProgress("");
 
-      if (data.results) {
-        // Guest mode — store results and redirect
-        sessionStorage.setItem("guestResults", JSON.stringify(data.results));
-        setTimeout(() => {
-          router.push("/results/guest");
-        }, 1000);
-      } else {
-        setTimeout(() => {
-          router.push(`/results/${data.reportId}`);
-        }, 2000);
-      }
+      // Store results and redirect to guest results page
+      sessionStorage.setItem("guestResults", JSON.stringify(data));
+      setTimeout(() => {
+        router.push("/results/guest");
+      }, 1000);
     } catch {
       setError("Network error. Please try again.");
       setProgress("");

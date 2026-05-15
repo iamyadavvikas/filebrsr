@@ -132,6 +132,59 @@ async def extract_brsr(
         return {"status": "failed", "error": str(e)}
 
 
+@app.post("/api/guest-extract")
+async def guest_extract_brsr(
+    file: UploadFile = File(...),
+):
+    """Public guest extraction endpoint — no auth, limited to 50MB."""
+    try:
+        content = await file.read()
+
+        if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large")
+
+        text = ""
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+
+        if not text.strip():
+            return {"status": "failed", "error": "No text could be extracted from PDF"}
+
+        regex_results = extract_with_regex(text)
+        enhanced_results = extract_enhanced(text)
+        try:
+            ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY)
+        except Exception:
+            ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
+
+        merged = {"section_a": {}, "section_b": {}, "section_c": {}}
+        for section in ["section_a", "section_b", "section_c"]:
+            merged[section] = {**enhanced_results.get(section, {})}
+            merged[section].update(regex_results.get(section, {}))
+            merged[section].update(ai_results.get(section, {}))
+
+        confidence = calculate_confidence(regex_results, ai_results)
+        benchmark = get_benchmark_comparison(merged)
+
+        return {
+            "status": "completed",
+            "report_id": "guest",
+            "extracted_data": merged,
+            "confidence_scores": confidence,
+            "gap_analysis": analyze_gaps_v2(merged),
+            "datapoints_stats": get_datapoints_stats(),
+            "benchmark": benchmark,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {"status": "failed", "error": str(e)}
+
+
 @app.get("/api/framework")
 async def get_framework():
     """Return the complete SEBI BRSR framework structure."""
