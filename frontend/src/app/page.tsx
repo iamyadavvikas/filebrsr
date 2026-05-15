@@ -10,7 +10,6 @@ const steps = [
 
 const features = [
   { t: "All 9 NGRBC Principles", d: "Ethics, Products, Employees, Stakeholders, Human Rights, Environment, Public Policy, Inclusive Growth, Consumer Protection — all covered.", i: "🎯" },
-  { t: "Mining & heavy industry expertise", d: "Built by someone who studied mining & SHE at IIT KGP. We understand DGMS returns, CPCB norms, LTIFR calculations — not generic ESG.", i: "⛏" },
   { t: "Audit-ready data lineage", d: "Every extracted metric traced back to source. When your assurance provider asks 'where did this come from?' — one click.", i: "🛡" },
   { t: "₹15L consultant → ₹0 tool", d: "Companies pay ₹5-15 lakhs for manual BRSR compilation. FileBRSR does it in 60 seconds. Start free.", i: "💰" },
   { t: "XBRL-JSON export", d: "Output aligned to SEBI's XBRL taxonomy. Download as CSV for Excel or XBRL-JSON for digital filing.", i: "📋" },
