@@ -6,9 +6,9 @@ from pathlib import Path
 class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_SERVICE_KEY: str
-    GEMINI_API_KEY: str
-    RAZORPAY_KEY_ID: str
-    RAZORPAY_KEY_SECRET: str
+    GEMINI_API_KEY: str = ""
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
     ALLOWED_ORIGINS: str = "http://localhost:3000"
     MAX_FILE_SIZE_MB: int = 50
 
