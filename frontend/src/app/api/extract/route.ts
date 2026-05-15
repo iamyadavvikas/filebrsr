@@ -7,8 +7,8 @@ export const config = {
   },
 };
 
-// Increase body size limit for this route
-export const maxDuration = 120;
+// Vercel Hobby plan max is 60s
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
