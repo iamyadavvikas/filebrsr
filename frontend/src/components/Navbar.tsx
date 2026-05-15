@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
@@ -29,13 +30,8 @@ export default function Navbar({ user }: { user?: { email: string } | null }) {
     <nav className="sticky top-0 z-50 border-b border-border" style={{ background: "rgba(250,251,249,0.92)", backdropFilter: "blur(16px)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-7">
         <div className="flex justify-between items-center" style={{ height: 58 }}>
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center text-white font-extrabold" style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg, #1B4D3E, #2D7A5F)", fontSize: 15 }}>
-              F
-            </div>
-            <span className="font-extrabold text-primary" style={{ fontSize: 20, letterSpacing: -0.5 }}>
-              File<span className="text-accent">BRSR</span>
-            </span>
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo.svg" alt="fileBRSR" width={160} height={40} priority />
           </Link>
 
           {/* Desktop nav */}
