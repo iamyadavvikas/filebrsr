@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
 // Vercel Hobby plan max is 60s
 export const maxDuration = 60;
 
