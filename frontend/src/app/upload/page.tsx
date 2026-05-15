@@ -74,8 +74,6 @@ export default function UploadPage() {
 
       const data = await res.json();
 
-      const data = await res.json();
-
       if (data.status === "failed") {
         setError(data.error || "Extraction failed");
         setUploading(false);
