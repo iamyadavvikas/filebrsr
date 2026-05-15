@@ -57,9 +57,8 @@ export default function UploadPage() {
     try {
       setProgress("AI is analyzing your report...");
 
-      // Call backend directly to avoid Vercel's 4.5MB body limit
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://filebrsr-api.onrender.com";
-      const res = await fetch(`${backendUrl}/api/guest-extract`, {
+      // Proxy through Vercel rewrite to avoid Zscaler/corporate network blocking
+      const res = await fetch("/backend/api/guest-extract", {
         method: "POST",
         body: formData,
       });
