@@ -67,7 +67,7 @@ export default function Navbar({ user }: { user?: { email: string } | null }) {
                 </Link>
                 <Link
                   href="/signup"
-                  className="text-white text-sm font-semibold transition-colors"
+                  className="text-white text-sm font-semibold btn-primary"
                   style={{ padding: "8px 22px", borderRadius: 10, background: "#1B4D3E" }}
                 >
                   Try Free →
