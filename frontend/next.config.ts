@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
     },
     proxyClientMaxBodySize: "50mb",
   },
+  async rewrites() {
+    return [
+      {
+        source: "/backend/:path*",
+        destination: "http://localhost:8000/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
