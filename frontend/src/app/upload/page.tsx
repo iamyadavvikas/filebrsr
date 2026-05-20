@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { Loader2, FileText, Upload, CheckCircle2, AlertCircle } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -12,8 +13,20 @@ export default function UploadPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [user, setUser] = useState<{ email: string } | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user ? { email: user.email ?? "" } : null);
+      setAuthChecked(true);
+    };
+    checkUser();
+  }, []);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -49,6 +62,12 @@ export default function UploadPage() {
 
   const handleUpload = async () => {
     if (!file) return;
+
+    // Require login before extraction
+    if (!user) {
+      router.push("/login");
+      return;
+    }
 
     setUploading(true);
     setError("");

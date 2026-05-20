@@ -10,16 +10,11 @@ export default function Navbar({ user }: { user?: { email: string } | null }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
-  const navLinks = user
-    ? [
-        { href: "/dashboard", label: "Dashboard" },
-        { href: "/upload", label: "Extract" },
-        { href: "/pricing", label: "Pricing" },
-      ]
-    : [
-        { href: "/upload", label: "Extract" },
-        { href: "/pricing", label: "Pricing" },
-      ];
+  const navLinks = [
+    { href: "/upload", label: "Extract" },
+    { href: "/pricing", label: "Pricing" },
+    ...(user ? [{ href: "/dashboard", label: "Dashboard" }] : []),
+  ];
 
   const handleSignOut = async () => {
     await fetch("/api/auth/signout", { method: "POST" });
@@ -57,23 +52,7 @@ export default function Navbar({ user }: { user?: { email: string } | null }) {
                   Sign Out
                 </button>
               </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/login"
-                  className="text-sm font-medium text-muted hover:text-foreground transition-colors"
-                >
-                  Log In
-                </Link>
-                <Link
-                  href="/signup"
-                  className="text-white text-sm font-semibold btn-primary"
-                  style={{ padding: "8px 22px", borderRadius: 10, background: "#1B4D3E" }}
-                >
-                  Try Free →
-                </Link>
-              </div>
-            )}
+            ) : null}
           </div>
 
           {/* Mobile toggle */}
@@ -105,25 +84,7 @@ export default function Navbar({ user }: { user?: { email: string } | null }) {
               >
                 Sign Out
               </button>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  className="block py-2 text-sm font-medium text-muted hover:text-primary"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  Log In
-                </Link>
-                <Link
-                  href="/signup"
-                  className="block mt-2 px-4 py-2 bg-primary text-white text-sm font-semibold text-center"
-                  style={{ borderRadius: 10 }}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  Try Free →
-                </Link>
-              </>
-            )}
+            ) : null}
           </div>
         )}
       </div>
