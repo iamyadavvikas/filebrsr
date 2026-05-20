@@ -1,28 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
-import { signInWithGooglePopup } from "@/lib/google-auth";
 
 export default function SignupPage() {
   const [error, setError] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
-  const router = useRouter();
 
   const handleGoogleSignup = async () => {
     setError("");
     setGoogleLoading(true);
-    await signInWithGooglePopup(
-      () => {
-        router.push("/dashboard");
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
-      (msg) => {
-        setError(msg);
-        setGoogleLoading(false);
-      }
-    );
+    });
+    if (error) {
+      setError(error.message);
+      setGoogleLoading(false);
+    }
   };
 
   return (
