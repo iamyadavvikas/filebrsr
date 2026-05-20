@@ -17,10 +17,10 @@ interface PageProps {
 export default async function ResultsPage({ params }: PageProps) {
   const { id } = await params;
 
-  // Guest mode or inline results — render client component
+  // Guest mode or inline results — render interactive ESG dashboard
   if (id === "guest") {
-    const { GuestResults } = await import("./GuestResults");
-    return <GuestResults />;
+    const { ESGDashboard } = await import("./ESGDashboard");
+    return <ESGDashboard />;
   }
 
   const supabase = await createClient();
