@@ -115,12 +115,11 @@ export default function UploadPage() {
       setSuccess("Extraction complete! Redirecting...");
       setProgress("");
 
-      // If we got inline results, store and show on results page
+      // Store results and redirect to interactive dashboard
       if (data.results) {
         sessionStorage.setItem("guestResults", JSON.stringify(data.results));
-        const resultId = data.reportId || "guest";
         setTimeout(() => {
-          router.push(`/results/${resultId}`);
+          router.push("/results/guest");
         }, 1200);
       } else if (data.reportId) {
         // Fallback: redirect to report page (will show processing state)
