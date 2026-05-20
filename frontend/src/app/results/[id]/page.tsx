@@ -30,6 +30,12 @@ export default async function ResultsPage({ params }: PageProps) {
 
   if (!user) redirect("/login");
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, plan")
+    .eq("id", user.id)
+    .single();
+
   const { data: report } = await supabase
     .from("reports")
     .select("*")
@@ -132,7 +138,7 @@ export default async function ResultsPage({ params }: PageProps) {
 
   return (
     <>
-      <Navbar user={{ email: user.email! }} />
+      <Navbar user={{ email: user.email!, name: profile?.full_name || user.user_metadata?.full_name || "", plan: profile?.plan || "Free" }} />
       <main className="flex-1">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
