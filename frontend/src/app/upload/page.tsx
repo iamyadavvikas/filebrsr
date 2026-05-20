@@ -91,7 +91,7 @@ export default function UploadPage() {
     try {
       setProgress("AI is analyzing your report...");
 
-      const res = await fetch("/backend/api/guest-extract", {
+      const res = await fetch("/api/extract", {
         method: "POST",
         body: formData,
       });
@@ -116,10 +116,18 @@ export default function UploadPage() {
       setSuccess("Extraction complete! Redirecting...");
       setProgress("");
 
-      sessionStorage.setItem("guestResults", JSON.stringify(data));
-      setTimeout(() => {
-        router.push("/results/guest");
-      }, 1200);
+      // If we got inline results (guest/free flow), store and show
+      if (data.results) {
+        sessionStorage.setItem("guestResults", JSON.stringify(data.results));
+        setTimeout(() => {
+          router.push("/results/guest");
+        }, 1200);
+      } else if (data.reportId) {
+        // Authenticated flow - redirect to report page
+        setTimeout(() => {
+          router.push(`/results/${data.reportId}`);
+        }, 1200);
+      }
     } catch {
       setError("Network error. Please check your connection and try again.");
       setProgress("");

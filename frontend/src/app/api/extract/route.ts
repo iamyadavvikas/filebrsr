@@ -13,8 +13,12 @@ export async function POST(request: NextRequest) {
   // Allow guest usage for testing
   const userId = user?.id || "guest";
 
-  // Check user credits only for authenticated users
-  if (user) {
+  // Founder emails get unlimited access
+  const FOUNDER_EMAILS = ["ydvikasiitkgp@gmail.com"];
+  const isFounder = user && FOUNDER_EMAILS.includes(user.email || "");
+
+  // Check user credits only for authenticated non-founder users
+  if (user && !isFounder) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("credits_remaining, plan")
@@ -145,18 +149,20 @@ export async function POST(request: NextRequest) {
       },
     }).catch(console.error);
 
-    // Deduct credit
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("credits_remaining")
-      .eq("id", user.id)
-      .single();
-
-    if (profile) {
-      await supabase
+    // Deduct credit (skip for founders)
+    if (!isFounder) {
+      const { data: profile } = await supabase
         .from("profiles")
-        .update({ credits_remaining: profile.credits_remaining - 1 })
-        .eq("id", user.id);
+        .select("credits_remaining")
+        .eq("id", user.id)
+        .single();
+
+      if (profile) {
+        await supabase
+          .from("profiles")
+          .update({ credits_remaining: profile.credits_remaining - 1 })
+          .eq("id", user.id);
+      }
     }
 
     return NextResponse.json({

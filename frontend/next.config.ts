@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
@@ -11,7 +13,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/backend/:path*",
-        destination: "http://localhost:8000/:path*",
+        destination: `${backendUrl}/:path*`,
       },
     ];
   },
