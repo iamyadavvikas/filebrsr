@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   const userId = user?.id || "guest";
 
   // Founder emails get unlimited access
-  const FOUNDER_EMAILS = ["ydvikasiitkgp@gmail.com"];
+  const FOUNDER_EMAILS = ["ydvikasiitkgp@gmail.com", "ydvikas.iitkgp@gmail.com", "vkyadav.iitkgp@gmail.com", "vikaskashi896@gmail.com"];
   const isFounder = user && FOUNDER_EMAILS.includes(user.email || "");
 
   // Check user credits only for authenticated non-founder users
