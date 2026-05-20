@@ -47,7 +47,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <Navbar user={{ email: user.email! }} />
+      <Navbar user={{ email: user.email!, name: profile?.full_name || user.user_metadata?.full_name || "", plan: profile?.plan || "Free" }} />
       <main className="flex-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Stats cards */}
