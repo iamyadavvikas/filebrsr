@@ -17,7 +17,7 @@ interface PageProps {
 export default async function ResultsPage({ params }: PageProps) {
   const { id } = await params;
 
-  // Guest mode — render client component
+  // Guest mode or inline results — render client component
   if (id === "guest") {
     const { GuestResults } = await import("./GuestResults");
     return <GuestResults />;
