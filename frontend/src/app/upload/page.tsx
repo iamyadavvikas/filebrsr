@@ -145,10 +145,13 @@ export default function UploadPage() {
               Try it now — free
             </p>
             <h1 className="text-center" style={{ fontSize: 28, fontWeight: 800, marginBottom: 8, letterSpacing: -0.5 }}>
-              Extract BRSR metrics instantly
+              AI-Powered BRSR Metric{" "}
+              <span style={{ background: "linear-gradient(120deg, #E8B931 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                Extraction in 60s
+              </span>
             </h1>
             <p className="text-center text-muted" style={{ fontSize: 14, marginBottom: 40 }}>
-              Upload any sustainability report PDF. Results in ~60 seconds.
+              Upload any sustainability report PDF. AI extracts 216 SEBI data points automatically.
             </p>
 
             {/* Upload zone */}
