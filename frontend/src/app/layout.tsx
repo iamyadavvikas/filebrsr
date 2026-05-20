@@ -25,6 +25,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+        <script src="https://accounts.google.com/gsi/client" async />
         <script src="https://checkout.razorpay.com/v1/checkout.js" async />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
