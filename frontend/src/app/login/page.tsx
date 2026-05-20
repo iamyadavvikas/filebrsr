@@ -2,17 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const router = useRouter();
 
   const handleGoogleLogin = async () => {
     setError("");
@@ -30,27 +25,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
-
-    router.push("/dashboard");
-    router.refresh();
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md">
@@ -65,17 +39,22 @@ export default function LoginPage() {
             Welcome back
           </h1>
           <p className="mt-2 text-sm text-muted">
-            Sign in to your account to continue
+            Sign in with your Google account to continue
           </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-border p-8">
-          {/* Google OAuth */}
+          {error && (
+            <div className="p-3 mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+              {error}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={handleGoogleLogin}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 py-2.5 border border-border rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium text-sm"
+            className="w-full flex items-center justify-center gap-3 py-3 border border-border rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium text-sm"
           >
             {googleLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -90,69 +69,9 @@ export default function LoginPage() {
             Continue with Google
           </button>
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border"></div>
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-3 text-muted">or sign in with email</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-5">
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-foreground mb-1.5"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-colors"
-                placeholder="you@company.com"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-foreground mb-1.5"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-colors"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-              style={{ borderRadius: 12, background: "linear-gradient(135deg, #1B4D3E, #2D7A5F)" }}
-            >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              Sign In
-            </button>
-          </form>
+          <p className="mt-4 text-center text-xs text-muted">
+            By signing in, you agree to our Terms of Service and Privacy Policy.
+          </p>
         </div>
 
         <p className="mt-6 text-center text-sm text-muted">
