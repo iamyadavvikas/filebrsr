@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 // Vercel Hobby plan max is 60s
 export const maxDuration = 60;
 
+// Admin client that bypasses RLS (for server-side DB operations)
+function getAdminClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
+  const adminDb = getAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -19,7 +29,7 @@ export async function POST(request: NextRequest) {
 
   // Check user credits only for authenticated non-founder users
   if (user && !isFounder) {
-    const { data: profile } = await supabase
+    const { data: profile } = await adminDb
       .from("profiles")
       .select("credits_remaining, plan")
       .eq("id", user.id)
@@ -102,19 +112,20 @@ export async function POST(request: NextRequest) {
 
     // Upload to Supabase Storage
     const fileName = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await adminDb.storage
       .from("brsr-reports")
       .upload(fileName, file);
 
     if (uploadError) {
+      console.error("Upload error:", uploadError);
       return NextResponse.json(
         { error: "Failed to upload file" },
         { status: 500 }
       );
     }
 
-    // Create report record
-    const { data: report, error: reportError } = await supabase
+    // Create report record (use admin client to bypass RLS)
+    const { data: report, error: reportError } = await adminDb
       .from("reports")
       .insert({
         user_id: user.id,
@@ -126,6 +137,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (reportError) {
+      console.error("Report insert error:", reportError);
       return NextResponse.json(
         { error: "Failed to create report" },
         { status: 500 }
@@ -151,14 +163,14 @@ export async function POST(request: NextRequest) {
 
     // Deduct credit (skip for founders)
     if (!isFounder) {
-      const { data: profile } = await supabase
+      const { data: profile } = await adminDb
         .from("profiles")
         .select("credits_remaining")
         .eq("id", user.id)
         .single();
 
       if (profile) {
-        await supabase
+        await adminDb
           .from("profiles")
           .update({ credits_remaining: profile.credits_remaining - 1 })
           .eq("id", user.id);
