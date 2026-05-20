@@ -17,6 +17,7 @@ from app.nifty50_benchmarks import (
 )
 from app.billing import router as billing_router
 from app.pdf_generator import generate_compliance_pdf
+from app.router_v2 import router as v2_router
 
 app = FastAPI(title="FileBRSR Extraction API", version="2.0.0")
 
@@ -24,6 +25,7 @@ settings = get_settings()
 
 # Register routers
 app.include_router(billing_router)
+app.include_router(v2_router)
 
 app.add_middleware(
     CORSMiddleware,
