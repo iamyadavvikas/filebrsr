@@ -68,9 +68,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Warm up the backend (Render free tier cold start)
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+    await fetch(`${backendUrl}/docs`, { signal: AbortSignal.timeout(10000) }).catch(() => {});
+
     // For guest users, send directly to backend and return inline results
     if (!user) {
-      const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
       const backendForm = new FormData();
       backendForm.append("file", file);
       backendForm.append("report_id", "guest");
@@ -82,7 +85,7 @@ export async function POST(request: NextRequest) {
         headers: {
           Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
         },
-        signal: AbortSignal.timeout(120000), // 120s timeout for large PDFs
+        signal: AbortSignal.timeout(50000), // 50s (Vercel max is 60s)
       });
 
       if (!backendRes.ok) {
@@ -145,8 +148,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Send to FastAPI backend for extraction (await response)
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
-
     const backendForm = new FormData();
     backendForm.append("file", file);
     backendForm.append("report_id", report.id);
