@@ -2,18 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
 export default function SignupPage() {
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const router = useRouter();
 
   const handleGoogleSignup = async () => {
     setError("");
@@ -29,36 +23,6 @@ export default function SignupPage() {
       setError(error.message);
       setGoogleLoading(false);
     }
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      setLoading(false);
-      return;
-    }
-
-    const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-      },
-    });
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
-
-    router.push("/dashboard");
-    router.refresh();
   };
 
   return (
@@ -80,12 +44,17 @@ export default function SignupPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-border p-8">
-          {/* Google OAuth */}
+          {error && (
+            <div className="p-3 mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
+              {error}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={handleGoogleSignup}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 py-2.5 border border-border rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium text-sm"
+            className="w-full flex items-center justify-center gap-3 py-3 border border-border rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium text-sm"
           >
             {googleLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -97,91 +66,12 @@ export default function SignupPage() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
             )}
-            Continue with Google
+            Sign up with Google
           </button>
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border"></div>
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-3 text-muted">or sign up with email</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleSignup} className="space-y-5">
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-foreground mb-1.5"
-              >
-                Full Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-colors"
-                placeholder="Your full name"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-foreground mb-1.5"
-              >
-                Work Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-colors"
-                placeholder="you@company.com"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-foreground mb-1.5"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-colors"
-                placeholder="Min 8 characters"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-              style={{ borderRadius: 12, background: "linear-gradient(135deg, #1B4D3E, #2D7A5F)" }}
-            >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              Create Account
-            </button>
-          </form>
+          <p className="mt-4 text-center text-xs text-muted">
+            By signing up, you agree to our Terms of Service and Privacy Policy.
+          </p>
         </div>
 
         <p className="mt-6 text-center text-sm text-muted">
