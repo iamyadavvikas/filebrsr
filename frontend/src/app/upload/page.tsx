@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { Loader2, FileText, Upload, CheckCircle2, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { signInWithGooglePopup } from "@/lib/google-auth";
-
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -31,15 +29,13 @@ export default function UploadPage() {
   }, []);
 
   const handleGoogleSignIn = async () => {
-    await signInWithGooglePopup(
-      () => {
-        // Refresh to pick up the new session
-        window.location.reload();
+    const supabase = createClient();
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=/upload`,
       },
-      (msg) => {
-        setError(msg);
-      }
-    );
+    });
   };
 
   const handleDrag = useCallback((e: React.DragEvent) => {
