@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send to FastAPI backend for extraction (server-side, no key exposure)
+    // Send to FastAPI backend for extraction (await response)
     const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
 
     const backendForm = new FormData();
@@ -152,35 +152,89 @@ export async function POST(request: NextRequest) {
     backendForm.append("report_id", report.id);
     backendForm.append("user_id", user.id);
 
-    // Fire and forget — backend will update Supabase directly
-    fetch(`${backendUrl}/api/extract`, {
-      method: "POST",
-      body: backendForm,
-      headers: {
-        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    }).catch(console.error);
+    try {
+      const backendRes = await fetch(`${backendUrl}/api/extract`, {
+        method: "POST",
+        body: backendForm,
+        headers: {
+          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        signal: AbortSignal.timeout(55000), // 55s (Vercel limit is 60s)
+      });
 
-    // Deduct credit (skip for founders)
-    if (!isFounder) {
-      const { data: profile } = await adminDb
-        .from("profiles")
-        .select("credits_remaining")
-        .eq("id", user.id)
-        .single();
-
-      if (profile) {
+      if (!backendRes.ok) {
+        console.error("Backend extraction failed:", backendRes.status);
+        // Mark report as failed
         await adminDb
-          .from("profiles")
-          .update({ credits_remaining: profile.credits_remaining - 1 })
-          .eq("id", user.id);
+          .from("reports")
+          .update({ status: "failed" })
+          .eq("id", report.id);
+        return NextResponse.json(
+          { error: "Extraction service unavailable. Please try again." },
+          { status: 502 }
+        );
       }
-    }
 
-    return NextResponse.json({
-      reportId: report.id,
-      message: "File uploaded. Processing will take 1-2 minutes.",
-    });
+      const backendData = await backendRes.json();
+
+      if (backendData.status === "failed") {
+        await adminDb
+          .from("reports")
+          .update({ status: "failed" })
+          .eq("id", report.id);
+        return NextResponse.json(
+          { error: backendData.error || "Extraction failed" },
+          { status: 422 }
+        );
+      }
+
+      // Backend already updates the report in Supabase, but let's return results inline too
+      // so the frontend can show them immediately
+      // Deduct credit (skip for founders)
+      if (!isFounder) {
+        const { data: profile } = await adminDb
+          .from("profiles")
+          .select("credits_remaining")
+          .eq("id", user.id)
+          .single();
+
+        if (profile) {
+          await adminDb
+            .from("profiles")
+            .update({ credits_remaining: profile.credits_remaining - 1 })
+            .eq("id", user.id);
+        }
+      }
+
+      return NextResponse.json({
+        reportId: report.id,
+        message: "Extraction complete!",
+        results: backendData,
+      });
+    } catch (fetchErr) {
+      console.error("Backend fetch error:", fetchErr);
+      // On timeout or network error, the report stays as "processing"
+      // Still deduct credit since we've already uploaded the file
+      if (!isFounder) {
+        const { data: profile } = await adminDb
+          .from("profiles")
+          .select("credits_remaining")
+          .eq("id", user.id)
+          .single();
+
+        if (profile) {
+          await adminDb
+            .from("profiles")
+            .update({ credits_remaining: profile.credits_remaining - 1 })
+            .eq("id", user.id);
+        }
+      }
+
+      return NextResponse.json({
+        reportId: report.id,
+        message: "File uploaded. Processing may take longer — check your dashboard.",
+      });
+    }
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

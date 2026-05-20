@@ -115,14 +115,15 @@ export default function UploadPage() {
       setSuccess("Extraction complete! Redirecting...");
       setProgress("");
 
-      // If we got inline results (guest/free flow), store and show
+      // If we got inline results, store and show on results page
       if (data.results) {
         sessionStorage.setItem("guestResults", JSON.stringify(data.results));
+        const resultId = data.reportId || "guest";
         setTimeout(() => {
-          router.push("/results/guest");
+          router.push(`/results/${resultId}`);
         }, 1200);
       } else if (data.reportId) {
-        // Authenticated flow - redirect to report page
+        // Fallback: redirect to report page (will show processing state)
         setTimeout(() => {
           router.push(`/results/${data.reportId}`);
         }, 1200);
