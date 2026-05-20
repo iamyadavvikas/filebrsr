@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { Menu, X, ChevronDown, User, CreditCard, LogOut } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 interface NavUser {
   email: string;
@@ -12,11 +13,35 @@ interface NavUser {
   plan?: string;
 }
 
-export default function Navbar({ user }: { user?: NavUser | null }) {
+export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [user, setUser] = useState<NavUser | null>(userProp || null);
+  const [authLoaded, setAuthLoaded] = useState(!!userProp);
   const profileRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+
+  // Auto-detect auth if no user prop passed
+  useEffect(() => {
+    if (userProp) {
+      setUser(userProp);
+      setAuthLoaded(true);
+      return;
+    }
+    const loadUser = async () => {
+      const supabase = createClient();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        setUser({
+          email: authUser.email ?? "",
+          name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || "",
+          plan: "Free",
+        });
+      }
+      setAuthLoaded(true);
+    };
+    loadUser();
+  }, [userProp]);
 
   const navLinks = [
     { href: "/upload", label: "Extract" },
@@ -149,6 +174,14 @@ export default function Navbar({ user }: { user?: NavUser | null }) {
                   </div>
                 )}
               </div>
+            ) : authLoaded ? (
+              <Link
+                href="/login"
+                className="text-white text-sm font-semibold"
+                style={{ padding: "8px 20px", borderRadius: 10, background: "#1B4D3E" }}
+              >
+                Log In
+              </Link>
             ) : null}
           </div>
 
@@ -203,6 +236,15 @@ export default function Navbar({ user }: { user?: NavUser | null }) {
                   Sign Out
                 </button>
               </>
+            ) : authLoaded ? (
+              <Link
+                href="/login"
+                className="block mt-2 px-4 py-2 bg-primary text-white text-sm font-semibold text-center"
+                style={{ borderRadius: 10, background: "#1B4D3E" }}
+                onClick={() => setMobileOpen(false)}
+              >
+                Log In
+              </Link>
             ) : null}
           </div>
         )}
