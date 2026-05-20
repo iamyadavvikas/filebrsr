@@ -210,28 +210,58 @@ export default function UploadPage() {
             </div>
 
             {/* Extract button */}
-            {file && !success && (
+            {file && !success && !uploading && (
               <button
                 onClick={handleUpload}
                 disabled={uploading}
                 className="flex items-center justify-center gap-2 w-full btn-primary"
                 style={{
                   padding: "14px 0", borderRadius: 12, border: "none",
-                  background: uploading ? "#94A3B8" : "#1B4D3E",
+                  background: "#1B4D3E",
                   color: "white", fontSize: 15, fontWeight: 700,
-                  cursor: uploading ? "default" : "pointer",
+                  cursor: "pointer",
                   marginBottom: 16,
                 }}
               >
-                {uploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {progress}
-                  </>
-                ) : (
-                  "Extract BRSR Metrics"
-                )}
+                Extract BRSR Metrics
               </button>
+            )}
+
+            {/* AI Extraction Progress Indicator */}
+            {uploading && (
+              <div style={{ background: "linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 50%, #F0FDFA 100%)", border: "1px solid #A7F3D0", borderRadius: 16, padding: "32px 24px", marginBottom: 16, textAlign: "center", position: "relative", overflow: "hidden" }}>
+                {/* Animated gradient sweep */}
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, transparent, rgba(27,77,62,0.05), transparent)", animation: "sweep 2s ease-in-out infinite" }} />
+                
+                <div style={{ position: "relative" }}>
+                  <div className="flex justify-center mb-4">
+                    <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg, #1B4D3E, #2D7A5F)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 20px rgba(27,77,62,0.3)", animation: "pulse 2s ease-in-out infinite" }}>
+                      <Loader2 className="w-7 h-7 text-white animate-spin" />
+                    </div>
+                  </div>
+                  
+                  <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#059669", marginBottom: 8 }}>
+                    AI-Powered
+                  </p>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, color: "#1B4D3E", marginBottom: 4, letterSpacing: -0.5 }}>
+                    BRSR Metric{" "}
+                    <span style={{ background: "linear-gradient(120deg, #E8B931 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                      Extraction
+                    </span>
+                  </h2>
+                  <p style={{ fontSize: 13, color: "#6B7280", marginTop: 8 }}>
+                    {progress || "Analyzing 216 SEBI BRSR data points..."}
+                  </p>
+                  
+                  {/* Progress bar */}
+                  <div style={{ marginTop: 20, height: 4, borderRadius: 4, background: "#E5E7EB", overflow: "hidden" }}>
+                    <div style={{ height: "100%", borderRadius: 4, background: "linear-gradient(90deg, #1B4D3E, #2D7A5F, #059669)", animation: "progress 60s linear forwards", width: "0%" }} />
+                  </div>
+                  <p style={{ fontSize: 11, color: "#9CA3AF", marginTop: 8 }}>
+                    Usually completes in ~60 seconds
+                  </p>
+                </div>
+              </div>
             )}
 
             {/* Auth prompt - shown when user tries to extract without login */}

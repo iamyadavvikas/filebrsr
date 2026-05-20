@@ -110,3 +110,19 @@ html {
   animation: shimmer 1.5s infinite;
   background-size: 200% 100%;
 }
+
+/* AI Extraction animations */
+@keyframes sweep {
+  0%, 100% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+}
+
+@keyframes progress {
+  0% { width: 0%; }
+  10% { width: 15%; }
+  30% { width: 40%; }
+  50% { width: 60%; }
+  70% { width: 75%; }
+  90% { width: 88%; }
+  100% { width: 95%; }
+}
