@@ -130,7 +130,7 @@ export default function UploadPage() {
         return;
       }
 
-      setSuccess("Extraction complete! Redirecting...");
+      setSuccess(data.results ? "Extraction complete! Redirecting..." : "Report submitted! Redirecting...");
       setProgress("");
 
       // Store results and redirect to interactive dashboard
