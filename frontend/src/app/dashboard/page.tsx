@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
 import {
@@ -11,6 +12,13 @@ import {
   CreditCard,
 } from "lucide-react";
 
+function getAdminClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
@@ -19,13 +27,16 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
+  // Use admin client to bypass RLS issues
+  const adminDb = getAdminClient();
+
+  const { data: profile } = await adminDb
     .from("profiles")
     .select("*")
     .eq("id", user.id)
     .single();
 
-  const { data: reports } = await supabase
+  const { data: reports } = await adminDb
     .from("reports")
     .select("*")
     .eq("user_id", user.id)

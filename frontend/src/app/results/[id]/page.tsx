@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
 import ProcessingPoller from "./ProcessingPoller";
@@ -10,6 +11,13 @@ import {
   Clock,
   XCircle,
 } from "lucide-react";
+
+function getAdminClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -31,13 +39,16 @@ export default async function ResultsPage({ params }: PageProps) {
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
+  // Use admin client to bypass RLS (we verify ownership via user_id filter)
+  const adminDb = getAdminClient();
+
+  const { data: profile } = await adminDb
     .from("profiles")
     .select("full_name, plan")
     .eq("id", user.id)
     .single();
 
-  const { data: report } = await supabase
+  const { data: report } = await adminDb
     .from("reports")
     .select("*")
     .eq("id", id)
