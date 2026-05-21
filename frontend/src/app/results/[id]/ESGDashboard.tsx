@@ -753,12 +753,12 @@ function SectionPanel({
       {/* Section Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-emerald-50">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-emerald-50">
             <Icon className="w-5 h-5 text-emerald-700" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-foreground">{sectionMeta?.name}</h2>
-            <p className="text-xs text-muted">{entries.length} datapoints • {disclosed.length} disclosed • {missing.length} gaps</p>
+            <h2 className="text-lg font-bold text-foreground">{sectionMeta?.name}</h2>
+            <p className="text-sm text-muted">{entries.length} datapoints • {disclosed.length} disclosed • {missing.length} gaps</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -782,19 +782,19 @@ function SectionPanel({
           {displayEntries.map(([key, value], idx) => {
             const isDisclosed = value && value !== "N/A" && value !== "Not disclosed";
             return (
-              <div key={key} className={`px-5 py-3 flex items-start gap-4 ${idx % 2 === 0 ? "bg-card" : "bg-surface"}`}>
+              <div key={key} className={`px-5 py-3.5 flex items-start gap-4 ${idx % 2 === 0 ? "bg-card" : "bg-surface"}`}>
                 <div className="mt-0.5">
                   {isDisclosed ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500" />
                   ) : (
-                    <XCircle className="w-4 h-4 text-red-400" />
+                    <XCircle className="w-4.5 h-4.5 text-red-400" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-muted">
+                  <p className="text-sm font-semibold text-muted">
                     {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                   </p>
-                  <p className={`text-sm mt-0.5 ${isDisclosed ? "text-foreground font-medium" : "text-red-400 italic"}`}>
+                  <p className={`text-base mt-0.5 ${isDisclosed ? "text-foreground font-medium" : "text-red-400 italic"}`}>
                     {isDisclosed ? String(value) : "Not disclosed"}
                   </p>
                 </div>
@@ -1097,12 +1097,12 @@ function GapsPanel({
               <table className="w-full">
                 <thead className="bg-surface sticky top-0 z-10">
                   <tr>
-                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-8">Status</th>
-                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-16">ID</th>
-                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase">Datapoint</th>
-                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-20">Type</th>
-                    <th className="text-center py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-14">Core</th>
-                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-28">ESRS Ref</th>
+                    <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase w-8">Status</th>
+                    <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase w-20">ID</th>
+                    <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase">Datapoint</th>
+                    <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase w-24">Type</th>
+                    <th className="text-center py-3 px-4 text-xs font-bold text-muted-light uppercase w-16">Core</th>
+                    <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase w-32">ESRS Ref</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -1112,18 +1112,18 @@ function GapsPanel({
                       onClick={() => setSelectedDatapoint(dp)}
                       className={`cursor-pointer transition-colors ${dp.status === "found" ? "bg-emerald-50/60 hover:bg-emerald-100/80" : "bg-red-50/40 hover:bg-red-100/60"}`}
                     >
-                      <td className="py-2.5 px-4">
-                        {dp.status === "found" ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-red-500" />}
+                      <td className="py-3 px-4">
+                        {dp.status === "found" ? <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600" /> : <XCircle className="w-4.5 h-4.5 text-red-500" />}
                       </td>
-                      <td className="py-2.5 px-4 text-[11px] font-mono text-muted font-semibold">{dp.id}</td>
-                      <td className="py-2.5 px-4 text-[11px] text-foreground font-medium">{dp.label}</td>
-                      <td className="py-2.5 px-4">
-                        <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
+                      <td className="py-3 px-4 text-sm font-mono text-muted font-semibold">{dp.id}</td>
+                      <td className="py-3 px-4 text-sm text-foreground font-medium">{dp.label}</td>
+                      <td className="py-3 px-4">
+                        <span className="text-[11px] px-2 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
                       </td>
-                      <td className="py-2.5 px-4 text-center">
-                        {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
+                      <td className="py-3 px-4 text-center">
+                        {dp.core && <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
                       </td>
-                      <td className="py-2.5 px-4 text-[10px] text-muted">{dp.esrs_ref || "—"}</td>
+                      <td className="py-3 px-4 text-xs text-muted">{dp.esrs_ref || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1475,12 +1475,12 @@ function PrinciplesPanel({
             <table className="w-full">
               <thead className="bg-surface sticky top-0 z-10">
                 <tr>
-                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-8">Status</th>
-                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-16">ID</th>
-                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase">Datapoint</th>
-                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-20">Type</th>
-                  <th className="text-center py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-14">Core</th>
-                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-28">ESRS Ref</th>
+                  <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase w-8">Status</th>
+                  <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase w-20">ID</th>
+                  <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase">Datapoint</th>
+                  <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase w-24">Type</th>
+                  <th className="text-center py-3 px-4 text-xs font-bold text-muted-light uppercase w-16">Core</th>
+                  <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase w-32">ESRS Ref</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -1490,18 +1490,18 @@ function PrinciplesPanel({
                     onClick={() => setSelectedDp(dp)}
                     className={`cursor-pointer transition-colors ${dp.status === "found" ? "bg-emerald-50/60 hover:bg-emerald-100/80" : "bg-red-50/40 hover:bg-red-100/60"}`}
                   >
-                    <td className="py-2.5 px-4">
-                      {dp.status === "found" ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-red-500" />}
+                    <td className="py-3 px-4">
+                      {dp.status === "found" ? <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600" /> : <XCircle className="w-4.5 h-4.5 text-red-500" />}
                     </td>
-                    <td className="py-2.5 px-4 text-[11px] font-mono text-muted font-semibold">{dp.id}</td>
-                    <td className="py-2.5 px-4 text-[11px] text-foreground font-medium">{dp.label}</td>
-                    <td className="py-2.5 px-4">
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
+                    <td className="py-3 px-4 text-sm font-mono text-muted font-semibold">{dp.id}</td>
+                    <td className="py-3 px-4 text-sm text-foreground font-medium">{dp.label}</td>
+                    <td className="py-3 px-4">
+                      <span className="text-[11px] px-2 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
                     </td>
-                    <td className="py-2.5 px-4 text-center">
-                      {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
+                    <td className="py-3 px-4 text-center">
+                      {dp.core && <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
                     </td>
-                    <td className="py-2.5 px-4 text-[10px] text-muted">{dp.esrs_ref || "—"}</td>
+                    <td className="py-3 px-4 text-xs text-muted">{dp.esrs_ref || "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1569,9 +1569,9 @@ function PrinciplesPanel({
       <div className="bg-card rounded-xl border border-border p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-base font-bold text-foreground">NGRBC Principles — Overview</h2>
-            <p className="text-xs text-muted mt-0.5">9 Principles • {totalDatapoints} datapoints • {totalFound} disclosed • {totalMissing} gaps</p>
-            <p className="text-[10px] text-muted-light mt-1">Click any principle to see its datapoints →</p>
+            <h2 className="text-lg font-bold text-foreground">NGRBC Principles — Overview</h2>
+            <p className="text-sm text-muted mt-0.5">9 Principles • {totalDatapoints} datapoints • {totalFound} disclosed • {totalMissing} gaps</p>
+            <p className="text-xs text-muted-light mt-1">Click any principle to see its datapoints →</p>
           </div>
           <div className="flex items-center gap-3">
             <ScoreCircle value={totalDatapoints > 0 ? Math.round((totalFound / totalDatapoints) * 100) : 0} label="Coverage" size={60} />
@@ -1628,19 +1628,19 @@ function PrinciplesPanel({
               className="w-full bg-card rounded-xl border border-border overflow-hidden transition-all hover:shadow-md hover:border-emerald-200"
             >
               <div className="flex items-center gap-4 px-5 py-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${p.color}15` }}>
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${p.color}15` }}>
                   <Icon className="w-5 h-5" style={{ color: p.color }} />
                 </div>
                 <div className="flex-1 text-left">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-muted-light">{p.short}</span>
-                    <span className="text-sm font-bold text-foreground">{p.name}</span>
+                    <span className="text-sm font-black text-muted-light">{p.short}</span>
+                    <span className="text-base font-bold text-foreground">{p.name}</span>
                   </div>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[10px] text-muted">{p.total} datapoints</span>
-                    <span className="text-[10px] text-emerald-600 font-semibold">{p.found} ✓</span>
-                    <span className="text-[10px] text-red-500 font-semibold">{p.missing} ✗</span>
-                    {p.coreCount > 0 && <span className="text-[10px] text-blue-600">Core: {p.coreFound}/{p.coreCount}</span>}
+                    <span className="text-xs text-muted">{p.total} datapoints</span>
+                    <span className="text-xs text-emerald-600 font-semibold">{p.found} ✓</span>
+                    <span className="text-xs text-red-500 font-semibold">{p.missing} ✗</span>
+                    {p.coreCount > 0 && <span className="text-xs text-blue-600">Core: {p.coreFound}/{p.coreCount}</span>}
                   </div>
                 </div>
                 <div className="hidden sm:flex items-center gap-3">
