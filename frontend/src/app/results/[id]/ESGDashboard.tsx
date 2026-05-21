@@ -1089,23 +1089,23 @@ function GapsPanel({
                   </button>
                 ))}
               </div>
-              <span className="text-[10px] text-gray-400 ml-auto">{filteredManifest.length} results</span>
+              <span className="text-[10px] text-muted-light ml-auto">{filteredManifest.length} results</span>
             </div>
 
             {/* Datapoints list */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden max-h-[600px] overflow-y-auto">
+            <div className="bg-card rounded-xl border border-border overflow-hidden max-h-[600px] overflow-y-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 sticky top-0 z-10">
+                <thead className="bg-surface sticky top-0 z-10">
                   <tr>
-                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-8">Status</th>
-                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-16">ID</th>
-                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase">Datapoint</th>
-                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-20">Type</th>
-                    <th className="text-center py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-14">Core</th>
-                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-28">ESRS Ref</th>
+                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-8">Status</th>
+                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-16">ID</th>
+                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase">Datapoint</th>
+                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-20">Type</th>
+                    <th className="text-center py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-14">Core</th>
+                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-28">ESRS Ref</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border">
                   {filteredManifest.map((dp) => (
                     <tr
                       key={dp.id}
@@ -1115,21 +1115,21 @@ function GapsPanel({
                       <td className="py-2.5 px-4">
                         {dp.status === "found" ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-red-500" />}
                       </td>
-                      <td className="py-2.5 px-4 text-[11px] font-mono text-gray-600 font-semibold">{dp.id}</td>
-                      <td className="py-2.5 px-4 text-[11px] text-gray-800 font-medium">{dp.label}</td>
+                      <td className="py-2.5 px-4 text-[11px] font-mono text-muted font-semibold">{dp.id}</td>
+                      <td className="py-2.5 px-4 text-[11px] text-foreground font-medium">{dp.label}</td>
                       <td className="py-2.5 px-4">
                         <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
                       </td>
                       <td className="py-2.5 px-4 text-center">
                         {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
                       </td>
-                      <td className="py-2.5 px-4 text-[10px] text-gray-500">{dp.esrs_ref || "—"}</td>
+                      <td className="py-2.5 px-4 text-[10px] text-muted">{dp.esrs_ref || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {filteredManifest.length === 0 && (
-                <div className="py-12 text-center text-gray-400 text-sm">No datapoints match the current filters</div>
+                <div className="py-12 text-center text-muted text-sm">No datapoints match the current filters</div>
               )}
             </div>
           </div>
@@ -1168,39 +1168,39 @@ function GapsPanel({
       {/* ── Datapoint Detail Modal (like stock detail panel) ── */}
       {selectedDatapoint && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setSelectedDatapoint(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ background: selectedDatapoint.status === "found" ? "#F0FDF4" : "#FEF2F2" }}>
+          <div className="bg-card rounded-2xl shadow-2xl border border-border w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-emerald-50" style={{ background: selectedDatapoint.status === "found" ? undefined : undefined }}>
               <div className="flex items-center gap-2">
                 {selectedDatapoint.status === "found" ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <XCircle className="w-5 h-5 text-red-500" />}
-                <span className="text-xs font-bold" style={{ color: selectedDatapoint.status === "found" ? "#166534" : "#991B1B" }}>
+                <span className="text-xs font-bold" style={{ color: selectedDatapoint.status === "found" ? "var(--success)" : "#EF4444" }}>
                   {selectedDatapoint.status === "found" ? "DISCLOSED" : "NOT DISCLOSED"}
                 </span>
               </div>
-              <button onClick={() => setSelectedDatapoint(null)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setSelectedDatapoint(null)} className="text-muted hover:text-foreground">
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
               <div>
-                <p className="text-xs font-mono text-gray-400">{selectedDatapoint.id}</p>
-                <h3 className="text-base font-bold text-gray-900 mt-1">{selectedDatapoint.label}</h3>
+                <p className="text-xs font-mono text-muted-light">{selectedDatapoint.id}</p>
+                <h3 className="text-base font-bold text-foreground mt-1">{selectedDatapoint.label}</h3>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Data Type</p>
-                  <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDatapoint.data_type}</p>
+                <div className="bg-surface rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-muted-light uppercase">Data Type</p>
+                  <p className="text-sm font-semibold text-foreground mt-0.5 capitalize">{selectedDatapoint.data_type}</p>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Section</p>
-                  <p className="text-sm font-semibold text-gray-800 mt-0.5">{selectedDatapoint.section.replace("section_", "Section ").toUpperCase()}</p>
+                <div className="bg-surface rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-muted-light uppercase">Section</p>
+                  <p className="text-sm font-semibold text-foreground mt-0.5">{selectedDatapoint.section.replace("section_", "Section ").toUpperCase()}</p>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Indicator</p>
-                  <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDatapoint.indicator_type}</p>
+                <div className="bg-surface rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-muted-light uppercase">Indicator</p>
+                  <p className="text-sm font-semibold text-foreground mt-0.5 capitalize">{selectedDatapoint.indicator_type}</p>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Paragraph</p>
-                  <p className="text-sm font-semibold text-gray-800 mt-0.5">{selectedDatapoint.paragraph_ref}</p>
+                <div className="bg-surface rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-muted-light uppercase">Paragraph</p>
+                  <p className="text-sm font-semibold text-foreground mt-0.5">{selectedDatapoint.paragraph_ref}</p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1470,20 +1470,20 @@ function PrinciplesPanel({
         </div>
 
         {/* Datapoints Table */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="max-h-[500px] overflow-y-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 sticky top-0 z-10">
+              <thead className="bg-surface sticky top-0 z-10">
                 <tr>
-                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-8">Status</th>
-                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-16">ID</th>
-                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase">Datapoint</th>
-                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-20">Type</th>
-                  <th className="text-center py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-14">Core</th>
-                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-28">ESRS Ref</th>
+                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-8">Status</th>
+                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-16">ID</th>
+                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase">Datapoint</th>
+                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-20">Type</th>
+                  <th className="text-center py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-14">Core</th>
+                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-muted-light uppercase w-28">ESRS Ref</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-border">
                 {filteredDps.map((dp) => (
                   <tr
                     key={dp.id}
@@ -1493,21 +1493,21 @@ function PrinciplesPanel({
                     <td className="py-2.5 px-4">
                       {dp.status === "found" ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-red-500" />}
                     </td>
-                    <td className="py-2.5 px-4 text-[11px] font-mono text-gray-600 font-semibold">{dp.id}</td>
-                    <td className="py-2.5 px-4 text-[11px] text-gray-800 font-medium">{dp.label}</td>
+                    <td className="py-2.5 px-4 text-[11px] font-mono text-muted font-semibold">{dp.id}</td>
+                    <td className="py-2.5 px-4 text-[11px] text-foreground font-medium">{dp.label}</td>
                     <td className="py-2.5 px-4">
                       <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
                     </td>
                     <td className="py-2.5 px-4 text-center">
                       {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
                     </td>
-                    <td className="py-2.5 px-4 text-[10px] text-gray-500">{dp.esrs_ref || "—"}</td>
+                    <td className="py-2.5 px-4 text-[10px] text-muted">{dp.esrs_ref || "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {filteredDps.length === 0 && (
-              <div className="py-12 text-center text-gray-400 text-sm">No datapoints match the current filters</div>
+              <div className="py-12 text-center text-muted text-sm">No datapoints match the current filters</div>
             )}
           </div>
         </div>
@@ -1515,37 +1515,37 @@ function PrinciplesPanel({
         {/* Datapoint Detail Modal */}
         {selectedDp && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setSelectedDp(null)}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ background: selectedDp.status === "found" ? "#F0FDF4" : "#FEF2F2" }}>
+            <div className="bg-card rounded-2xl shadow-2xl border border-border w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-emerald-50">
                 <div className="flex items-center gap-2">
                   {selectedDp.status === "found" ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <XCircle className="w-5 h-5 text-red-500" />}
-                  <span className="text-xs font-bold" style={{ color: selectedDp.status === "found" ? "#166534" : "#991B1B" }}>
+                  <span className="text-xs font-bold" style={{ color: selectedDp.status === "found" ? "var(--success)" : "#EF4444" }}>
                     {selectedDp.status === "found" ? "DISCLOSED" : "NOT DISCLOSED"}
                   </span>
                 </div>
-                <button onClick={() => setSelectedDp(null)} className="text-gray-400 hover:text-gray-600"><XCircle className="w-5 h-5" /></button>
+                <button onClick={() => setSelectedDp(null)} className="text-muted hover:text-foreground"><XCircle className="w-5 h-5" /></button>
               </div>
               <div className="px-6 py-5 space-y-4">
                 <div>
-                  <p className="text-xs font-mono text-gray-400">{selectedDp.id}</p>
-                  <h3 className="text-base font-bold text-gray-900 mt-1">{selectedDp.label}</h3>
+                  <p className="text-xs font-mono text-muted-light">{selectedDp.id}</p>
+                  <h3 className="text-base font-bold text-foreground mt-1">{selectedDp.label}</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Data Type</p>
-                    <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDp.data_type}</p>
+                  <div className="bg-surface rounded-lg p-3">
+                    <p className="text-[10px] font-bold text-muted-light uppercase">Data Type</p>
+                    <p className="text-sm font-semibold text-foreground mt-0.5 capitalize">{selectedDp.data_type}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Indicator</p>
-                    <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDp.indicator_type}</p>
+                  <div className="bg-surface rounded-lg p-3">
+                    <p className="text-[10px] font-bold text-muted-light uppercase">Indicator</p>
+                    <p className="text-sm font-semibold text-foreground mt-0.5 capitalize">{selectedDp.indicator_type}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Paragraph</p>
-                    <p className="text-sm font-semibold text-gray-800 mt-0.5">{selectedDp.paragraph_ref}</p>
+                  <div className="bg-surface rounded-lg p-3">
+                    <p className="text-[10px] font-bold text-muted-light uppercase">Paragraph</p>
+                    <p className="text-sm font-semibold text-foreground mt-0.5">{selectedDp.paragraph_ref}</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Section</p>
-                    <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDp.section.replace("_", " ")}</p>
+                  <div className="bg-surface rounded-lg p-3">
+                    <p className="text-[10px] font-bold text-muted-light uppercase">Section</p>
+                    <p className="text-sm font-semibold text-foreground mt-0.5 capitalize">{selectedDp.section.replace("_", " ")}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1566,12 +1566,12 @@ function PrinciplesPanel({
   return (
     <div className="max-w-6xl space-y-5">
       {/* ── Top Summary ── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="bg-card rounded-xl border border-border p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-base font-bold text-gray-900">NGRBC Principles — Overview</h2>
-            <p className="text-xs text-gray-500 mt-0.5">9 Principles • {totalDatapoints} datapoints • {totalFound} disclosed • {totalMissing} gaps</p>
-            <p className="text-[10px] text-gray-400 mt-1">Click any principle to see its datapoints →</p>
+            <h2 className="text-base font-bold text-foreground">NGRBC Principles — Overview</h2>
+            <p className="text-xs text-muted mt-0.5">9 Principles • {totalDatapoints} datapoints • {totalFound} disclosed • {totalMissing} gaps</p>
+            <p className="text-[10px] text-muted-light mt-1">Click any principle to see its datapoints →</p>
           </div>
           <div className="flex items-center gap-3">
             <ScoreCircle value={totalDatapoints > 0 ? Math.round((totalFound / totalDatapoints) * 100) : 0} label="Coverage" size={60} />
@@ -1589,20 +1589,20 @@ function PrinciplesPanel({
               title={`${p.short}: ${p.pct}%`}
             >
               <div className="absolute bottom-0 left-0 right-0 transition-all" style={{ height: `${p.pct}%`, background: p.color, opacity: 0.7 }} />
-              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-gray-700 opacity-0 group-hover:opacity-100 transition">{p.short}</span>
+              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-foreground opacity-0 group-hover:opacity-100 transition">{p.short}</span>
             </button>
           ))}
         </div>
         <div className="flex justify-between mt-1.5">
-          <span className="text-[9px] text-gray-400">P1</span>
-          <span className="text-[9px] text-gray-400">P9</span>
+          <span className="text-[9px] text-muted-light">P1</span>
+          <span className="text-[9px] text-muted-light">P9</span>
         </div>
       </div>
 
       {/* ── Radar Chart ── */}
       {principleChartData.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-800 mb-3">Coverage Radar</h3>
+        <div className="bg-card rounded-xl border border-border p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Coverage Radar</h3>
           <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={principleChartData} cx="50%" cy="50%" outerRadius="80%">
@@ -1625,7 +1625,7 @@ function PrinciplesPanel({
             <button
               key={p.key}
               onClick={() => onSelectPrinciple(p.key)}
-              className="w-full bg-white rounded-xl border border-gray-200 overflow-hidden transition-all hover:shadow-md hover:border-emerald-200"
+              className="w-full bg-card rounded-xl border border-border overflow-hidden transition-all hover:shadow-md hover:border-emerald-200"
             >
               <div className="flex items-center gap-4 px-5 py-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${p.color}15` }}>
@@ -1633,11 +1633,11 @@ function PrinciplesPanel({
                 </div>
                 <div className="flex-1 text-left">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-gray-400">{p.short}</span>
-                    <span className="text-sm font-bold text-gray-900">{p.name}</span>
+                    <span className="text-xs font-black text-muted-light">{p.short}</span>
+                    <span className="text-sm font-bold text-foreground">{p.name}</span>
                   </div>
                   <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[10px] text-gray-500">{p.total} datapoints</span>
+                    <span className="text-[10px] text-muted">{p.total} datapoints</span>
                     <span className="text-[10px] text-emerald-600 font-semibold">{p.found} ✓</span>
                     <span className="text-[10px] text-red-500 font-semibold">{p.missing} ✗</span>
                     {p.coreCount > 0 && <span className="text-[10px] text-blue-600">Core: {p.coreFound}/{p.coreCount}</span>}
@@ -1645,13 +1645,13 @@ function PrinciplesPanel({
                 </div>
                 <div className="hidden sm:flex items-center gap-3">
                   <div className="w-20">
-                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                    <div className="h-2 rounded-full bg-border overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700" style={{ width: `${p.pct}%`, background: p.color }} />
                     </div>
                   </div>
                   <span className="text-sm font-black w-10 text-right" style={{ color: p.pct >= 75 ? "#059669" : p.pct >= 50 ? "#D97706" : "#DC2626" }}>{p.pct}%</span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
+                <ChevronRight className="w-4 h-4 text-muted" />
               </div>
             </button>
           );
