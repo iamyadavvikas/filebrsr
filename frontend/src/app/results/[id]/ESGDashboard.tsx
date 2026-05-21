@@ -271,7 +271,25 @@ export function ESGDashboard() {
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const filtered = Object.entries(sectionData).filter(
-          ([key, val]) => key.toLowerCase().includes(q) || String(val).toLowerCase().includes(q)
+          ([key, val]) => {
+            // Match against raw key and value
+            if (key.toLowerCase().includes(q) || String(val).toLowerCase().includes(q)) return true;
+            // Also match against human-readable label (replace underscores with spaces)
+            const label = key.replace(/_/g, " ").toLowerCase();
+            if (label.includes(q)) return true;
+            // Match against BRSR datapoint labels for this key
+            const matchingDp = BRSR_DATAPOINTS.find(dp =>
+              dp.section === section && dp.label.toLowerCase().includes(q)
+            );
+            if (matchingDp) {
+              // Check if this key corresponds to this datapoint
+              const keyWords = key.replace(/_/g, " ").toLowerCase().split(/\s+/).filter(w => w.length > 3);
+              const dpWords = matchingDp.label.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+              const overlap = keyWords.filter(w => dpWords.includes(w));
+              if (overlap.length >= Math.min(2, dpWords.length)) return true;
+            }
+            return false;
+          }
         );
         if (filtered.length > 0) result[section] = Object.fromEntries(filtered);
       } else {
@@ -715,8 +733,8 @@ function SectionPanel({
     return (
       <div className="flex flex-col items-center justify-center h-64 text-gray-400">
         <XCircle className="w-10 h-10 mb-3" />
-        <p className="text-sm font-medium">No data extracted for this section</p>
-        <p className="text-xs mt-1">This section may not be present in the uploaded PDF</p>
+        <p className="text-sm font-medium">{searchQuery ? "No datapoints match your search" : "No data extracted for this section"}</p>
+        <p className="text-xs mt-1">{searchQuery ? `Try a different keyword or clear the search` : "This section may not be present in the uploaded PDF"}</p>
       </div>
     );
   }
@@ -804,6 +822,11 @@ function GapsPanel({
   const [dpFilter, setDpFilter] = useState<"all" | "found" | "missing">("all");
   const [dpCoreFilter, setDpCoreFilter] = useState<"all" | "core" | "non-core">("all");
   const [selectedDatapoint, setSelectedDatapoint] = useState<DatapointItem | null>(null);
+
+  // Auto-switch to datapoints view when search is active
+  useEffect(() => {
+    if (searchQuery && viewMode === "overview") setViewMode("datapoints");
+  }, [searchQuery, viewMode]);
 
   // Always compute manifest from client-side data (falls back to backend if available)
   const manifest = buildClientManifest(extractedData, gaps?.datapoints_manifest);
