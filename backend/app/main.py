@@ -79,7 +79,7 @@ async def extract_brsr(
         regex_results = extract_with_regex(text)
         enhanced_results = extract_enhanced(text)
         try:
-            ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY)
+            ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
         except Exception as ai_err:
             print(f"AI extraction failed (using regex only): {ai_err}")
             ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
@@ -158,7 +158,7 @@ async def guest_extract_brsr(
         regex_results = extract_with_regex(text)
         enhanced_results = extract_enhanced(text)
         try:
-            ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY)
+            ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
         except Exception:
             ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
 

@@ -6,6 +6,7 @@ from pathlib import Path
 class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_SERVICE_KEY: str
+    ANTHROPIC_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     RAZORPAY_KEY_ID: str = ""

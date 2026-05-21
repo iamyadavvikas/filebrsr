@@ -1,3 +1,4 @@
+from anthropic import Anthropic
 from google import genai
 from groq import Groq
 import json
@@ -44,6 +45,30 @@ def _parse_ai_response(response_text: str) -> dict[str, Any]:
             except json.JSONDecodeError:
                 pass
         return {"section_a": {}, "section_b": {}, "section_c": {}}
+
+
+async def _extract_with_claude(text: str, api_key: str) -> dict[str, Any]:
+    """Extract using Anthropic Claude."""
+    client = Anthropic(api_key=api_key)
+
+    # Claude context is 200K tokens (~800K chars)
+    max_chars = 600000
+    if len(text) > max_chars:
+        text = text[:max_chars]
+
+    response = await asyncio.wait_for(
+        asyncio.to_thread(
+            client.messages.create,
+            model="claude-sonnet-4-20250514",
+            max_tokens=4096,
+            messages=[
+                {"role": "user", "content": BRSR_EXTRACTION_PROMPT.format(text=text)},
+            ],
+            temperature=0.1,
+        ),
+        timeout=30.0,
+    )
+    return _parse_ai_response(response.content[0].text)
 
 
 async def _extract_with_gemini(text: str, api_key: str) -> dict[str, Any]:
@@ -94,9 +119,19 @@ async def _extract_with_groq(text: str, api_key: str) -> dict[str, Any]:
     return _parse_ai_response(response.choices[0].message.content or "")
 
 
-async def extract_with_ai(text: str, gemini_key: str, groq_key: str = "") -> dict[str, Any]:
-    """Extract BRSR metrics using AI. Tries Gemini first, falls back to Groq."""
-    # Try Gemini first
+async def extract_with_ai(text: str, gemini_key: str, groq_key: str = "", anthropic_key: str = "") -> dict[str, Any]:
+    """Extract BRSR metrics using AI. Chain: Claude → Gemini → Groq → regex."""
+    # Try Claude first (best quality)
+    if anthropic_key:
+        try:
+            result = await _extract_with_claude(text, anthropic_key)
+            if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
+                print("AI extraction: Claude succeeded")
+                return result
+        except Exception as e:
+            print(f"Claude failed: {e}")
+
+    # Fallback to Gemini
     if gemini_key and gemini_key != "your_gemini_api_key":
         try:
             result = await _extract_with_gemini(text, gemini_key)
@@ -111,10 +146,10 @@ async def extract_with_ai(text: str, gemini_key: str, groq_key: str = "") -> dic
         try:
             result = await _extract_with_groq(text, groq_key)
             if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
-                print("AI extraction: Groq fallback succeeded")
+                print("AI extraction: Groq succeeded")
                 return result
         except Exception as e:
-            print(f"Groq fallback failed: {e}")
+            print(f"Groq failed: {e}")
 
     print("AI extraction: all providers failed, using regex only")
     return {"section_a": {}, "section_b": {}, "section_c": {}}
