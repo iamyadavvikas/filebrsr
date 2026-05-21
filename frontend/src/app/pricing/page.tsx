@@ -204,18 +204,18 @@ export default function PricingPage() {
       <Navbar />
       <main className="flex-1">
         {/* Header */}
-        <section style={{ padding: "72px 28px 48px", background: "linear-gradient(180deg, #FAFBF9 0%, white 100%)" }}>
+        <section style={{ padding: "72px 28px 48px", background: "var(--highlight-bg)" }}>
           <div className="max-w-[960px] mx-auto text-center">
-            <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#2D7A5F", marginBottom: 8 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 8 }}>
               Pricing
             </p>
-            <h1 style={{ fontSize: 38, fontWeight: 800, marginBottom: 12, letterSpacing: -1 }}>
+            <h1 style={{ fontSize: 38, fontWeight: 800, marginBottom: 12, letterSpacing: -1, color: "var(--foreground)" }}>
               Replace ₹15L consultants with one tool
             </h1>
-            <p className="text-muted" style={{ fontSize: 16, maxWidth: 520, margin: "0 auto 8px", lineHeight: 1.6 }}>
+            <p style={{ fontSize: 16, maxWidth: 520, margin: "0 auto 8px", lineHeight: 1.6, color: "var(--muted)" }}>
               Companies pay ₹5-15 lakhs annually for manual BRSR compilation. FileBRSR does it in seconds.
             </p>
-            <div className="flex justify-center gap-6 mt-6" style={{ fontSize: 13, color: "#6B7280" }}>
+            <div className="flex justify-center gap-6 mt-6" style={{ fontSize: 13, color: "var(--muted)" }}>
               <span>✓ No credit card for free tier</span>
               <span>✓ Cancel anytime</span>
               <span>✓ GST invoice included</span>
@@ -230,11 +230,12 @@ export default function PricingPage() {
               {plans.map((p) => (
                 <div
                   key={p.key}
-                  className="relative flex flex-col bg-white"
+                  className="relative flex flex-col"
                   style={{
                     borderRadius: 20,
-                    border: p.popular ? "2px solid #1B4D3E" : "1px solid #E5E7DF",
+                    border: p.popular ? "2px solid var(--primary)" : "1px solid var(--border)",
                     padding: "28px 24px",
+                    background: "var(--card)",
                     boxShadow: p.popular ? "0 12px 40px rgba(27,77,62,0.12)" : "0 2px 8px rgba(0,0,0,0.04)",
                   }}
                 >
@@ -251,14 +252,14 @@ export default function PricingPage() {
                       Most Popular
                     </div>
                   )}
-                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{p.name}</h3>
-                  <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>{p.desc}</p>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, color: "var(--foreground)" }}>{p.name}</h3>
+                  <p style={{ fontSize: 13, marginBottom: 16, color: "var(--muted)" }}>{p.desc}</p>
                   <div style={{ marginBottom: 8 }}>
-                    <span style={{ fontSize: 32, fontWeight: 800, letterSpacing: -1 }}>{p.price}</span>
-                    {p.period && <span className="text-muted" style={{ fontSize: 14, marginLeft: 4 }}>{p.period}</span>}
+                    <span style={{ fontSize: 32, fontWeight: 800, letterSpacing: -1, color: "var(--foreground)" }}>{p.price}</span>
+                    {p.period && <span style={{ fontSize: 14, marginLeft: 4, color: "var(--muted)" }}>{p.period}</span>}
                   </div>
                   {"monthlyEquiv" in p && p.monthlyEquiv && (
-                    <p style={{ fontSize: 12, color: "#6B7280", marginBottom: 12 }}>{p.monthlyEquiv}</p>
+                    <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>{p.monthlyEquiv}</p>
                   )}
                   <div style={{ background: "#F0FDF4", borderRadius: 10, padding: "8px 12px", marginBottom: 20, fontSize: 13, fontWeight: 600, color: "#166534" }}>
                     {p.reports}
@@ -278,8 +279,8 @@ export default function PricingPage() {
                   </button>
                   <div className="flex flex-col gap-2.5 flex-1">
                     {p.features.map((f) => (
-                      <div key={f} className="flex items-start gap-2 text-muted" style={{ fontSize: 13 }}>
-                        <span style={{ color: "#059669", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>✓</span>
+                      <div key={f} className="flex items-start gap-2" style={{ fontSize: 13, color: "var(--muted)" }}>
+                        <span style={{ color: "var(--success)", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>✓</span>
                         {f}
                       </div>
                     ))}
@@ -290,14 +291,14 @@ export default function PricingPage() {
 
             {/* Pay-per-report callout */}
             <div
-              className="mt-8 flex flex-col md:flex-row items-center justify-between gap-6 bg-white"
-              style={{ border: "1px solid #E5E7DF", borderRadius: 20, padding: "28px 32px" }}
+              className="mt-8 flex flex-col md:flex-row items-center justify-between gap-6"
+              style={{ border: "1px solid var(--border)", borderRadius: 20, padding: "28px 32px", background: "var(--card)" }}
             >
               <div>
-                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
-                  Just need one report? <span style={{ color: "#2D7A5F" }}>₹2,500 per report</span>
+                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, color: "var(--foreground)" }}>
+                  Just need one report? <span style={{ color: "var(--primary-light)" }}>₹2,500 per report</span>
                 </h3>
-                <p className="text-muted" style={{ fontSize: 14 }}>
+                <p style={{ fontSize: 14, color: "var(--muted)" }}>
                   Full analysis with NIFTY 50 benchmarks, ESRS mapping, and branded PDF — no subscription needed.
                 </p>
               </div>
@@ -307,7 +308,7 @@ export default function PricingPage() {
                 className="flex items-center gap-2 whitespace-nowrap"
                 style={{
                   padding: "12px 28px", borderRadius: 12, fontSize: 14, fontWeight: 700,
-                  border: "2px solid #2D7A5F", background: "white", color: "#2D7A5F", cursor: "pointer",
+                  border: "2px solid var(--primary-light)", background: "var(--card)", color: "var(--primary-light)", cursor: "pointer",
                 }}
               >
                 {loadingPlan === "pay_per_report" && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -318,30 +319,30 @@ export default function PricingPage() {
         </section>
 
         {/* Comparison Table */}
-        <section style={{ padding: "48px 28px 72px", background: "#F9F6EF" }}>
+        <section style={{ padding: "48px 28px 72px", background: "var(--warm)" }}>
           <div className="max-w-[960px] mx-auto">
-            <h2 className="text-center" style={{ fontSize: 26, fontWeight: 800, marginBottom: 32 }}>
+            <h2 className="text-center" style={{ fontSize: 26, fontWeight: 800, marginBottom: 32, color: "var(--foreground)" }}>
               Compare plans
             </h2>
-            <div className="overflow-x-auto" style={{ borderRadius: 16, border: "1px solid #E5E7DF" }}>
-              <table className="w-full" style={{ background: "white", borderCollapse: "collapse" }}>
+            <div className="overflow-x-auto" style={{ borderRadius: 16, border: "1px solid var(--border)" }}>
+              <table className="w-full" style={{ background: "var(--card)", borderCollapse: "collapse" }}>
                 <thead>
-                  <tr style={{ background: "#F9FAFB" }}>
-                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: 13, fontWeight: 600 }}>Feature</th>
-                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600 }}>Free</th>
-                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600 }}>Starter</th>
-                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "#1B4D3E" }}>Professional</th>
-                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600 }}>Enterprise</th>
+                  <tr style={{ background: "var(--surface)" }}>
+                    <th style={{ padding: "14px 16px", textAlign: "left", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Feature</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Free</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Starter</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>Professional</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Enterprise</th>
                   </tr>
                 </thead>
                 <tbody>
                   {comparisonData.map((row, i) => (
-                    <tr key={i} style={{ borderTop: "1px solid #F3F4F6" }}>
-                      <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500 }}>{row.feature}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "#6B7280" }}>{row.free}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "#6B7280" }}>{row.starter}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", fontWeight: 600, color: "#1B4D3E" }}>{row.pro}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "#6B7280" }}>{row.enterprise}</td>
+                    <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
+                      <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500, color: "var(--foreground)" }}>{row.feature}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.free}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.starter}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", fontWeight: 600, color: "var(--primary)" }}>{row.pro}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.enterprise}</td>
                     </tr>
                   ))}
                 </tbody>
