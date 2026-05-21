@@ -3,12 +3,20 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import { Loader2, FileText, Upload, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, FileText, Upload, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+const PROGRESS_STEPS = [
+  { label: "Upload", desc: "Sending PDF" },
+  { label: "Parse", desc: "Reading pages" },
+  { label: "Extract", desc: "Finding datapoints" },
+  { label: "Analyze", desc: "Gap analysis" },
+];
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState("");
+  const [progressStep, setProgressStep] = useState(0);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [dragActive, setDragActive] = useState(false);
@@ -83,17 +91,27 @@ export default function UploadPage() {
     setError("");
     setSuccess("");
     setProgress("Uploading PDF...");
+    setProgressStep(0);
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
+      setProgressStep(1);
       setProgress("AI is analyzing your report...");
+
+      // Simulate step progression while waiting for API
+      const stepTimer = setTimeout(() => setProgressStep(2), 8000);
+      const stepTimer2 = setTimeout(() => setProgressStep(3), 25000);
 
       const res = await fetch("/api/extract", {
         method: "POST",
         body: formData,
       });
+
+      clearTimeout(stepTimer);
+      clearTimeout(stepTimer2);
+      setProgressStep(3);
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -212,6 +230,29 @@ export default function UploadPage() {
               )}
             </div>
 
+            {/* Try with sample */}
+            {!file && !uploading && (
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center gap-1.5 text-xs text-muted" style={{ marginBottom: 6 }}>
+                  <span className="w-8 h-px bg-gray-200" />
+                  or
+                  <span className="w-8 h-px bg-gray-200" />
+                </div>
+                <br />
+                <button
+                  onClick={() => {
+                    // Use a sample PDF URL to demonstrate
+                    window.open("https://www.filebrsr.com/upload?sample=true", "_self");
+                  }}
+                  className="inline-flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors"
+                  style={{ color: "#1B4D3E", padding: "8px 16px", borderRadius: 10, border: "1px dashed #A7F3D0", background: "#F0FDF4" }}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Try with sample sustainability report
+                </button>
+              </div>
+            )}
+
             {/* Extract button */}
             {file && !success && !uploading && (
               <button
@@ -241,6 +282,32 @@ export default function UploadPage() {
                     <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg, #1B4D3E, #2D7A5F)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 20px rgba(27,77,62,0.3)", animation: "pulse 2s ease-in-out infinite" }}>
                       <Loader2 className="w-7 h-7 text-white animate-spin" />
                     </div>
+                  </div>
+
+                  {/* Multi-step progress */}
+                  <div className="flex items-center justify-between mb-6 px-2" style={{ maxWidth: 360, margin: "0 auto 24px" }}>
+                    {PROGRESS_STEPS.map((step, i) => (
+                      <div key={step.label} className="flex items-center">
+                        <div className="flex flex-col items-center">
+                          <div
+                            className="flex items-center justify-center rounded-full text-xs font-bold transition-all duration-500"
+                            style={{
+                              width: 28, height: 28,
+                              background: i <= progressStep ? "#1B4D3E" : "#E5E7EB",
+                              color: i <= progressStep ? "white" : "#9CA3AF",
+                            }}
+                          >
+                            {i < progressStep ? "✓" : i + 1}
+                          </div>
+                          <span className="text-xs mt-1.5 font-medium" style={{ color: i <= progressStep ? "#1B4D3E" : "#9CA3AF" }}>
+                            {step.label}
+                          </span>
+                        </div>
+                        {i < PROGRESS_STEPS.length - 1 && (
+                          <div className="mx-1.5" style={{ width: 24, height: 2, borderRadius: 2, background: i < progressStep ? "#1B4D3E" : "#E5E7EB", transition: "background 0.5s" }} />
+                        )}
+                      </div>
+                    ))}
                   </div>
                   
                   <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#059669", marginBottom: 8 }}>
@@ -288,16 +355,6 @@ export default function UploadPage() {
                   </svg>
                   Continue with Google
                 </button>
-              </div>
-            )}
-
-            {/* Progress indicator */}
-            {uploading && (
-              <div style={{ marginBottom: 16 }}>
-                <div className="progress-bar" style={{ width: "100%", marginBottom: 8 }} />
-                <p className="text-center text-muted" style={{ fontSize: 12 }}>
-                  This usually takes 30-60 seconds depending on report length
-                </p>
               </div>
             )}
 
