@@ -330,7 +330,7 @@ export function ESGDashboard() {
             <h1 className="text-sm font-bold text-gray-900 leading-tight">
               {data.section_a?.company_name || "BRSR Compliance Report"}
             </h1>
-            <p className="text-[10px] text-gray-400">{data.section_a?.financial_year || "FY 2024-25"} • SEBI BRSR Framework</p>
+            <p className="text-[10px] text-gray-400">{data.section_a?.financial_year || "FY 2024-25"} • SEBI BRSR Framework • Analyzed {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
           </div>
         </div>
         <div className="flex-1" />
@@ -371,6 +371,11 @@ export function ESGDashboard() {
 
         {/* Actions */}
         <div className="flex items-center gap-1.5">
+          {/* Time saved badge */}
+          <div className="hidden md:flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            ~3 weeks saved
+          </div>
           <a
             href="/api/download-datapoints-excel"
             className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
@@ -386,6 +391,13 @@ export function ESGDashboard() {
             <Download className="w-3.5 h-3.5" />
             Export
           </button>
+          <Link
+            href="/upload"
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 hover:bg-emerald-50 transition"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            New Report
+          </Link>
         </div>
       </header>
 

@@ -1,7 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { ChevronDown } from "lucide-react";
 
 const productSuite = [
   {
@@ -311,25 +315,88 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ═══ COMPARISON TABLE ═══ */}
+        <section style={{ padding: "80px 28px" }}>
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-12">
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#DC2626", marginBottom: 10 }}>
+                STOP WASTING TIME & MONEY
+              </p>
+              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5 }}>
+                Manual filing vs FileBRSR
+              </h2>
+            </div>
+            <div className="bg-white rounded-2xl border border-border overflow-hidden shadow-sm">
+              <table className="w-full">
+                <thead>
+                  <tr style={{ background: "#F9FAFB" }}>
+                    <th className="text-left py-4 px-6 text-sm font-bold text-gray-900">Metric</th>
+                    <th className="text-center py-4 px-6 text-sm font-bold text-gray-500">Manual / Consultants</th>
+                    <th className="text-center py-4 px-6 text-sm font-bold" style={{ color: "#1B4D3E" }}>FileBRSR</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {[
+                    { metric: "Time to extract all 216 datapoints", manual: "2-4 weeks", ai: "~60 seconds", highlight: true },
+                    { metric: "Annual cost", manual: "₹5-15 lakh", ai: "₹25,000/year", highlight: true },
+                    { metric: "Compliance accuracy", manual: "Varies (human error)", ai: "AI + audit trail", highlight: false },
+                    { metric: "Gap analysis", manual: "Manual comparison", ai: "Instant, automated", highlight: false },
+                    { metric: "ESRS/GRI cross-mapping", manual: "Not included", ai: "Built-in", highlight: true },
+                    { metric: "Peer benchmarking", manual: "Separate exercise", ai: "NIFTY 50 included", highlight: false },
+                    { metric: "Scalability", manual: "Linear cost increase", ai: "Unlimited reports", highlight: false },
+                  ].map((row, i) => (
+                    <tr key={i} className={row.highlight ? "bg-emerald-50/30" : ""}>
+                      <td className="py-3.5 px-6 text-sm font-medium text-gray-800">{row.metric}</td>
+                      <td className="py-3.5 px-6 text-center text-sm text-gray-500">{row.manual}</td>
+                      <td className="py-3.5 px-6 text-center text-sm font-semibold" style={{ color: "#1B4D3E" }}>{row.ai}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="text-center mt-8">
+              <Link
+                href="/upload"
+                style={{ fontSize: 14, fontWeight: 700, padding: "13px 32px", borderRadius: 12, background: "#1B4D3E", color: "white", display: "inline-flex", alignItems: "center", gap: 8 }}
+              >
+                START SAVING TIME
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* ═══ SOCIAL PROOF ═══ */}
         <section style={{ padding: "64px 28px", background: "#FAFBF9" }}>
           <div className="max-w-4xl mx-auto text-center">
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#2D7A5F", marginBottom: 10 }}>
-              BUILT FOR INDIA
+              BUILT FOR INDIA&apos;S TOP LISTED COMPANIES
             </p>
             <h2 style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 16 }}>
-              Proven impact for Indian compliance teams
+              Who uses FileBRSR?
             </h2>
             <p className="text-muted mx-auto" style={{ fontSize: 15, maxWidth: 560, lineHeight: 1.7, marginBottom: 40 }}>
-              SEBI mandates BRSR for the top 1,000 listed companies. BRSR Core with third-party assurance is mandatory for the top 250 from FY 2026-27. FileBRSR helps you get compliant in minutes, not months.
+              SEBI mandates BRSR for the top 1,000 listed companies. BRSR Core with third-party assurance is mandatory for the top 250 from FY 2026-27.
             </p>
+
+            {/* Urgency Banner */}
+            <div className="mb-8 inline-flex items-center gap-3 px-5 py-3 rounded-xl border border-amber-200" style={{ background: "#FFFBEB" }}>
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+              </span>
+              <span className="text-sm font-semibold text-amber-800">
+                BRSR Core assurance deadline: FY 2026-27 — Top 250 companies must comply
+              </span>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {[
                 { icon: "🏢", title: "Compliance Officers", desc: "Automate data collection across departments. No more chasing Excel sheets." },
                 { icon: "📊", title: "ESG Consultants", desc: "Serve more clients with instant extraction. Scale without hiring." },
                 { icon: "✅", title: "Assurance Providers", desc: "Verify BRSR filings faster with structured, traceable data." },
               ].map((t) => (
-                <div key={t.title} className="bg-white rounded-2xl border border-border p-6 text-left">
+                <div key={t.title} className="bg-white rounded-2xl border border-border p-6 text-left hover:shadow-md transition-shadow">
                   <span className="text-2xl mb-3 block">{t.icon}</span>
                   <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>{t.title}</h3>
                   <p className="text-muted" style={{ fontSize: 13, lineHeight: 1.65 }}>{t.desc}</p>
@@ -345,12 +412,7 @@ export default function HomePage() {
             <h2 className="text-center" style={{ fontSize: 28, fontWeight: 800, marginBottom: 48, letterSpacing: -0.3 }}>
               Frequently asked questions
             </h2>
-            {faqs.map((f, i) => (
-              <div key={i} style={{ borderBottom: i < faqs.length - 1 ? "1px solid #E5E7DF" : "none", padding: "20px 0" }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>{f.q}</h3>
-                <p className="text-muted" style={{ fontSize: 14, lineHeight: 1.7 }}>{f.a}</p>
-              </div>
-            ))}
+            <FAQAccordion faqs={faqs} />
           </div>
         </section>
 
@@ -376,5 +438,35 @@ export default function HomePage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Interactive FAQ Accordion
+// ══════════════════════════════════════════════════════════════════
+function FAQAccordion({ faqs }: { faqs: Array<{ q: string; a: string }> }) {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  return (
+    <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-white">
+      {faqs.map((f, i) => (
+        <div key={i}>
+          <button
+            onClick={() => setOpenIndex(openIndex === i ? null : i)}
+            className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-gray-50/50 transition-colors"
+          >
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1F2937", paddingRight: 16 }}>{f.q}</h3>
+            <ChevronDown
+              className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${openIndex === i ? "rotate-180" : ""}`}
+            />
+          </button>
+          <div
+            className={`overflow-hidden transition-all duration-300 ${openIndex === i ? "max-h-48 opacity-100" : "max-h-0 opacity-0"}`}
+          >
+            <p className="px-6 pb-5 text-muted" style={{ fontSize: 14, lineHeight: 1.7 }}>{f.a}</p>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
