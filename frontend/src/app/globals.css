@@ -14,6 +14,13 @@
   --success: #059669;
   --surface: #F8FAFB;
   --nav-bg: rgba(250, 251, 249, 0.92);
+  --highlight-bg: linear-gradient(180deg, #F0FDF4 0%, #FAFBF9 100%);
+  --icon-soft: #EEF7F3;
+  --urgency-bg: #FFFBEB;
+  --urgency-border: #FDE68A;
+  --urgency-text: #92400E;
+  --illustration-bg: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 50%, #F0FDFA 100%);
+  --illustration-border: #BBF7D0;
 }
 
 .dark {
@@ -30,6 +37,13 @@
   --success: #3FB950;
   --surface: #161B22;
   --nav-bg: rgba(15, 20, 25, 0.92);
+  --highlight-bg: linear-gradient(180deg, #0D1117 0%, #161B22 100%);
+  --icon-soft: rgba(45, 155, 110, 0.12);
+  --urgency-bg: rgba(245, 158, 11, 0.08);
+  --urgency-border: rgba(245, 158, 11, 0.25);
+  --urgency-text: #FCD34D;
+  --illustration-bg: linear-gradient(135deg, rgba(5,150,105,0.06) 0%, rgba(5,150,105,0.03) 100%);
+  --illustration-border: rgba(5, 150, 105, 0.2);
 }
 
 @theme inline {
@@ -53,6 +67,9 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: 'Outfit', 'Segoe UI', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

@@ -14,14 +14,14 @@ export default function Footer() {
                 file<span style={{ color: "var(--accent)" }}>BRSR</span>
               </span>
             </div>
-            <p style={{ fontSize: 13, color: "#6B7280", lineHeight: 1.7 }}>
+            <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7 }}>
               #1 AI-powered BRSR compliance platform for Indian listed companies.
             </p>
           </div>
 
           {/* Platform */}
           <div>
-            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "#1B4D3E", marginBottom: 14 }}>Platform</h4>
+            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Platform</h4>
             <ul className="space-y-2.5">
               {[
                 { label: "Upload & Extract", href: "/upload" },
@@ -37,7 +37,7 @@ export default function Footer() {
 
           {/* Resources */}
           <div>
-            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "#1B4D3E", marginBottom: 14 }}>Resources</h4>
+            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Resources</h4>
             <ul className="space-y-2.5">
               {[
                 { label: "BRSR Framework Guide", href: "https://www.sebi.gov.in/legal/regulations/may-2021/business-responsibility-and-sustainability-reporting-by-listed-entities_50096.html" },
@@ -53,7 +53,7 @@ export default function Footer() {
 
           {/* Legal */}
           <div>
-            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "#1B4D3E", marginBottom: 14 }}>Legal</h4>
+            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Legal</h4>
             <ul className="space-y-2.5">
               {[
                 { label: "Terms of Use", href: "#" },
@@ -70,7 +70,7 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div className="mt-10 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p style={{ fontSize: 12, color: "#9CA3AF" }}>
+          <p style={{ fontSize: 12, color: "var(--muted-light)" }}>
             © {new Date().getFullYear()} FileBRSR. All rights reserved. Made in India 🇮🇳
           </p>
           <Link href="mailto:support@filebrsr.com" className="text-xs text-muted hover:text-foreground transition-colors">
