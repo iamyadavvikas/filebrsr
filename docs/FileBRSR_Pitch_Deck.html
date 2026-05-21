@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FileBRSR — Pitch Deck</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body { font-family: 'Outfit', sans-serif; background: #0F1419; color: white; }
+  
+  .slide {
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    min-height: 540px;
+    padding: 60px 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  
+  @media print {
+    .slide { page-break-after: always; min-height: 100vh; border: none; }
+    body { background: white; color: #1a1a1a; }
+    .dark-invert { filter: none; }
+  }
+  
+  /* Slide variants */
+  .slide-cover { background: linear-gradient(135deg, #1B4D3E 0%, #0F2E25 100%); text-align: center; justify-content: center; align-items: center; min-height: 600px; }
+  .slide-dark { background: #0F1419; }
+  .slide-green { background: linear-gradient(135deg, #1B4D3E 0%, #134434 100%); }
+  .slide-light { background: #FAFBFC; color: #1a1a1a; }
+  .slide-gold { background: linear-gradient(135deg, #1B4D3E 0%, #0F2E25 60%, #2D1810 100%); }
+  
+  .slide-number { position: absolute; bottom: 24px; right: 36px; font-size: 11px; color: rgba(255,255,255,0.3); font-weight: 600; }
+  .slide-light .slide-number { color: rgba(0,0,0,0.2); }
+  
+  /* Typography */
+  .mega { font-size: 56px; font-weight: 900; letter-spacing: -2px; line-height: 1.1; }
+  .title { font-size: 36px; font-weight: 800; letter-spacing: -1px; line-height: 1.2; margin-bottom: 16px; }
+  .subtitle { font-size: 18px; font-weight: 400; opacity: 0.7; line-height: 1.5; }
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #E8B931; margin-bottom: 12px; }
+  .slide-light .section-label { color: #1B4D3E; }
+  
+  .gold { color: #E8B931; }
+  .green { color: #2EFBA1; }
+  .emerald { color: #34D399; }
+  
+  /* Components */
+  .stat-row { display: flex; gap: 32px; margin-top: 40px; }
+  .stat-item { text-align: center; flex: 1; }
+  .stat-number { font-size: 48px; font-weight: 900; color: #E8B931; }
+  .stat-label { font-size: 13px; color: rgba(255,255,255,0.6); margin-top: 4px; }
+  .slide-light .stat-label { color: #6B7280; }
+  .slide-light .stat-number { color: #1B4D3E; }
+  
+  .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 32px; }
+  .card-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; }
+  .slide-light .card { background: white; border: 1px solid #E5E7EB; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .card-icon { font-size: 28px; margin-bottom: 12px; }
+  .card-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  .card-desc { font-size: 12px; opacity: 0.6; line-height: 1.5; }
+  
+  .comparison { width: 100%; margin-top: 24px; border-collapse: collapse; font-size: 13px; }
+  .comparison th { text-align: left; padding: 12px 16px; border-bottom: 2px solid rgba(255,255,255,0.1); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.5); }
+  .comparison td { padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .comparison .highlight-row td { background: rgba(232,185,49,0.1); }
+  .slide-light .comparison th { color: #6B7280; border-color: #E5E7EB; }
+  .slide-light .comparison td { border-color: #F3F4F6; color: #374151; }
+  .slide-light .comparison .highlight-row td { background: #F0FDF4; }
+  
+  .check { color: #2EFBA1; font-weight: 700; }
+  .cross { color: #FF6B6B; opacity: 0.6; }
+  
+  .timeline-h { display: flex; gap: 0; margin-top: 32px; }
+  .timeline-step { flex: 1; text-align: center; position: relative; padding-top: 24px; }
+  .timeline-step::before { content: ''; position: absolute; top: 8px; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.1); }
+  .timeline-step::after { content: ''; position: absolute; top: 3px; left: 50%; width: 12px; height: 12px; border-radius: 50%; background: #E8B931; transform: translateX(-50%); }
+  .timeline-step .step-year { font-size: 12px; font-weight: 700; color: #E8B931; }
+  .timeline-step .step-text { font-size: 11px; opacity: 0.5; margin-top: 4px; }
+  
+  .pill { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; margin: 3px; }
+  .pill-green { background: rgba(46,251,161,0.15); color: #2EFBA1; }
+  .pill-gold { background: rgba(232,185,49,0.15); color: #E8B931; }
+  .pill-blue { background: rgba(56,189,248,0.15); color: #38BDF8; }
+  .pill-purple { background: rgba(167,139,250,0.15); color: #A78BFA; }
+  
+  .logo-text { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-text span { color: #E8B931; }
+  
+  .big-quote { font-size: 24px; font-weight: 600; line-height: 1.5; font-style: italic; opacity: 0.9; }
+  .quote-source { font-size: 13px; opacity: 0.5; margin-top: 16px; }
+  
+  .flow-row { display: flex; align-items: center; gap: 8px; margin-top: 32px; }
+  .flow-box { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px 20px; flex: 1; text-align: center; }
+  .flow-box .flow-icon { font-size: 24px; margin-bottom: 6px; }
+  .flow-box .flow-label { font-size: 12px; font-weight: 600; }
+  .flow-arrow { color: #E8B931; font-size: 18px; font-weight: 700; }
+  
+  .cta-box { background: linear-gradient(135deg, #E8B931 0%, #F59E0B 100%); color: #1B4D3E; padding: 32px 40px; border-radius: 20px; text-align: center; margin-top: 40px; }
+  .cta-box .cta-title { font-size: 24px; font-weight: 800; }
+  .cta-box .cta-sub { font-size: 14px; margin-top: 8px; opacity: 0.8; }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: COVER -->
+<div class="slide slide-cover">
+  <div class="logo-text" style="margin-bottom: 48px;">File<span>BRSR</span></div>
+  <h1 class="mega">AI-Powered BRSR<br>Compliance in <span class="gold">60 Seconds</span></h1>
+  <p class="subtitle" style="margin-top: 24px; max-width: 600px;">India's first purpose-built platform for automated BRSR extraction,<br>gap analysis, and cross-framework ESG intelligence.</p>
+  <div class="stat-row" style="max-width: 500px;">
+    <div class="stat-item"><div class="stat-number">216</div><div class="stat-label">Data Points</div></div>
+    <div class="stat-item"><div class="stat-number">60s</div><div class="stat-label">Extraction</div></div>
+    <div class="stat-item"><div class="stat-number">5</div><div class="stat-label">Frameworks</div></div>
+  </div>
+  <p style="position: absolute; bottom: 36px; font-size: 12px; opacity: 0.4;">Seed Round — May 2026 | Confidential</p>
+</div>
+
+<!-- SLIDE 2: THE PROBLEM -->
+<div class="slide slide-dark">
+  <div class="section-label">The Problem</div>
+  <h2 class="title">1,000+ Indian Companies Must File BRSR.<br>None Have an <span class="gold">Automated Tool</span>.</h2>
+  <p class="subtitle">SEBI mandates 216 quantitative disclosures. Companies spend ₹15-50 lakhs and 4-7 months on manual compliance.</p>
+  
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-icon">⏳</div>
+      <div class="card-title">400-800 Person-Hours</div>
+      <div class="card-desc">Per annual BRSR cycle. Data scattered across 15-30 departments with no standardized collection.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">💸</div>
+      <div class="card-title">₹15-50 Lakhs</div>
+      <div class="card-desc">Average Big 4 engagement cost. Out of reach for 800+ mid-cap companies.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">❌</div>
+      <div class="card-title">Zero Purpose-Built Tools</div>
+      <div class="card-desc">Workiva ($50K+/yr) doesn't support BRSR. No India-specific SaaS solution exists.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">⚠️</div>
+      <div class="card-title">₹100+ Cr Penalty Risk</div>
+      <div class="card-desc">Non-compliance risks SEBI notices, institutional investor withdrawal, and delisting.</div>
+    </div>
+  </div>
+  <div class="slide-number">02</div>
+</div>
+
+<!-- SLIDE 3: MARKET SIZE -->
+<div class="slide slide-light">
+  <div class="section-label">Market Opportunity</div>
+  <h2 class="title" style="color: #1B4D3E;">₹190 Cr TAM Growing to<br>₹500+ Cr by 2028</h2>
+  
+  <div class="stat-row">
+    <div class="stat-item"><div class="stat-number">1,000+</div><div class="stat-label">Listed companies (mandatory)</div></div>
+    <div class="stat-item"><div class="stat-number">5,000+</div><div class="stat-label">Value chain (2027 mandate)</div></div>
+    <div class="stat-item"><div class="stat-number">200+</div><div class="stat-label">ESG consultants & auditors</div></div>
+  </div>
+  
+  <div class="timeline-h">
+    <div class="timeline-step"><div class="step-year">2023</div><div class="step-text">Top 1,000 mandatory</div></div>
+    <div class="timeline-step"><div class="step-year">2024</div><div class="step-text">BRSR Core assurance (150)</div></div>
+    <div class="timeline-step"><div class="step-year">2026</div><div class="step-text">Assurance expands (250)</div></div>
+    <div class="timeline-step"><div class="step-year">2027</div><div class="step-text">Value chain + SMEs</div></div>
+    <div class="timeline-step"><div class="step-year">2028</div><div class="step-text">All listed entities</div></div>
+  </div>
+  <div class="slide-number" style="color: rgba(0,0,0,0.2);">03</div>
+</div>
+
+<!-- SLIDE 4: SOLUTION -->
+<div class="slide slide-green">
+  <div class="section-label">The Solution</div>
+  <h2 class="title">Upload PDF → Get Complete<br>BRSR Intelligence in <span class="gold">60 Seconds</span></h2>
+  
+  <div class="flow-row">
+    <div class="flow-box"><div class="flow-icon">📄</div><div class="flow-label">Upload BRSR PDF</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box"><div class="flow-icon">🤖</div><div class="flow-label">AI Extraction</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box"><div class="flow-icon">✅</div><div class="flow-label">Gap Analysis</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box"><div class="flow-icon">📊</div><div class="flow-label">Dashboard</div></div>
+  </div>
+  
+  <div class="card-grid" style="margin-top: 32px;">
+    <div class="card">
+      <div class="card-title">🎯 216 Data Point Extraction</div>
+      <div class="card-desc">AI parses every SEBI-mandated field from unstructured PDFs into structured, auditable data.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🔍 Compliance Scoring</div>
+      <div class="card-desc">CDP-style A-F rating. Identifies missing BRSR Core fields needing third-party assurance.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🌐 5-Framework Mapping</div>
+      <div class="card-desc">Auto-maps BRSR disclosures to ESRS, GRI, TCFD, ISSB, and UN SDG references.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">📈 NIFTY 50 Benchmark</div>
+      <div class="card-desc">Compare against sector median and top-quartile ESG performance of India's largest companies.</div>
+    </div>
+  </div>
+  <div class="slide-number">04</div>
+</div>
+
+<!-- SLIDE 5: COMPETITIVE ADVANTAGE -->
+<div class="slide slide-dark">
+  <div class="section-label">Why Us</div>
+  <h2 class="title">The Only Tool Built <span class="gold">Exclusively</span><br>for India's BRSR Ecosystem</h2>
+  
+  <table class="comparison">
+    <thead>
+      <tr>
+        <th>Capability</th>
+        <th>FileBRSR</th>
+        <th>Big 4</th>
+        <th>Workiva</th>
+        <th>ChatGPT</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="highlight-row"><td>BRSR-specific extraction</td><td class="check">✓</td><td>Manual</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td>60-second processing</td><td class="check">✓</td><td class="cross">Weeks</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td>216 data point validation</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr><td>ESRS/GRI cross-mapping</td><td class="check">✓</td><td>₹₹₹</td><td class="check">✓</td><td class="cross">✗</td></tr>
+      <tr><td>NIFTY 50 peer benchmark</td><td class="check">✓</td><td>Custom</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+      <tr class="highlight-row"><td>Price</td><td class="gold">₹5K/report</td><td>₹15-50L</td><td>$50K+/yr</td><td>Free*</td></tr>
+      <tr><td>India regulatory alignment</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size: 11px; opacity: 0.3; margin-top: 12px;">*ChatGPT lacks BRSR domain knowledge — outputs are generic and non-auditable</p>
+  <div class="slide-number">05</div>
+</div>
+
+<!-- SLIDE 6: PRODUCT DEMO -->
+<div class="slide slide-dark">
+  <div class="section-label">Product</div>
+  <h2 class="title">Interactive ESG Analytics<br><span class="emerald">Dashboard</span></h2>
+  
+  <div class="card-grid card-grid-3" style="margin-top: 24px;">
+    <div class="card" style="text-align: center;">
+      <div class="card-icon">🎯</div>
+      <div class="card-title">Radar Chart</div>
+      <div class="card-desc">9 NGRBC principles coverage visualization</div>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div class="card-icon">📊</div>
+      <div class="card-title">Bar Charts</div>
+      <div class="card-desc">Section-wise compliance scoring</div>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div class="card-icon">🥧</div>
+      <div class="card-title">Donut Charts</div>
+      <div class="card-desc">Disclosure coverage breakdown</div>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div class="card-icon">📋</div>
+      <div class="card-title">Gap Analysis</div>
+      <div class="card-desc">Priority-tagged recommendations</div>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div class="card-icon">⚖️</div>
+      <div class="card-title">Peer Benchmark</div>
+      <div class="card-desc">NIFTY 50 sector comparison</div>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div class="card-icon">📥</div>
+      <div class="card-title">Export</div>
+      <div class="card-desc">JSON, Excel, PDF audit reports</div>
+    </div>
+  </div>
+  
+  <p style="text-align: center; margin-top: 24px;">
+    <span class="pill pill-green">Left Sidebar Navigation</span>
+    <span class="pill pill-gold">Top Filters & Search</span>
+    <span class="pill pill-blue">Mobile Responsive</span>
+    <span class="pill pill-purple">Real-time Scoring</span>
+  </p>
+  <div class="slide-number">06</div>
+</div>
+
+<!-- SLIDE 7: BUSINESS MODEL -->
+<div class="slide slide-light">
+  <div class="section-label">Business Model</div>
+  <h2 class="title" style="color: #1B4D3E;">SaaS + API Revenue Model</h2>
+  
+  <table class="comparison" style="color: #374151;">
+    <thead>
+      <tr>
+        <th style="color: #6B7280;">Plan</th>
+        <th style="color: #6B7280;">Price</th>
+        <th style="color: #6B7280;">Target</th>
+        <th style="color: #6B7280;">Key Features</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Free</strong></td><td>₹0</td><td>Lead gen</td><td>3 extractions, basic gaps, watermarked</td></tr>
+      <tr class="highlight-row"><td><strong style="color:#1B4D3E;">Pro</strong></td><td><strong>₹4,999/mo</strong></td><td>Sustainability teams</td><td>Unlimited, full analysis, benchmarks</td></tr>
+      <tr><td><strong>Enterprise</strong></td><td>₹2-5L/yr</td><td>Large corporates</td><td>API, multi-user, audit trail</td></tr>
+      <tr><td><strong>API (B2B)</strong></td><td>₹500/call</td><td>Consultants, fintechs</td><td>RESTful, batch, webhooks</td></tr>
+    </tbody>
+  </table>
+  
+  <div class="stat-row" style="margin-top: 32px;">
+    <div class="stat-item"><div class="stat-number">₹1.5 Cr</div><div class="stat-label">Year 1 ARR</div></div>
+    <div class="stat-item"><div class="stat-number">₹5 Cr</div><div class="stat-label">Year 2 ARR</div></div>
+    <div class="stat-item"><div class="stat-number">₹15 Cr</div><div class="stat-label">Year 3 ARR</div></div>
+  </div>
+  <div class="slide-number" style="color: rgba(0,0,0,0.2);">07</div>
+</div>
+
+<!-- SLIDE 8: TRACTION -->
+<div class="slide slide-dark">
+  <div class="section-label">Traction & Progress</div>
+  <h2 class="title">Built in 5 Days. <span class="gold">Live Today.</span></h2>
+  
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title" style="color: #2EFBA1;">✓ Product Live</div>
+      <div class="card-desc">Full-stack SaaS at filebrsr.com — extraction, dashboard, gap analysis, benchmarks operational.</div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color: #2EFBA1;">✓ 20 API Endpoints</div>
+      <div class="card-desc">V2 API: cross-framework mapping, validation, scoring, batch extraction, API key auth.</div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color: #2EFBA1;">✓ BRSR Knowledge Base</div>
+      <div class="card-desc">216 data points mapped, 39 cross-framework references, 23 validation rules, NIFTY 50 benchmarks.</div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color: #E8B931;">◐ GTM Channels</div>
+      <div class="card-desc">Targeting sustainability heads via LinkedIn, SEBI compliance webinars, CA/CS association partnerships.</div>
+    </div>
+  </div>
+  
+  <div style="margin-top: 32px; text-align: center;">
+    <p style="font-size: 13px; opacity: 0.5;">Technology stack</p>
+    <p style="margin-top: 8px;">
+      <span class="pill pill-green">Next.js 16</span>
+      <span class="pill pill-blue">FastAPI</span>
+      <span class="pill pill-gold">Gemini 2.0</span>
+      <span class="pill pill-purple">Supabase</span>
+      <span class="pill pill-green">Recharts</span>
+      <span class="pill pill-blue">Vercel</span>
+    </p>
+  </div>
+  <div class="slide-number">08</div>
+</div>
+
+<!-- SLIDE 9: MOAT -->
+<div class="slide slide-green">
+  <div class="section-label">Defensibility</div>
+  <h2 class="title">5 Layers of <span class="gold">Competitive Moat</span></h2>
+  
+  <div style="margin-top: 32px;">
+    <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px;">
+      <span style="font-size: 28px;">🧠</span>
+      <div>
+        <div class="card-title">Domain-Specific AI Training</div>
+        <div class="card-desc" style="color: rgba(255,255,255,0.6);">500+ actual BRSR filing patterns. Can't be replicated without manual annotation of SEBI disclosure PDFs.</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px;">
+      <span style="font-size: 28px;">📐</span>
+      <div>
+        <div class="card-title">216-Point Validation Schema</div>
+        <div class="card-desc" style="color: rgba(255,255,255,0.6);">Hand-built regex, range checks, inter-field consistency rules. 23 validation layers specific to SEBI BRSR format.</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px;">
+      <span style="font-size: 28px;">🌐</span>
+      <div>
+        <div class="card-title">Cross-Framework Knowledge Graph</div>
+        <div class="card-desc" style="color: rgba(255,255,255,0.6);">39 BRSR→ESRS/GRI/TCFD/ISSB/SDG mappings from EFRAG IG-3 guidance and correlation tables.</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px;">
+      <span style="font-size: 28px;">📊</span>
+      <div>
+        <div class="card-title">NIFTY 50 Benchmark Database</div>
+        <div class="card-desc" style="color: rgba(255,255,255,0.6);">Sector-specific ESG metrics from all NIFTY 50 public filings. Annual refresh creates compounding data advantage.</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: flex-start; gap: 16px;">
+      <span style="font-size: 28px;">🔗</span>
+      <div>
+        <div class="card-title">API Network Effects (B2B)</div>
+        <div class="card-desc" style="color: rgba(255,255,255,0.6);">ESG consultants build workflows on our API. Each integration deepens switching costs.</div>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">09</div>
+</div>
+
+<!-- SLIDE 10: THE ASK -->
+<div class="slide slide-gold">
+  <div class="section-label">The Ask</div>
+  <h2 class="mega" style="margin-bottom: 24px;">Raising <span class="gold">₹2 Cr</span> Seed</h2>
+  <p class="subtitle" style="max-width: 600px;">To capture India's ₹190 Cr BRSR compliance market before the 2027 value chain mandate creates 5× demand expansion.</p>
+  
+  <div class="card-grid card-grid-3" style="margin-top: 40px;">
+    <div class="card" style="text-align: center;">
+      <div class="card-icon">👥</div>
+      <div class="card-title">40% — Team</div>
+      <div class="card-desc">ML engineer, ESG domain expert, enterprise sales</div>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div class="card-icon">🚀</div>
+      <div class="card-title">35% — Product</div>
+      <div class="card-desc">Gemini Pro upgrade, multi-year comparison, audit integrations</div>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div class="card-icon">📣</div>
+      <div class="card-title">25% — GTM</div>
+      <div class="card-desc">Enterprise pilots, compliance webinars, CA/CS partnerships</div>
+    </div>
+  </div>
+  
+  <div class="cta-box">
+    <div class="cta-title">filebrsr.com</div>
+    <div class="cta-sub">Try it free — Upload any BRSR PDF, results in 60 seconds</div>
+  </div>
+  <div class="slide-number">10</div>
+</div>
+
+<!-- SLIDE 11: VISION -->
+<div class="slide slide-cover" style="min-height: 500px;">
+  <div class="big-quote" style="max-width: 700px;">
+    "Workiva became a $5B company solving XBRL for SEC filings.<br><br>FileBRSR is building the same for India's ESG compliance — a <span class="gold">mandatory, recurring, regulation-driven</span> market with zero discretionary budget risk."
+  </div>
+  <p class="quote-source">— FileBRSR Vision</p>
+  
+  <div style="margin-top: 60px;">
+    <div class="logo-text" style="font-size: 24px;">File<span>BRSR</span></div>
+    <p style="font-size: 13px; opacity: 0.4; margin-top: 8px;">AI-Powered BRSR Compliance | filebrsr.com</p>
+  </div>
+</div>
+
+</body>
+</html>
