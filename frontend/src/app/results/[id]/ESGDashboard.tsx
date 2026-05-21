@@ -17,6 +17,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { BRSR_DATAPOINTS, SECTION_LABELS, SUBSECTION_LABELS, type BRSRDatapoint } from "@/lib/brsr-datapoints";
 
 // ──────────────────────────────────────────────────────────────────
 // Types
@@ -120,6 +121,46 @@ const SECTIONS = [
 const CHART_COLORS = ["#1B4D3E", "#2D7A5F", "#059669", "#0891B2", "#7C3AED", "#16A34A", "#CA8A04", "#DC2626", "#EA580C"];
 
 type ViewTab = "overview" | "section_a" | "section_b" | "section_c" | "gaps" | "benchmark" | "principles";
+
+// ──────────────────────────────────────────────────────────────────
+// Helper: Build datapoint manifest from client-side data
+// Always shows all 216 datapoints, marks found/missing by matching extracted keys
+// ──────────────────────────────────────────────────────────────────
+function buildClientManifest(extractedData: ExtractedData | null, backendManifest?: DatapointItem[]): DatapointItem[] {
+  // If backend already provided a manifest, prefer it
+  if (backendManifest && backendManifest.length > 0) return backendManifest;
+
+  // Fallback: compute from client-side BRSR_DATAPOINTS + extracted data
+  const extractedKeys = new Set<string>();
+  if (extractedData) {
+    for (const section of ["section_a", "section_b", "section_c"] as const) {
+      const sectionData = extractedData[section];
+      if (sectionData && typeof sectionData === "object") {
+        Object.keys(sectionData).forEach((k) => extractedKeys.add(k.toLowerCase()));
+      }
+    }
+  }
+
+  return BRSR_DATAPOINTS.map((dp) => {
+    // Match by checking if extracted keys contain words from the label
+    const labelWords = dp.label.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+    let found = false;
+    for (const key of extractedKeys) {
+      const keyWords = key.replace(/_/g, " ").toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+      if (labelWords.length > 0 && keyWords.length > 0) {
+        const overlap = labelWords.filter((w) => keyWords.includes(w));
+        if (overlap.length >= Math.min(2, labelWords.length)) {
+          found = true;
+          break;
+        }
+      }
+    }
+    return {
+      ...dp,
+      status: found ? "found" as const : "missing" as const,
+    };
+  });
+}
 
 // ──────────────────────────────────────────────────────────────────
 // Dashboard Component
@@ -472,9 +513,9 @@ export function ESGDashboard() {
         <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 lg:pb-6">
           {activeTab === "overview" && <OverviewPanel data={data} gaps={gaps} stats={stats} benchmark={benchmark} sectionChartData={sectionChartData} principleChartData={principleChartData} dataTypeChart={dataTypeChart} compliancePieData={compliancePieData} complianceScore={complianceScore} coreScore={coreScore} setActiveTab={setActiveTab} />}
           {(activeTab === "section_a" || activeTab === "section_b" || activeTab === "section_c") && <SectionPanel sectionKey={activeTab} data={filteredDatapoints} searchQuery={searchQuery} filterStatus={filterStatus} />}
-          {activeTab === "gaps" && <GapsPanel gaps={gaps} recommendations={filteredRecommendations} filterPriority={filterPriority} searchQuery={searchQuery} />}
+          {activeTab === "gaps" && <GapsPanel gaps={gaps} recommendations={filteredRecommendations} filterPriority={filterPriority} searchQuery={searchQuery} extractedData={data} />}
           {activeTab === "benchmark" && <BenchmarkPanel benchmark={benchmark} />}
-          {activeTab === "principles" && <PrinciplesPanel stats={stats} gaps={gaps} principleChartData={principleChartData} />}
+          {activeTab === "principles" && <PrinciplesPanel stats={stats} gaps={gaps} principleChartData={principleChartData} extractedData={data} />}
         </main>
       </div>
     </div>
@@ -737,12 +778,13 @@ function SectionPanel({
 // Gap Analysis Panel — Interactive Drill-Down
 // ══════════════════════════════════════════════════════════════════
 function GapsPanel({
-  gaps, recommendations, filterPriority, searchQuery,
+  gaps, recommendations, filterPriority, searchQuery, extractedData,
 }: {
   gaps: GapAnalysis | null;
   recommendations: Array<{ field_id: string; label: string; priority: string; reason: string; data_type?: string; esrs_ref?: string }>;
   filterPriority: string;
   searchQuery: string;
+  extractedData: ExtractedData | null;
 }) {
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [expandedSubsection, setExpandedSubsection] = useState<string | null>(null);
@@ -751,12 +793,32 @@ function GapsPanel({
   const [dpCoreFilter, setDpCoreFilter] = useState<"all" | "core" | "non-core">("all");
   const [selectedDatapoint, setSelectedDatapoint] = useState<DatapointItem | null>(null);
 
-  if (!gaps) {
-    return <div className="text-center text-gray-400 py-16">No gap analysis available</div>;
-  }
+  // Always compute manifest from client-side data (falls back to backend if available)
+  const manifest = buildClientManifest(extractedData, gaps?.datapoints_manifest);
+  const subsectionScores = gaps?.subsection_scores || {};
 
-  const manifest = gaps.datapoints_manifest || [];
-  const subsectionScores = gaps.subsection_scores || {};
+  // Compute section-level scores from manifest
+  const computedSectionScores: Record<string, { total: number; found: number; score: number }> = {};
+  for (const sec of ["section_a", "section_b", "section_c"]) {
+    const secDps = manifest.filter(dp => dp.section === sec);
+    const secFound = secDps.filter(dp => dp.status === "found").length;
+    computedSectionScores[sec] = {
+      total: secDps.length,
+      found: secFound,
+      score: secDps.length > 0 ? Math.round((secFound / secDps.length) * 100) : 0,
+    };
+  }
+  const sectionScores = gaps?.section_scores && Object.keys(gaps.section_scores).length > 0
+    ? gaps.section_scores : computedSectionScores;
+
+  // Compute overall stats from manifest
+  const totalFound = manifest.filter(dp => dp.status === "found").length;
+  const totalMissing = manifest.filter(dp => dp.status === "missing").length;
+  const coreDps = manifest.filter(dp => dp.core);
+  const coreFound = coreDps.filter(dp => dp.status === "found").length;
+  const coreMissing = coreDps.filter(dp => dp.status === "missing").length;
+  const overallPct = manifest.length > 0 ? Math.round((totalFound / manifest.length) * 100) : 0;
+  const corePct = coreDps.length > 0 ? Math.round((coreFound / coreDps.length) * 100) : 0;
 
   // Group manifest by section → subsection
   const groupedBySection: Record<string, Record<string, DatapointItem[]>> = {};
@@ -788,33 +850,6 @@ function GapsPanel({
     low: { bg: "#F3F4F6", text: "#374151", border: "#E5E7EB" },
   };
 
-  const sectionLabels: Record<string, string> = {
-    section_a: "Section A — General Disclosures",
-    section_b: "Section B — Management & Process",
-    section_c: "Section C — Principle-wise Performance",
-  };
-
-  const subsectionLabels: Record<string, string> = {
-    details_of_entity: "I. Details of Listed Entity",
-    products_services: "II. Products/Services",
-    operations: "III. Operations",
-    employees: "IV. Employees",
-    holding_subsidiary: "V. Holding/Subsidiary",
-    csr_details: "VI. CSR Details",
-    transparency: "VII. Transparency & Disclosures",
-    policy_management: "Policy & Management",
-    governance: "Governance, Leadership & Oversight",
-    principle_1: "P1 — Ethics & Transparency",
-    principle_2: "P2 — Sustainable Products",
-    principle_3: "P3 — Employee Wellbeing",
-    principle_4: "P4 — Stakeholder Engagement",
-    principle_5: "P5 — Human Rights",
-    principle_6: "P6 — Environment",
-    principle_7: "P7 — Policy Advocacy",
-    principle_8: "P8 — Inclusive Growth",
-    principle_9: "P9 — Consumer Value",
-  };
-
   const dataTypeBadgeColor: Record<string, string> = {
     narrative: "#6366F1", boolean: "#8B5CF6", integer: "#0EA5E9",
     monetary: "#059669", percent: "#D97706", decimal: "#0891B2",
@@ -830,29 +865,29 @@ function GapsPanel({
         <div className="bg-white rounded-xl border border-gray-200 p-4 relative overflow-hidden">
           <div className="absolute inset-0 opacity-5" style={{ background: `linear-gradient(135deg, #059669 0%, transparent 60%)` }} />
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Overall Score</p>
-          <p className="text-3xl font-black text-gray-900 mt-1">{gaps.overall_compliance}<span className="text-sm font-medium text-gray-400">%</span></p>
-          <div className="h-1.5 mt-2 rounded-full bg-gray-100"><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${gaps.overall_compliance}%`, background: gaps.overall_compliance >= 75 ? "#059669" : gaps.overall_compliance >= 50 ? "#D97706" : "#DC2626" }} /></div>
+          <p className="text-3xl font-black text-gray-900 mt-1">{overallPct}<span className="text-sm font-medium text-gray-400">%</span></p>
+          <div className="h-1.5 mt-2 rounded-full bg-gray-100"><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${overallPct}%`, background: overallPct >= 75 ? "#059669" : overallPct >= 50 ? "#D97706" : "#DC2626" }} /></div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4 relative overflow-hidden">
           <div className="absolute inset-0 opacity-5" style={{ background: `linear-gradient(135deg, #3B82F6 0%, transparent 60%)` }} />
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">BRSR Core</p>
-          <p className="text-3xl font-black text-gray-900 mt-1">{gaps.core_compliance}<span className="text-sm font-medium text-gray-400">%</span></p>
-          <div className="h-1.5 mt-2 rounded-full bg-gray-100"><div className="h-full rounded-full bg-blue-500 transition-all duration-1000" style={{ width: `${gaps.core_compliance}%` }} /></div>
+          <p className="text-3xl font-black text-gray-900 mt-1">{corePct}<span className="text-sm font-medium text-gray-400">%</span></p>
+          <div className="h-1.5 mt-2 rounded-full bg-gray-100"><div className="h-full rounded-full bg-blue-500 transition-all duration-1000" style={{ width: `${corePct}%` }} /></div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Disclosed</p>
-          <p className="text-3xl font-black text-emerald-600 mt-1">{gaps.fields_found}</p>
-          <p className="text-[10px] text-gray-400 mt-1">of {gaps.total_fields} mandatory</p>
+          <p className="text-3xl font-black text-emerald-600 mt-1">{totalFound}</p>
+          <p className="text-[10px] text-gray-400 mt-1">of {manifest.length} total</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Gaps</p>
-          <p className="text-3xl font-black text-red-600 mt-1">{gaps.fields_missing}</p>
+          <p className="text-3xl font-black text-red-600 mt-1">{totalMissing}</p>
           <p className="text-[10px] text-gray-400 mt-1">action required</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Core Missing</p>
-          <p className="text-3xl font-black text-amber-600 mt-1">{gaps.core_missing}</p>
-          <p className="text-[10px] text-gray-400 mt-1">assurance risk</p>
+          <p className="text-3xl font-black text-amber-600 mt-1">{coreMissing}</p>
+          <p className="text-[10px] text-gray-400 mt-1">of {coreDps.length} core items</p>
         </div>
       </div>
 
@@ -882,8 +917,8 @@ function GapsPanel({
         {/* ── VIEW: Section Heatmap ── */}
         {viewMode === "overview" && (
           <div className="p-5 space-y-4">
-            {Object.entries(sectionLabels).map(([sectionKey, sectionName]) => {
-              const score = gaps.section_scores[sectionKey];
+            {Object.entries(SECTION_LABELS).map(([sectionKey, sectionName]) => {
+              const score = sectionScores[sectionKey];
               if (!score) return null;
               const isExpanded = expandedSection === sectionKey;
               const subsections = groupedBySection[sectionKey] || {};
@@ -935,7 +970,7 @@ function GapsPanel({
                               className="w-full flex items-center gap-3 px-8 py-3 hover:bg-white/60 transition-colors"
                             >
                               <div className={`w-2 h-2 rounded-full shrink-0 ${pct >= 75 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500"}`} />
-                              <span className="text-xs font-semibold text-gray-700 flex-1 text-left">{subsectionLabels[subKey] || subKey.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</span>
+                              <span className="text-xs font-semibold text-gray-700 flex-1 text-left">{SUBSECTION_LABELS[subKey] || subKey.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</span>
                               <span className="text-[10px] text-gray-400">{foundCount}/{totalCount}</span>
                               <div className="w-16 h-1.5 rounded-full bg-gray-200 overflow-hidden">
                                 <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: pct >= 75 ? "#059669" : pct >= 50 ? "#D97706" : "#DC2626" }} />
@@ -951,17 +986,24 @@ function GapsPanel({
                                   <button
                                     key={dp.id}
                                     onClick={() => setSelectedDatapoint(dp)}
-                                    className="w-full flex items-center gap-3 px-10 py-2.5 hover:bg-emerald-50/30 transition-colors border-b border-gray-50 last:border-b-0 text-left"
+                                    className={`w-full flex items-center gap-3 px-10 py-2.5 transition-colors border-b border-gray-50 last:border-b-0 text-left ${
+                                      dp.status === "found"
+                                        ? "bg-green-50/70 hover:bg-green-100/80"
+                                        : "bg-red-50/50 hover:bg-red-100/60"
+                                    }`}
                                   >
                                     {dp.status === "found" ? (
-                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                      <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
                                     ) : (
-                                      <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                                      <XCircle className="w-4 h-4 text-red-500 shrink-0" />
                                     )}
-                                    <span className="text-[11px] text-gray-700 flex-1 leading-tight">{dp.label}</span>
+                                    <span className={`text-[11px] flex-1 leading-tight font-medium ${dp.status === "found" ? "text-green-800" : "text-red-800"}`}>{dp.label}</span>
                                     <div className="flex items-center gap-1.5 shrink-0">
-                                      {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">CORE</span>}
-                                      <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
+                                      {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${dp.status === "found" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                                        {dp.status === "found" ? "✓ Present" : "✗ Missing"}
+                                      </span>
                                     </div>
                                   </button>
                                 ))}
@@ -1030,20 +1072,20 @@ function GapsPanel({
                     <tr
                       key={dp.id}
                       onClick={() => setSelectedDatapoint(dp)}
-                      className={`cursor-pointer transition-colors ${dp.status === "found" ? "hover:bg-emerald-50/40" : "hover:bg-red-50/40"}`}
+                      className={`cursor-pointer transition-colors ${dp.status === "found" ? "bg-emerald-50/60 hover:bg-emerald-100/80" : "bg-red-50/40 hover:bg-red-100/60"}`}
                     >
                       <td className="py-2.5 px-4">
-                        {dp.status === "found" ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <XCircle className="w-4 h-4 text-red-400" />}
+                        {dp.status === "found" ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-red-500" />}
                       </td>
-                      <td className="py-2.5 px-4 text-[11px] font-mono text-gray-500">{dp.id}</td>
+                      <td className="py-2.5 px-4 text-[11px] font-mono text-gray-600 font-semibold">{dp.id}</td>
                       <td className="py-2.5 px-4 text-[11px] text-gray-800 font-medium">{dp.label}</td>
                       <td className="py-2.5 px-4">
-                        <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}12`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
                       </td>
                       <td className="py-2.5 px-4 text-center">
-                        {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">CORE</span>}
+                        {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
                       </td>
-                      <td className="py-2.5 px-4 text-[10px] text-gray-400">{dp.esrs_ref || "—"}</td>
+                      <td className="py-2.5 px-4 text-[10px] text-gray-500">{dp.esrs_ref || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1232,19 +1274,20 @@ function BenchmarkPanel({ benchmark }: { benchmark: BenchmarkData | null }) {
 // Principles Panel — Interactive Drill-Down per Principle
 // ══════════════════════════════════════════════════════════════════
 function PrinciplesPanel({
-  stats, gaps, principleChartData,
+  stats, gaps, principleChartData, extractedData,
 }: {
   stats: DatapointsStats | null;
   gaps: GapAnalysis | null;
   principleChartData: Array<{ principle: string; name: string; datapoints: number; fullMark: number }>;
+  extractedData: ExtractedData | null;
 }) {
   const [expandedPrinciple, setExpandedPrinciple] = useState<string | null>(null);
   const [principleFilter, setPrincipleFilter] = useState<"all" | "found" | "missing">("all");
   const [principleSearch, setPrincipleSearch] = useState("");
   const [selectedDp, setSelectedDp] = useState<DatapointItem | null>(null);
 
-  const manifest = gaps?.datapoints_manifest || [];
-  const subsectionScores = gaps?.subsection_scores || {};
+  // Always compute manifest from client-side data
+  const manifest = buildClientManifest(extractedData, gaps?.datapoints_manifest);
 
   // Group datapoints by principle (subsection)
   const principleDatapoints: Record<string, DatapointItem[]> = {};
@@ -1423,25 +1466,29 @@ function PrinciplesPanel({
                           key={dp.id}
                           onClick={() => setSelectedDp(dp)}
                           className={`w-full flex items-center gap-3 px-5 py-3 transition-colors text-left ${
-                            dp.status === "found" ? "hover:bg-emerald-50/30" : "hover:bg-red-50/30"
+                            dp.status === "found"
+                              ? "bg-green-50/60 hover:bg-green-100/80"
+                              : "bg-red-50/40 hover:bg-red-100/60"
                           }`}
                         >
                           {dp.status === "found" ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                            <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
                           ) : (
-                            <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                            <XCircle className="w-4 h-4 text-red-500 shrink-0" />
                           )}
                           <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-medium text-gray-800 leading-tight">{dp.label}</p>
+                            <p className={`text-[11px] font-medium leading-tight ${dp.status === "found" ? "text-green-800" : "text-red-800"}`}>{dp.label}</p>
                             <div className="flex items-center gap-1.5 mt-1">
-                              <span className="text-[9px] font-mono text-gray-400">{dp.id}</span>
-                              {dp.esrs_ref && <span className="text-[9px] text-purple-500">• {dp.esrs_ref}</span>}
+                              <span className="text-[9px] font-mono text-gray-500">{dp.id}</span>
+                              {dp.esrs_ref && <span className="text-[9px] text-purple-600 font-medium">• {dp.esrs_ref}</span>}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
-                            {dp.core && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">CORE</span>}
-                            <span className="text-[8px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}12`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
-                            {dp.mandatory && <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-50 text-red-500 font-medium">M</span>}
+                            {dp.core && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
+                            <span className="text-[8px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
+                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${dp.status === "found" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                              {dp.status === "found" ? "✓" : "✗"}
+                            </span>
                           </div>
                         </button>
                       ))
