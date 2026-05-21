@@ -121,7 +121,7 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
 
                 {profileOpen && (
                   <div
-                    className="absolute right-0 mt-2 bg-white border border-border shadow-lg"
+                    className="absolute right-0 mt-2 bg-card border border-border shadow-lg"
                     style={{ borderRadius: 12, width: 240, padding: "8px 0", zIndex: 100 }}
                   >
                     {/* User info */}
@@ -135,7 +135,7 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <CreditCard className="w-3.5 h-3.5 text-muted" />
-                          <span style={{ fontSize: 12, color: "#6B7280" }}>Plan</span>
+                          <span style={{ fontSize: 12, color: "var(--muted)" }}>Plan</span>
                         </div>
                         <span
                           style={{
@@ -143,8 +143,8 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                             fontWeight: 600,
                             padding: "2px 8px",
                             borderRadius: 6,
-                            background: planLabel === "Free" ? "#F3F4F6" : "#F0FDF4",
-                            color: planLabel === "Free" ? "#6B7280" : "#166534",
+                            background: planLabel === "Free" ? "var(--surface)" : "var(--icon-soft)",
+                            color: planLabel === "Free" ? "var(--muted)" : "var(--success)",
                           }}
                         >
                           {planLabel}
@@ -173,7 +173,7 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                     </div>
 
                     {/* Sign out */}
-                    <div style={{ borderTop: "1px solid #E5E7DF", padding: "4px 0" }}>
+                    <div style={{ borderTop: "1px solid var(--border)", padding: "4px 0" }}>
                       <button
                         onClick={handleSignOut}
                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"

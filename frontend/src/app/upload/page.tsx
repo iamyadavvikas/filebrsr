@@ -159,7 +159,7 @@ export default function UploadPage() {
       <main className="flex-1">
         <section style={{ padding: "72px 28px" }}>
           <div className="max-w-[600px] mx-auto">
-            <p className="text-center" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#2D7A5F", marginBottom: 8 }}>
+            <p className="text-center" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 8 }}>
               Try it now — free
             </p>
             <h1 className="text-center" style={{ fontSize: 28, fontWeight: 800, marginBottom: 8, letterSpacing: -0.5 }}>
@@ -245,7 +245,7 @@ export default function UploadPage() {
                     window.open("https://www.filebrsr.com/upload?sample=true", "_self");
                   }}
                   className="inline-flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors"
-                  style={{ color: "#1B4D3E", padding: "8px 16px", borderRadius: 10, border: "1px dashed #A7F3D0", background: "#F0FDF4" }}
+                  style={{ color: "var(--primary)", padding: "8px 16px", borderRadius: 10, border: "1px dashed var(--illustration-border)", background: "var(--icon-soft)" }}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   Try with sample sustainability report
@@ -261,7 +261,7 @@ export default function UploadPage() {
                 className="flex items-center justify-center gap-2 w-full btn-primary"
                 style={{
                   padding: "14px 0", borderRadius: 12, border: "none",
-                  background: "#1B4D3E",
+                  background: "var(--primary)",
                   color: "white", fontSize: 15, fontWeight: 700,
                   cursor: "pointer",
                   marginBottom: 16,
@@ -273,7 +273,7 @@ export default function UploadPage() {
 
             {/* AI Extraction Progress Indicator */}
             {uploading && (
-              <div style={{ background: "linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 50%, #F0FDFA 100%)", border: "1px solid #A7F3D0", borderRadius: 16, padding: "32px 24px", marginBottom: 16, textAlign: "center", position: "relative", overflow: "hidden" }}>
+              <div style={{ background: "var(--illustration-bg)", border: "1px solid var(--illustration-border)", borderRadius: 16, padding: "32px 24px", marginBottom: 16, textAlign: "center", position: "relative", overflow: "hidden" }}>
                 {/* Animated gradient sweep */}
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, transparent, rgba(27,77,62,0.05), transparent)", animation: "sweep 2s ease-in-out infinite" }} />
                 
@@ -293,41 +293,41 @@ export default function UploadPage() {
                             className="flex items-center justify-center rounded-full text-xs font-bold transition-all duration-500"
                             style={{
                               width: 28, height: 28,
-                              background: i <= progressStep ? "#1B4D3E" : "#E5E7EB",
-                              color: i <= progressStep ? "white" : "#9CA3AF",
+                              background: i <= progressStep ? "var(--primary)" : "var(--border)",
+                              color: i <= progressStep ? "white" : "var(--muted-light)",
                             }}
                           >
                             {i < progressStep ? "✓" : i + 1}
                           </div>
-                          <span className="text-xs mt-1.5 font-medium" style={{ color: i <= progressStep ? "#1B4D3E" : "#9CA3AF" }}>
+                          <span className="text-xs mt-1.5 font-medium" style={{ color: i <= progressStep ? "var(--primary)" : "var(--muted-light)" }}>
                             {step.label}
                           </span>
                         </div>
                         {i < PROGRESS_STEPS.length - 1 && (
-                          <div className="mx-1.5" style={{ width: 24, height: 2, borderRadius: 2, background: i < progressStep ? "#1B4D3E" : "#E5E7EB", transition: "background 0.5s" }} />
+                          <div className="mx-1.5" style={{ width: 24, height: 2, borderRadius: 2, background: i < progressStep ? "var(--primary)" : "var(--border)", transition: "background 0.5s" }} />
                         )}
                       </div>
                     ))}
                   </div>
                   
-                  <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#059669", marginBottom: 8 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--success)", marginBottom: 8 }}>
                     AI-Powered
                   </p>
-                  <h2 style={{ fontSize: 22, fontWeight: 800, color: "#1B4D3E", marginBottom: 4, letterSpacing: -0.5 }}>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--primary)", marginBottom: 4, letterSpacing: -0.5 }}>
                     BRSR Metric{" "}
                     <span style={{ background: "linear-gradient(120deg, #E8B931 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                       Extraction
                     </span>
                   </h2>
-                  <p style={{ fontSize: 13, color: "#6B7280", marginTop: 8 }}>
+                  <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 8 }}>
                     {progress || "Analyzing 216 SEBI BRSR data points..."}
                   </p>
                   
                   {/* Progress bar */}
-                  <div style={{ marginTop: 20, height: 4, borderRadius: 4, background: "#E5E7EB", overflow: "hidden" }}>
+                  <div style={{ marginTop: 20, height: 4, borderRadius: 4, background: "var(--border)", overflow: "hidden" }}>
                     <div style={{ height: "100%", borderRadius: 4, background: "linear-gradient(90deg, #1B4D3E, #2D7A5F, #059669)", animation: "progress 60s linear forwards", width: "0%" }} />
                   </div>
-                  <p style={{ fontSize: 11, color: "#9CA3AF", marginTop: 8 }}>
+                  <p style={{ fontSize: 11, color: "var(--muted-light)", marginTop: 8 }}>
                     Usually completes in ~60 seconds
                   </p>
                 </div>
@@ -336,11 +336,11 @@ export default function UploadPage() {
 
             {/* Auth prompt - shown when user tries to extract without login */}
             {showAuthPrompt && (
-              <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: "20px 24px", marginBottom: 16, textAlign: "center" }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: "#92400E", marginBottom: 4 }}>
+              <div style={{ background: "var(--urgency-bg)", border: "1px solid var(--urgency-border)", borderRadius: 12, padding: "20px 24px", marginBottom: 16, textAlign: "center" }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "var(--urgency-text)", marginBottom: 4 }}>
                   Sign in to extract your report
                 </p>
-                <p style={{ fontSize: 12, color: "#A16207", marginBottom: 16 }}>
+                <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>
                   Quick one-click sign in with Google. Your file will be processed right after.
                 </p>
                 <button

@@ -170,8 +170,8 @@ export default function HomePage() {
           <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {stats.map((s) => (
               <div key={s.label}>
-                <p style={{ fontSize: 36, fontWeight: 800, color: "#1B4D3E", letterSpacing: -1 }}>{s.value}</p>
-                <p style={{ fontSize: 12, color: "#6B7280", marginTop: 4, fontWeight: 500 }}>{s.label}</p>
+                <p style={{ fontSize: 36, fontWeight: 800, color: "var(--primary)", letterSpacing: -1 }}>{s.value}</p>
+                <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4, fontWeight: 500 }}>{s.label}</p>
               </div>
             ))}
           </div>
@@ -181,7 +181,7 @@ export default function HomePage() {
         <section style={{ padding: "80px 28px" }}>
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-14">
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#2D7A5F", marginBottom: 10 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
                 OUR PLATFORM
               </p>
               <h2 style={{ fontSize: "clamp(28px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 14 }}>
@@ -196,7 +196,7 @@ export default function HomePage() {
               {productSuite.map((p) => (
                 <div
                   key={p.name}
-                  className="group relative bg-white border border-border hover:border-transparent hover:shadow-xl transition-all duration-300"
+                  className="group relative bg-card border border-border hover:border-transparent hover:shadow-xl transition-all duration-300"
                   style={{ borderRadius: 20, padding: "32px 28px" }}
                 >
                   <div className="flex items-start gap-4">
@@ -218,7 +218,7 @@ export default function HomePage() {
             <div className="text-center mt-10">
               <Link
                 href="/upload"
-                style={{ fontSize: 14, fontWeight: 700, padding: "13px 32px", borderRadius: 12, background: "#1B4D3E", color: "white", display: "inline-flex", alignItems: "center", gap: 8 }}
+                style={{ fontSize: 14, fontWeight: 700, padding: "13px 32px", borderRadius: 12, background: "var(--primary)", color: "white", display: "inline-flex", alignItems: "center", gap: 8 }}
               >
                 TRY THE PLATFORM
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -228,7 +228,7 @@ export default function HomePage() {
         </section>
 
         {/* ═══ HIGHLIGHTS ═══ */}
-        <section style={{ padding: "80px 28px", background: "linear-gradient(180deg, #F0FDF4 0%, #FAFBF9 100%)" }}>
+        <section style={{ padding: "80px 28px", background: "var(--highlight-bg)" }}>
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-14">
               <h2 style={{ fontSize: "clamp(26px, 3vw, 34px)", fontWeight: 800, letterSpacing: -0.5 }}>
@@ -237,9 +237,9 @@ export default function HomePage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
               {highlights.map((h) => (
-                <div key={h.title} className="bg-white rounded-2xl border border-border p-6 text-center hover:shadow-lg transition-shadow">
-                  <div className="mx-auto mb-4" style={{ width: 48, height: 48, borderRadius: 14, background: "#EEF7F3", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg style={{ width: 22, height: 22, color: "#1B4D3E" }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <div key={h.title} className="bg-card rounded-2xl border border-border p-6 text-center hover:shadow-lg transition-shadow">
+                  <div className="mx-auto mb-4" style={{ width: 48, height: 48, borderRadius: 14, background: "var(--icon-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg style={{ width: 22, height: 22, color: "var(--primary)" }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d={h.icon} />
                     </svg>
                   </div>
@@ -256,7 +256,7 @@ export default function HomePage() {
           <div className="max-w-5xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div>
-                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#E8B931", marginBottom: 12 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--accent)", marginBottom: 12 }}>
                   HOW IT WORKS
                 </p>
                 <h2 style={{ fontSize: "clamp(26px, 3vw, 34px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 20 }}>
@@ -269,7 +269,7 @@ export default function HomePage() {
                     { n: "03", t: "Download audit-ready data", d: "Get structured reports — PDF, Excel workbook, or XBRL-JSON — with full data lineage." },
                   ].map((s) => (
                     <div key={s.n} className="flex gap-4 items-start">
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "#1B4D3E", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--primary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
                         {s.n}
                       </div>
                       <div>
@@ -282,11 +282,11 @@ export default function HomePage() {
               </div>
               {/* Right illustration */}
               <div className="relative">
-                <div className="rounded-2xl p-8" style={{ background: "linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 50%, #F0FDFA 100%)", border: "1px solid #BBF7D0" }}>
-                  <div className="bg-white rounded-xl shadow-sm border border-border p-5">
+                <div className="rounded-2xl p-8" style={{ background: "var(--illustration-bg)", border: "1px solid var(--illustration-border)" }}>
+                  <div className="bg-card rounded-xl shadow-sm border border-border p-5">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "#EEF7F3" }}>
-                        <svg style={{ width: 20, height: 20, color: "#1B4D3E" }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "var(--icon-soft)" }}>
+                        <svg style={{ width: 20, height: 20, color: "var(--primary)" }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                         </svg>
                       </div>
@@ -295,7 +295,7 @@ export default function HomePage() {
                         <p className="text-xs text-muted">4.2 MB • Processing complete</p>
                       </div>
                       <div className="ml-auto">
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "#DCFCE7", color: "#166534" }}>✓ Done</span>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--icon-soft)", color: "var(--success)" }}>✓ Done</span>
                       </div>
                     </div>
                     <div className="border-t border-border pt-4 space-y-2.5">
@@ -319,20 +319,20 @@ export default function HomePage() {
         <section style={{ padding: "80px 28px" }}>
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-12">
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#DC2626", marginBottom: 10 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#EF4444", marginBottom: 10 }}>
                 STOP WASTING TIME & MONEY
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5 }}>
                 Manual filing vs FileBRSR
               </h2>
             </div>
-            <div className="bg-white rounded-2xl border border-border overflow-hidden shadow-sm">
+            <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
               <table className="w-full">
                 <thead>
                   <tr style={{ background: "var(--surface)" }}>
                     <th className="text-left py-4 px-6 text-sm font-bold text-gray-900">Metric</th>
                     <th className="text-center py-4 px-6 text-sm font-bold text-gray-500">Manual / Consultants</th>
-                    <th className="text-center py-4 px-6 text-sm font-bold" style={{ color: "#1B4D3E" }}>FileBRSR</th>
+                    <th className="text-center py-4 px-6 text-sm font-bold" style={{ color: "var(--primary)" }}>FileBRSR</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -348,7 +348,7 @@ export default function HomePage() {
                     <tr key={i} className={row.highlight ? "bg-emerald-50/30" : ""}>
                       <td className="py-3.5 px-6 text-sm font-medium text-gray-800">{row.metric}</td>
                       <td className="py-3.5 px-6 text-center text-sm text-gray-500">{row.manual}</td>
-                      <td className="py-3.5 px-6 text-center text-sm font-semibold" style={{ color: "#1B4D3E" }}>{row.ai}</td>
+                      <td className="py-3.5 px-6 text-center text-sm font-semibold" style={{ color: "var(--primary)" }}>{row.ai}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -357,7 +357,7 @@ export default function HomePage() {
             <div className="text-center mt-8">
               <Link
                 href="/upload"
-                style={{ fontSize: 14, fontWeight: 700, padding: "13px 32px", borderRadius: 12, background: "#1B4D3E", color: "white", display: "inline-flex", alignItems: "center", gap: 8 }}
+                style={{ fontSize: 14, fontWeight: 700, padding: "13px 32px", borderRadius: 12, background: "var(--primary)", color: "white", display: "inline-flex", alignItems: "center", gap: 8 }}
               >
                 START SAVING TIME
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -369,7 +369,7 @@ export default function HomePage() {
         {/* ═══ SOCIAL PROOF ═══ */}
         <section style={{ padding: "64px 28px", background: "var(--surface)" }}>
           <div className="max-w-4xl mx-auto text-center">
-            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#2D7A5F", marginBottom: 10 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
               BUILT FOR INDIA&apos;S TOP LISTED COMPANIES
             </p>
             <h2 style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 16 }}>
@@ -380,12 +380,12 @@ export default function HomePage() {
             </p>
 
             {/* Urgency Banner */}
-            <div className="mb-8 inline-flex items-center gap-3 px-5 py-3 rounded-xl border border-amber-200" style={{ background: "#FFFBEB" }}>
+            <div className="mb-8 inline-flex items-center gap-3 px-5 py-3 rounded-xl" style={{ background: "var(--urgency-bg)", border: "1px solid var(--urgency-border)" }}>
               <span className="flex h-2.5 w-2.5 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
               </span>
-              <span className="text-sm font-semibold text-amber-800">
+              <span className="text-sm font-semibold" style={{ color: "var(--urgency-text)" }}>
                 BRSR Core assurance deadline: FY 2026-27 — Top 250 companies must comply
               </span>
             </div>
@@ -396,7 +396,7 @@ export default function HomePage() {
                 { icon: "📊", title: "ESG Consultants", desc: "Serve more clients with instant extraction. Scale without hiring." },
                 { icon: "✅", title: "Assurance Providers", desc: "Verify BRSR filings faster with structured, traceable data." },
               ].map((t) => (
-                <div key={t.title} className="bg-white rounded-2xl border border-border p-6 text-left hover:shadow-md transition-shadow">
+                <div key={t.title} className="bg-card rounded-2xl border border-border p-6 text-left hover:shadow-md transition-shadow">
                   <span className="text-2xl mb-3 block">{t.icon}</span>
                   <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>{t.title}</h3>
                   <p className="text-muted" style={{ fontSize: 13, lineHeight: 1.65 }}>{t.desc}</p>
@@ -448,14 +448,14 @@ function FAQAccordion({ faqs }: { faqs: Array<{ q: string; a: string }> }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-white">
+    <div className="divide-y divide-border rounded-2xl border border-border overflow-hidden bg-card">
       {faqs.map((f, i) => (
         <div key={i}>
           <button
             onClick={() => setOpenIndex(openIndex === i ? null : i)}
             className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-gray-50/50 transition-colors"
           >
-            <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1F2937", paddingRight: 16 }}>{f.q}</h3>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--foreground)", paddingRight: 16 }}>{f.q}</h3>
             <ChevronDown
               className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${openIndex === i ? "rotate-180" : ""}`}
             />
