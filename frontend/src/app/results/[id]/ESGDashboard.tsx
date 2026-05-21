@@ -40,6 +40,8 @@ interface GapAnalysis {
   missing_mandatory: Array<{ id: string; label: string; core: boolean; data_type?: string; esrs_ref?: string }>;
   missing_core: Array<{ id: string; label: string; esrs_ref?: string }>;
   recommendations: Array<{ field_id: string; label: string; priority: string; reason: string; data_type?: string; esrs_ref?: string }>;
+  datapoints_manifest?: Array<DatapointItem>;
+  subsection_scores?: Record<string, { total: number; found: number; missing: number; score: number }>;
 }
 
 interface DatapointsStats {
@@ -77,6 +79,21 @@ interface BackendResponse {
   gap_analysis?: GapAnalysis;
   datapoints_stats?: DatapointsStats;
   benchmark?: BenchmarkData;
+}
+
+interface DatapointItem {
+  id: string;
+  label: string;
+  data_type: string;
+  mandatory: boolean;
+  core: boolean;
+  indicator_type: string;
+  section: string;
+  subsection: string;
+  esrs_ref: string | null;
+  paragraph_ref: string;
+  conditional: boolean;
+  status: "found" | "missing";
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -717,7 +734,7 @@ function SectionPanel({
 }
 
 // ══════════════════════════════════════════════════════════════════
-// Gap Analysis Panel
+// Gap Analysis Panel — Interactive Drill-Down
 // ══════════════════════════════════════════════════════════════════
 function GapsPanel({
   gaps, recommendations, filterPriority, searchQuery,
@@ -727,99 +744,392 @@ function GapsPanel({
   filterPriority: string;
   searchQuery: string;
 }) {
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [expandedSubsection, setExpandedSubsection] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"overview" | "datapoints" | "recommendations">("overview");
+  const [dpFilter, setDpFilter] = useState<"all" | "found" | "missing">("all");
+  const [dpCoreFilter, setDpCoreFilter] = useState<"all" | "core" | "non-core">("all");
+  const [selectedDatapoint, setSelectedDatapoint] = useState<DatapointItem | null>(null);
+
   if (!gaps) {
     return <div className="text-center text-gray-400 py-16">No gap analysis available</div>;
   }
 
+  const manifest = gaps.datapoints_manifest || [];
+  const subsectionScores = gaps.subsection_scores || {};
+
+  // Group manifest by section → subsection
+  const groupedBySection: Record<string, Record<string, DatapointItem[]>> = {};
+  manifest.forEach((dp) => {
+    if (!groupedBySection[dp.section]) groupedBySection[dp.section] = {};
+    if (!groupedBySection[dp.section][dp.subsection]) groupedBySection[dp.section][dp.subsection] = [];
+    groupedBySection[dp.section][dp.subsection].push(dp);
+  });
+
+  // Filter manifest
+  const filteredManifest = manifest.filter((dp) => {
+    if (dpFilter === "found" && dp.status !== "found") return false;
+    if (dpFilter === "missing" && dp.status !== "missing") return false;
+    if (dpCoreFilter === "core" && !dp.core) return false;
+    if (dpCoreFilter === "non-core" && dp.core) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return dp.label.toLowerCase().includes(q) || dp.id.toLowerCase().includes(q) || (dp.esrs_ref || "").toLowerCase().includes(q);
+    }
+    return true;
+  });
+
   const priorityColors: Record<string, { bg: string; text: string; border: string }> = {
     critical: { bg: "#FEE2E2", text: "#991B1B", border: "#FECACA" },
     high: { bg: "#FEF3C7", text: "#92400E", border: "#FDE68A" },
+    HIGH: { bg: "#FEF3C7", text: "#92400E", border: "#FDE68A" },
     medium: { bg: "#E0F2FE", text: "#075985", border: "#BAE6FD" },
+    MEDIUM: { bg: "#E0F2FE", text: "#075985", border: "#BAE6FD" },
     low: { bg: "#F3F4F6", text: "#374151", border: "#E5E7EB" },
   };
 
+  const sectionLabels: Record<string, string> = {
+    section_a: "Section A — General Disclosures",
+    section_b: "Section B — Management & Process",
+    section_c: "Section C — Principle-wise Performance",
+  };
+
+  const subsectionLabels: Record<string, string> = {
+    details_of_entity: "I. Details of Listed Entity",
+    products_services: "II. Products/Services",
+    operations: "III. Operations",
+    employees: "IV. Employees",
+    holding_subsidiary: "V. Holding/Subsidiary",
+    csr_details: "VI. CSR Details",
+    transparency: "VII. Transparency & Disclosures",
+    policy_management: "Policy & Management",
+    governance: "Governance, Leadership & Oversight",
+    principle_1: "P1 — Ethics & Transparency",
+    principle_2: "P2 — Sustainable Products",
+    principle_3: "P3 — Employee Wellbeing",
+    principle_4: "P4 — Stakeholder Engagement",
+    principle_5: "P5 — Human Rights",
+    principle_6: "P6 — Environment",
+    principle_7: "P7 — Policy Advocacy",
+    principle_8: "P8 — Inclusive Growth",
+    principle_9: "P9 — Consumer Value",
+  };
+
+  const dataTypeBadgeColor: Record<string, string> = {
+    narrative: "#6366F1", boolean: "#8B5CF6", integer: "#0EA5E9",
+    monetary: "#059669", percent: "#D97706", decimal: "#0891B2",
+    date: "#EC4899", gyear: "#EC4899", table: "#7C3AED",
+    enumeration: "#F59E0B", mass: "#10B981", energy: "#F97316",
+    volume: "#06B6D4", area: "#84CC16", intensity: "#EF4444",
+  };
+
   return (
-    <div className="max-w-5xl space-y-5">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-[10px] font-bold text-gray-400 uppercase">Overall</p>
-          <p className="text-2xl font-black text-gray-900 mt-1">{gaps.overall_compliance}%</p>
-          <div className="h-1.5 mt-2 rounded-full bg-gray-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${gaps.overall_compliance}%` }} /></div>
+    <div className="max-w-6xl space-y-5">
+      {/* ── Top Summary Strip ── */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-5" style={{ background: `linear-gradient(135deg, #059669 0%, transparent 60%)` }} />
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Overall Score</p>
+          <p className="text-3xl font-black text-gray-900 mt-1">{gaps.overall_compliance}<span className="text-sm font-medium text-gray-400">%</span></p>
+          <div className="h-1.5 mt-2 rounded-full bg-gray-100"><div className="h-full rounded-full transition-all duration-1000" style={{ width: `${gaps.overall_compliance}%`, background: gaps.overall_compliance >= 75 ? "#059669" : gaps.overall_compliance >= 50 ? "#D97706" : "#DC2626" }} /></div>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-5" style={{ background: `linear-gradient(135deg, #3B82F6 0%, transparent 60%)` }} />
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">BRSR Core</p>
+          <p className="text-3xl font-black text-gray-900 mt-1">{gaps.core_compliance}<span className="text-sm font-medium text-gray-400">%</span></p>
+          <div className="h-1.5 mt-2 rounded-full bg-gray-100"><div className="h-full rounded-full bg-blue-500 transition-all duration-1000" style={{ width: `${gaps.core_compliance}%` }} /></div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-[10px] font-bold text-gray-400 uppercase">BRSR Core</p>
-          <p className="text-2xl font-black text-gray-900 mt-1">{gaps.core_compliance}%</p>
-          <div className="h-1.5 mt-2 rounded-full bg-gray-100"><div className="h-full rounded-full bg-blue-500" style={{ width: `${gaps.core_compliance}%` }} /></div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Disclosed</p>
+          <p className="text-3xl font-black text-emerald-600 mt-1">{gaps.fields_found}</p>
+          <p className="text-[10px] text-gray-400 mt-1">of {gaps.total_fields} mandatory</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-[10px] font-bold text-gray-400 uppercase">Found</p>
-          <p className="text-2xl font-black text-emerald-600 mt-1">{gaps.fields_found}</p>
-          <p className="text-[10px] text-gray-400 mt-1">of {gaps.total_fields} total</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-[10px] font-bold text-gray-400 uppercase">Missing</p>
-          <p className="text-2xl font-black text-red-600 mt-1">{gaps.fields_missing}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Gaps</p>
+          <p className="text-3xl font-black text-red-600 mt-1">{gaps.fields_missing}</p>
           <p className="text-[10px] text-gray-400 mt-1">action required</p>
         </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Core Missing</p>
+          <p className="text-3xl font-black text-amber-600 mt-1">{gaps.core_missing}</p>
+          <p className="text-[10px] text-gray-400 mt-1">assurance risk</p>
+        </div>
       </div>
 
-      {/* Recommendations List */}
+      {/* ── View Mode Tabs (like stock market tabs) ── */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-gray-800">Recommendations ({recommendations.length})</h3>
-          <div className="flex items-center gap-2 text-[10px] text-gray-400">
-            {filterPriority !== "all" && <span className="px-2 py-0.5 bg-gray-100 rounded">Priority: {filterPriority}</span>}
-            {searchQuery && <span className="px-2 py-0.5 bg-gray-100 rounded">Search: &quot;{searchQuery}&quot;</span>}
-          </div>
+        <div className="flex border-b border-gray-100">
+          {[
+            { key: "overview" as const, label: "Section Heatmap", icon: BarChart3 },
+            { key: "datapoints" as const, label: `All Datapoints (${manifest.length})`, icon: Layers },
+            { key: "recommendations" as const, label: `Recommendations (${recommendations.length})`, icon: AlertTriangle },
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setViewMode(key)}
+              className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold transition-all border-b-2 ${
+                viewMode === key
+                  ? "border-emerald-600 text-emerald-700 bg-emerald-50/50"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </button>
+          ))}
         </div>
-        <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto">
-          {recommendations.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 text-sm">No recommendations match the current filters</div>
-          ) : (
-            recommendations.map((rec, i) => {
-              const colors = priorityColors[rec.priority] || priorityColors.low;
+
+        {/* ── VIEW: Section Heatmap ── */}
+        {viewMode === "overview" && (
+          <div className="p-5 space-y-4">
+            {Object.entries(sectionLabels).map(([sectionKey, sectionName]) => {
+              const score = gaps.section_scores[sectionKey];
+              if (!score) return null;
+              const isExpanded = expandedSection === sectionKey;
+              const subsections = groupedBySection[sectionKey] || {};
+
               return (
-                <div key={i} className="px-5 py-3 flex items-start gap-3 hover:bg-gray-50/50 transition">
-                  <span className="text-xs font-bold px-2 py-0.5 rounded mt-0.5 shrink-0" style={{ background: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}>
-                    {rec.priority.toUpperCase()}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800">{rec.label}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{rec.reason}</p>
-                    <div className="flex gap-2 mt-1.5">
-                      {rec.data_type && <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">{rec.data_type}</span>}
-                      {rec.esrs_ref && <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded">ESRS: {rec.esrs_ref}</span>}
+                <div key={sectionKey} className="border border-gray-200 rounded-xl overflow-hidden transition-all">
+                  {/* Section Header - Clickable */}
+                  <button
+                    onClick={() => setExpandedSection(isExpanded ? null : sectionKey)}
+                    className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50/50 transition-colors"
+                  >
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{
+                      background: score.score >= 75 ? "#DCFCE7" : score.score >= 50 ? "#FEF3C7" : "#FEE2E2",
+                    }}>
+                      <span className="text-sm font-black" style={{
+                        color: score.score >= 75 ? "#166534" : score.score >= 50 ? "#92400E" : "#991B1B",
+                      }}>{score.score}%</span>
                     </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-gray-300 shrink-0 mt-1" />
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-bold text-gray-900">{sectionName}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{score.found} of {score.total} disclosed • {score.total - score.found} gaps</p>
+                    </div>
+                    {/* Mini progress bar */}
+                    <div className="hidden sm:block w-32">
+                      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-700" style={{
+                          width: `${score.score}%`,
+                          background: score.score >= 75 ? "#059669" : score.score >= 50 ? "#D97706" : "#DC2626",
+                        }} />
+                      </div>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
+                  </button>
+
+                  {/* Expanded: Subsection Breakdown */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 bg-gray-50/30">
+                      {Object.entries(subsections).map(([subKey, datapoints]) => {
+                        const subScore = subsectionScores[subKey];
+                        const subExpanded = expandedSubsection === subKey;
+                        const foundCount = datapoints.filter(d => d.status === "found").length;
+                        const totalCount = datapoints.length;
+                        const pct = totalCount > 0 ? Math.round((foundCount / totalCount) * 100) : 0;
+
+                        return (
+                          <div key={subKey} className="border-b border-gray-100 last:border-b-0">
+                            <button
+                              onClick={() => setExpandedSubsection(subExpanded ? null : subKey)}
+                              className="w-full flex items-center gap-3 px-8 py-3 hover:bg-white/60 transition-colors"
+                            >
+                              <div className={`w-2 h-2 rounded-full shrink-0 ${pct >= 75 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500"}`} />
+                              <span className="text-xs font-semibold text-gray-700 flex-1 text-left">{subsectionLabels[subKey] || subKey.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</span>
+                              <span className="text-[10px] text-gray-400">{foundCount}/{totalCount}</span>
+                              <div className="w-16 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: pct >= 75 ? "#059669" : pct >= 50 ? "#D97706" : "#DC2626" }} />
+                              </div>
+                              <span className="text-[10px] font-bold w-8 text-right" style={{ color: pct >= 75 ? "#059669" : pct >= 50 ? "#D97706" : "#DC2626" }}>{pct}%</span>
+                              <ChevronRight className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${subExpanded ? "rotate-90" : ""}`} />
+                            </button>
+
+                            {/* Expanded: Individual Datapoints */}
+                            {subExpanded && (
+                              <div className="bg-white border-t border-gray-100">
+                                {datapoints.map((dp) => (
+                                  <button
+                                    key={dp.id}
+                                    onClick={() => setSelectedDatapoint(dp)}
+                                    className="w-full flex items-center gap-3 px-10 py-2.5 hover:bg-emerald-50/30 transition-colors border-b border-gray-50 last:border-b-0 text-left"
+                                  >
+                                    {dp.status === "found" ? (
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                    ) : (
+                                      <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                                    )}
+                                    <span className="text-[11px] text-gray-700 flex-1 leading-tight">{dp.label}</span>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">CORE</span>}
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
+
+        {/* ── VIEW: All Datapoints (Flat searchable list) ── */}
+        {viewMode === "datapoints" && (
+          <div className="p-5 space-y-3">
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex bg-gray-100 rounded-lg p-0.5">
+                {(["all", "found", "missing"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setDpFilter(f)}
+                    className={`px-3 py-1.5 text-[11px] font-semibold rounded-md transition-all ${
+                      dpFilter === f ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {f === "all" ? `All (${manifest.length})` : f === "found" ? `Disclosed (${manifest.filter(d => d.status === "found").length})` : `Missing (${manifest.filter(d => d.status === "missing").length})`}
+                  </button>
+                ))}
+              </div>
+              <div className="flex bg-gray-100 rounded-lg p-0.5">
+                {(["all", "core", "non-core"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setDpCoreFilter(f)}
+                    className={`px-3 py-1.5 text-[11px] font-semibold rounded-md transition-all ${
+                      dpCoreFilter === f ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {f === "all" ? "All" : f === "core" ? "Core Only" : "Non-Core"}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[10px] text-gray-400 ml-auto">{filteredManifest.length} results</span>
+            </div>
+
+            {/* Datapoints list */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden max-h-[600px] overflow-y-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-8">Status</th>
+                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-16">ID</th>
+                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase">Datapoint</th>
+                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-20">Type</th>
+                    <th className="text-center py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-14">Core</th>
+                    <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-28">ESRS Ref</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filteredManifest.map((dp) => (
+                    <tr
+                      key={dp.id}
+                      onClick={() => setSelectedDatapoint(dp)}
+                      className={`cursor-pointer transition-colors ${dp.status === "found" ? "hover:bg-emerald-50/40" : "hover:bg-red-50/40"}`}
+                    >
+                      <td className="py-2.5 px-4">
+                        {dp.status === "found" ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <XCircle className="w-4 h-4 text-red-400" />}
+                      </td>
+                      <td className="py-2.5 px-4 text-[11px] font-mono text-gray-500">{dp.id}</td>
+                      <td className="py-2.5 px-4 text-[11px] text-gray-800 font-medium">{dp.label}</td>
+                      <td className="py-2.5 px-4">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}12`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
+                      </td>
+                      <td className="py-2.5 px-4 text-center">
+                        {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">CORE</span>}
+                      </td>
+                      <td className="py-2.5 px-4 text-[10px] text-gray-400">{dp.esrs_ref || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filteredManifest.length === 0 && (
+                <div className="py-12 text-center text-gray-400 text-sm">No datapoints match the current filters</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── VIEW: Recommendations ── */}
+        {viewMode === "recommendations" && (
+          <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
+            {recommendations.length === 0 ? (
+              <div className="p-8 text-center text-gray-400 text-sm">No recommendations match the current filters</div>
+            ) : (
+              recommendations.map((rec, i) => {
+                const colors = priorityColors[rec.priority] || priorityColors.low;
+                return (
+                  <div key={i} className="px-5 py-4 flex items-start gap-3 hover:bg-gray-50/50 transition">
+                    <span className="text-[10px] font-bold px-2 py-1 rounded mt-0.5 shrink-0" style={{ background: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}>
+                      {rec.priority}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{rec.label}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{rec.reason}</p>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full font-medium">{rec.field_id}</span>
+                        {rec.data_type && <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: `${dataTypeBadgeColor[rec.data_type] || "#6B7280"}12`, color: dataTypeBadgeColor[rec.data_type] || "#6B7280" }}>📊 {rec.data_type}</span>}
+                        {rec.esrs_ref && <span className="text-[10px] px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full font-medium">🇪🇺 {rec.esrs_ref}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Missing Core Fields */}
-      {gaps.missing_core && gaps.missing_core.length > 0 && (
-        <div className="bg-white rounded-xl border border-red-200 overflow-hidden">
-          <div className="px-5 py-3 border-b border-red-100 bg-red-50">
-            <h3 className="text-sm font-bold text-red-800 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" />
-              Missing BRSR Core Fields ({gaps.missing_core.length})
-            </h3>
-            <p className="text-xs text-red-600 mt-0.5">These are mandatory for limited assurance under SEBI Listing Obligations</p>
-          </div>
-          <div className="divide-y divide-red-50 max-h-[300px] overflow-y-auto">
-            {gaps.missing_core.map((field, i) => (
-              <div key={i} className="px-5 py-2.5 flex items-center gap-3">
-                <XCircle className="w-4 h-4 text-red-400 shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">{field.label}</p>
-                  {field.esrs_ref && <p className="text-[10px] text-gray-400">ESRS: {field.esrs_ref}</p>}
+      {/* ── Datapoint Detail Modal (like stock detail panel) ── */}
+      {selectedDatapoint && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setSelectedDatapoint(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ background: selectedDatapoint.status === "found" ? "#F0FDF4" : "#FEF2F2" }}>
+              <div className="flex items-center gap-2">
+                {selectedDatapoint.status === "found" ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <XCircle className="w-5 h-5 text-red-500" />}
+                <span className="text-xs font-bold" style={{ color: selectedDatapoint.status === "found" ? "#166534" : "#991B1B" }}>
+                  {selectedDatapoint.status === "found" ? "DISCLOSED" : "NOT DISCLOSED"}
+                </span>
+              </div>
+              <button onClick={() => setSelectedDatapoint(null)} className="text-gray-400 hover:text-gray-600">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <p className="text-xs font-mono text-gray-400">{selectedDatapoint.id}</p>
+                <h3 className="text-base font-bold text-gray-900 mt-1">{selectedDatapoint.label}</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Data Type</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDatapoint.data_type}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Section</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5">{selectedDatapoint.section.replace("section_", "Section ").toUpperCase()}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Indicator</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDatapoint.indicator_type}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Paragraph</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5">{selectedDatapoint.paragraph_ref}</p>
                 </div>
               </div>
-            ))}
+              <div className="flex flex-wrap gap-2">
+                {selectedDatapoint.mandatory && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">Mandatory</span>}
+                {selectedDatapoint.core && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">BRSR Core</span>}
+                {selectedDatapoint.conditional && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Conditional</span>}
+                {selectedDatapoint.esrs_ref && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">ESRS: {selectedDatapoint.esrs_ref}</span>}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -919,7 +1229,7 @@ function BenchmarkPanel({ benchmark }: { benchmark: BenchmarkData | null }) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// Principles Panel
+// Principles Panel — Interactive Drill-Down per Principle
 // ══════════════════════════════════════════════════════════════════
 function PrinciplesPanel({
   stats, gaps, principleChartData,
@@ -928,13 +1238,86 @@ function PrinciplesPanel({
   gaps: GapAnalysis | null;
   principleChartData: Array<{ principle: string; name: string; datapoints: number; fullMark: number }>;
 }) {
+  const [expandedPrinciple, setExpandedPrinciple] = useState<string | null>(null);
+  const [principleFilter, setPrincipleFilter] = useState<"all" | "found" | "missing">("all");
+  const [principleSearch, setPrincipleSearch] = useState("");
+  const [selectedDp, setSelectedDp] = useState<DatapointItem | null>(null);
+
+  const manifest = gaps?.datapoints_manifest || [];
+  const subsectionScores = gaps?.subsection_scores || {};
+
+  // Group datapoints by principle (subsection)
+  const principleDatapoints: Record<string, DatapointItem[]> = {};
+  manifest.forEach((dp) => {
+    if (dp.subsection.startsWith("principle_")) {
+      if (!principleDatapoints[dp.subsection]) principleDatapoints[dp.subsection] = [];
+      principleDatapoints[dp.subsection].push(dp);
+    }
+  });
+
+  const dataTypeBadgeColor: Record<string, string> = {
+    narrative: "#6366F1", boolean: "#8B5CF6", integer: "#0EA5E9",
+    monetary: "#059669", percent: "#D97706", decimal: "#0891B2",
+    date: "#EC4899", gyear: "#EC4899", table: "#7C3AED",
+    enumeration: "#F59E0B", mass: "#10B981", energy: "#F97316",
+    volume: "#06B6D4", area: "#84CC16", intensity: "#EF4444",
+  };
+
+  // Calculate principle totals
+  const principleStats = PRINCIPLES.map((p) => {
+    const dps = principleDatapoints[p.key] || [];
+    const found = dps.filter((d) => d.status === "found").length;
+    const missing = dps.filter((d) => d.status === "missing").length;
+    const total = dps.length;
+    const coreCount = dps.filter(d => d.core).length;
+    const coreFound = dps.filter(d => d.core && d.status === "found").length;
+    return { ...p, dps, found, missing, total, pct: total > 0 ? Math.round((found / total) * 100) : 0, coreCount, coreFound };
+  });
+
+  const totalDatapoints = principleStats.reduce((a, b) => a + b.total, 0);
+  const totalFound = principleStats.reduce((a, b) => a + b.found, 0);
+  const totalMissing = principleStats.reduce((a, b) => a + b.missing, 0);
+
   return (
-    <div className="max-w-5xl space-y-5">
-      {/* Radar Chart */}
+    <div className="max-w-6xl space-y-5">
+      {/* ── Top Summary ── */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">NGRBC Principles — Detailed Datapoint Tracking</h2>
+            <p className="text-xs text-gray-500 mt-0.5">9 Principles • {totalDatapoints} datapoints • {totalFound} disclosed • {totalMissing} gaps</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <ScoreCircle value={totalDatapoints > 0 ? Math.round((totalFound / totalDatapoints) * 100) : 0} label="Coverage" size={60} />
+          </div>
+        </div>
+
+        {/* Heat strip — all 9 principles at a glance */}
+        <div className="flex gap-1 h-8 rounded-lg overflow-hidden">
+          {principleStats.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setExpandedPrinciple(expandedPrinciple === p.key ? null : p.key)}
+              className="relative flex-1 group transition-all hover:flex-[2]"
+              style={{ background: p.pct >= 75 ? "#DCFCE7" : p.pct >= 50 ? "#FEF3C7" : p.pct >= 25 ? "#FEE2E2" : "#FEE2E2" }}
+              title={`${p.short}: ${p.pct}%`}
+            >
+              <div className="absolute bottom-0 left-0 right-0 transition-all" style={{ height: `${p.pct}%`, background: p.color, opacity: 0.7 }} />
+              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-gray-700 opacity-0 group-hover:opacity-100 transition">{p.short}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex justify-between mt-1.5">
+          <span className="text-[9px] text-gray-400">P1</span>
+          <span className="text-[9px] text-gray-400">P9</span>
+        </div>
+      </div>
+
+      {/* ── Radar Chart ── */}
       {principleChartData.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-800 mb-4">NGRBC Principle Coverage Radar</h3>
-          <div className="h-[300px]">
+          <h3 className="text-sm font-semibold text-gray-800 mb-3">Coverage Radar</h3>
+          <div className="h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={principleChartData} cx="50%" cy="50%" outerRadius="80%">
                 <PolarGrid stroke="#E2E8F0" />
@@ -948,31 +1331,175 @@ function PrinciplesPanel({
         </div>
       )}
 
-      {/* Principle Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {PRINCIPLES.map((p) => {
+      {/* ── Principle Cards — Expandable Accordion ── */}
+      <div className="space-y-3">
+        {principleStats.map((p) => {
           const Icon = p.icon;
-          const count = stats?.by_principle[p.key] || 0;
-          const maxCount = stats ? Math.max(...Object.values(stats.by_principle)) : 1;
-          const pct = maxCount > 0 ? Math.round((count / maxCount) * 100) : 0;
+          const isExpanded = expandedPrinciple === p.key;
+
+          // Filter datapoints within this principle
+          const filteredDps = p.dps.filter((dp) => {
+            if (principleFilter === "found" && dp.status !== "found") return false;
+            if (principleFilter === "missing" && dp.status !== "missing") return false;
+            if (principleSearch) {
+              const q = principleSearch.toLowerCase();
+              return dp.label.toLowerCase().includes(q) || dp.id.toLowerCase().includes(q);
+            }
+            return true;
+          });
+
           return (
-            <div key={p.key} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-sm transition">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${p.color}15` }}>
-                  <Icon className="w-4 h-4" style={{ color: p.color }} />
+            <div key={p.key} className="bg-white rounded-xl border border-gray-200 overflow-hidden transition-all">
+              {/* Principle Header */}
+              <button
+                onClick={() => setExpandedPrinciple(isExpanded ? null : p.key)}
+                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50/50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${p.color}15` }}>
+                  <Icon className="w-5 h-5" style={{ color: p.color }} />
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-gray-800">{p.short} — {p.name}</p>
-                  <p className="text-[10px] text-gray-400">{count} datapoints</p>
+                <div className="flex-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-gray-400">{p.short}</span>
+                    <span className="text-sm font-bold text-gray-900">{p.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-[10px] text-gray-500">{p.total} datapoints</span>
+                    <span className="text-[10px] text-emerald-600 font-semibold">{p.found} ✓</span>
+                    <span className="text-[10px] text-red-500 font-semibold">{p.missing} ✗</span>
+                    {p.coreCount > 0 && <span className="text-[10px] text-blue-600">Core: {p.coreFound}/{p.coreCount}</span>}
+                  </div>
                 </div>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: p.color }} />
-              </div>
+                {/* Score badge */}
+                <div className="hidden sm:flex items-center gap-3">
+                  <div className="w-20">
+                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${p.pct}%`, background: p.color }} />
+                    </div>
+                  </div>
+                  <span className="text-sm font-black w-10 text-right" style={{ color: p.pct >= 75 ? "#059669" : p.pct >= 50 ? "#D97706" : "#DC2626" }}>{p.pct}%</span>
+                </div>
+                <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
+              </button>
+
+              {/* Expanded: Datapoints List */}
+              {isExpanded && (
+                <div className="border-t border-gray-100">
+                  {/* Sub-filters */}
+                  <div className="px-5 py-3 bg-gray-50/50 flex flex-wrap items-center gap-2 border-b border-gray-100">
+                    <div className="flex bg-white rounded-lg p-0.5 border border-gray-200">
+                      {(["all", "found", "missing"] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => setPrincipleFilter(f)}
+                          className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-all ${
+                            principleFilter === f ? "bg-gray-100 text-gray-900" : "text-gray-500"
+                          }`}
+                        >
+                          {f === "all" ? "All" : f === "found" ? "Disclosed" : "Missing"}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="relative flex-1 max-w-xs">
+                      <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search datapoints..."
+                        value={principleSearch}
+                        onChange={(e) => setPrincipleSearch(e.target.value)}
+                        className="w-full pl-6 pr-3 py-1.5 text-[11px] border border-gray-200 rounded-lg bg-white focus:border-emerald-300 outline-none"
+                      />
+                    </div>
+                    <span className="text-[10px] text-gray-400">{filteredDps.length} of {p.total}</span>
+                  </div>
+
+                  {/* Datapoints */}
+                  <div className="max-h-[400px] overflow-y-auto divide-y divide-gray-50">
+                    {filteredDps.length === 0 ? (
+                      <div className="py-8 text-center text-gray-400 text-xs">No datapoints match filters</div>
+                    ) : (
+                      filteredDps.map((dp) => (
+                        <button
+                          key={dp.id}
+                          onClick={() => setSelectedDp(dp)}
+                          className={`w-full flex items-center gap-3 px-5 py-3 transition-colors text-left ${
+                            dp.status === "found" ? "hover:bg-emerald-50/30" : "hover:bg-red-50/30"
+                          }`}
+                        >
+                          {dp.status === "found" ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-medium text-gray-800 leading-tight">{dp.label}</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span className="text-[9px] font-mono text-gray-400">{dp.id}</span>
+                              {dp.esrs_ref && <span className="text-[9px] text-purple-500">• {dp.esrs_ref}</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {dp.core && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">CORE</span>}
+                            <span className="text-[8px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}12`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
+                            {dp.mandatory && <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-50 text-red-500 font-medium">M</span>}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
       </div>
+
+      {/* ── Datapoint Detail Modal ── */}
+      {selectedDp && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setSelectedDp(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ background: selectedDp.status === "found" ? "#F0FDF4" : "#FEF2F2" }}>
+              <div className="flex items-center gap-2">
+                {selectedDp.status === "found" ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <XCircle className="w-5 h-5 text-red-500" />}
+                <span className="text-xs font-bold" style={{ color: selectedDp.status === "found" ? "#166534" : "#991B1B" }}>
+                  {selectedDp.status === "found" ? "DISCLOSED" : "NOT DISCLOSED"}
+                </span>
+              </div>
+              <button onClick={() => setSelectedDp(null)} className="text-gray-400 hover:text-gray-600"><XCircle className="w-5 h-5" /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <p className="text-xs font-mono text-gray-400">{selectedDp.id}</p>
+                <h3 className="text-base font-bold text-gray-900 mt-1">{selectedDp.label}</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Data Type</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDp.data_type}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Principle</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5">{selectedDp.subsection.replace("principle_", "P")}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Indicator</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDp.indicator_type}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">Paragraph</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5">{selectedDp.paragraph_ref}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {selectedDp.mandatory && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">Mandatory</span>}
+                {selectedDp.core && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">BRSR Core</span>}
+                {selectedDp.conditional && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Conditional</span>}
+                {selectedDp.esrs_ref && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">ESRS: {selectedDp.esrs_ref}</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
