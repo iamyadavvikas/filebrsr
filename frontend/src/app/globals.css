@@ -12,6 +12,22 @@
   --card: #FFFFFF;
   --warm: #F9F6EF;
   --success: #059669;
+  --surface: #F8FAFB;
+}
+
+.dark {
+  --background: #0F1419;
+  --foreground: #E7E9EA;
+  --primary: #2D9B6E;
+  --primary-light: #4ADE80;
+  --accent: #F5C842;
+  --muted: #8B949E;
+  --muted-light: #6E7681;
+  --border: #2D333B;
+  --card: #1C2128;
+  --warm: #1C1F24;
+  --success: #3FB950;
+  --surface: #161B22;
 }
 
 @theme inline {
@@ -26,6 +42,7 @@
   --color-card: var(--card);
   --color-warm: var(--warm);
   --color-success: var(--success);
+  --color-surface: var(--surface);
   --font-sans: 'Outfit', var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -125,4 +142,71 @@ html {
   70% { width: 75%; }
   90% { width: 88%; }
   100% { width: 95%; }
+}
+
+/* ═══ Dark mode overrides for common patterns ═══ */
+.dark body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Override white backgrounds in dark mode */
+.dark .bg-white { background-color: var(--card) !important; }
+.dark .bg-gray-50 { background-color: var(--surface) !important; }
+.dark .bg-gray-50\/50 { background-color: color-mix(in srgb, var(--surface) 50%, transparent) !important; }
+.dark .bg-gray-100 { background-color: #21262D !important; }
+
+/* Borders */
+.dark .border-gray-200,
+.dark .border-gray-100 { border-color: var(--border) !important; }
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-50 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border) !important; }
+
+/* Text */
+.dark .text-gray-900 { color: #E7E9EA !important; }
+.dark .text-gray-800 { color: #D1D5DB !important; }
+.dark .text-gray-700 { color: #B0B8C1 !important; }
+.dark .text-gray-600 { color: #8B949E !important; }
+.dark .text-gray-500 { color: #8B949E !important; }
+.dark .text-gray-400 { color: #6E7681 !important; }
+
+/* Hover states */
+.dark .hover\:bg-gray-50:hover { background-color: var(--surface) !important; }
+.dark .hover\:bg-gray-100:hover { background-color: #21262D !important; }
+
+/* Input/Select backgrounds */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: var(--surface);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+.dark input::placeholder { color: var(--muted-light); }
+
+/* Shadows in dark mode */
+.dark .shadow-sm,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl,
+.dark .shadow-2xl {
+  --tw-shadow-color: rgba(0, 0, 0, 0.4);
+}
+
+/* Specific component overrides */
+.dark .bg-emerald-50 { background-color: rgba(5, 150, 105, 0.1) !important; }
+.dark .bg-emerald-50\/50 { background-color: rgba(5, 150, 105, 0.05) !important; }
+.dark .bg-red-50 { background-color: rgba(220, 38, 38, 0.1) !important; }
+.dark .bg-red-50\/50 { background-color: rgba(220, 38, 38, 0.05) !important; }
+.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.1) !important; }
+.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.1) !important; }
+.dark .bg-green-50\/60 { background-color: rgba(5, 150, 105, 0.08) !important; }
+.dark .bg-green-50\/70 { background-color: rgba(5, 150, 105, 0.1) !important; }
+.dark .bg-red-50\/40 { background-color: rgba(220, 38, 38, 0.06) !important; }
+.dark .bg-red-50\/50 { background-color: rgba(220, 38, 38, 0.08) !important; }
+.dark .bg-purple-50 { background-color: rgba(124, 58, 237, 0.1) !important; }
+
+/* Card hover in dark */
+.dark .card-hover:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
