@@ -757,8 +757,8 @@ function SectionPanel({
             <Icon className="w-5 h-5 text-emerald-700" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-gray-900">{sectionMeta?.name}</h2>
-            <p className="text-xs text-gray-500">{entries.length} datapoints • {disclosed.length} disclosed • {missing.length} gaps</p>
+            <h2 className="text-base font-bold text-foreground">{sectionMeta?.name}</h2>
+            <p className="text-xs text-muted">{entries.length} datapoints • {disclosed.length} disclosed • {missing.length} gaps</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -772,17 +772,17 @@ function SectionPanel({
       </div>
 
       {/* Mini completion bar */}
-      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+      <div className="h-2 rounded-full bg-border overflow-hidden">
         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(disclosed.length / entries.length) * 100}%`, background: "linear-gradient(90deg, #1B4D3E, #059669)" }} />
       </div>
 
       {/* Data Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="divide-y divide-gray-100">
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="divide-y divide-border">
           {displayEntries.map(([key, value], idx) => {
             const isDisclosed = value && value !== "N/A" && value !== "Not disclosed";
             return (
-              <div key={key} className={`px-5 py-3 flex items-start gap-4 ${idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
+              <div key={key} className={`px-5 py-3 flex items-start gap-4 ${idx % 2 === 0 ? "bg-card" : "bg-surface"}`}>
                 <div className="mt-0.5">
                   {isDisclosed ? (
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -791,10 +791,10 @@ function SectionPanel({
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-700">
+                  <p className="text-xs font-semibold text-muted">
                     {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                   </p>
-                  <p className={`text-sm mt-0.5 ${isDisclosed ? "text-gray-900" : "text-red-400 italic"}`}>
+                  <p className={`text-sm mt-0.5 ${isDisclosed ? "text-foreground font-medium" : "text-red-400 italic"}`}>
                     {isDisclosed ? String(value) : "Not disclosed"}
                   </p>
                 </div>
