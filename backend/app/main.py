@@ -250,6 +250,95 @@ async def compare_with_benchmark(req: BenchmarkCompareRequest):
     return get_benchmark_comparison(req.extracted_data, req.sector)
 
 
+class ExtractAsyncRequest(BaseModel):
+    report_id: str
+    user_id: str
+    file_url: str  # Supabase Storage path e.g. "user_id/timestamp-filename.pdf"
+
+
+@app.post("/api/extract-async")
+async def extract_brsr_async(
+    req: ExtractAsyncRequest,
+    authorization: str = Header(...),
+):
+    """Pull file from Supabase Storage and process. Called by frontend fire-and-forget."""
+    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
+    if authorization != expected_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    supabase = get_supabase_admin()
+
+    try:
+        # Download file from Supabase Storage
+        file_bytes = supabase.storage.from_("brsr-reports").download(req.file_url)
+
+        if not file_bytes:
+            supabase.table("reports").update({"status": "failed"}).eq(
+                "id", req.report_id
+            ).execute()
+            return {"status": "failed", "error": "Could not download file from storage"}
+
+        if len(file_bytes) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large")
+
+        # Extract text from PDF (limit to first 80 pages for performance on free tier)
+        text = ""
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for i, page in enumerate(pdf.pages):
+                if i >= 80:
+                    break
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+
+        if not text.strip():
+            supabase.table("reports").update({"status": "failed"}).eq(
+                "id", req.report_id
+            ).execute()
+            return {"status": "failed", "error": "No text could be extracted from PDF"}
+
+        # Triple extraction: regex + enhanced + AI
+        regex_results = extract_with_regex(text)
+        enhanced_results = extract_enhanced(text)
+        try:
+            ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
+        except Exception as ai_err:
+            print(f"AI extraction failed (using regex only): {ai_err}")
+            ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
+
+        # Merge: enhanced base → regex fills → AI takes precedence
+        merged = {"section_a": {}, "section_b": {}, "section_c": {}}
+        for section in ["section_a", "section_b", "section_c"]:
+            merged[section] = {**enhanced_results.get(section, {})}
+            merged[section].update(regex_results.get(section, {}))
+            merged[section].update(ai_results.get(section, {}))
+
+        confidence = calculate_confidence(regex_results, ai_results)
+        company_name = merged.get("section_a", {}).get("company_name", None)
+        financial_year = merged.get("section_a", {}).get("financial_year", None)
+
+        # Update report in DB
+        supabase.table("reports").update(
+            {
+                "status": "completed",
+                "extracted_data": merged,
+                "confidence_scores": confidence,
+                "company_name": company_name,
+                "financial_year": financial_year,
+            }
+        ).eq("id", req.report_id).execute()
+
+        return {"status": "completed", "report_id": req.report_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        supabase.table("reports").update({"status": "failed"}).eq(
+            "id", req.report_id
+        ).execute()
+        return {"status": "failed", "error": str(e)}
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "2.0.0"}

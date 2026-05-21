@@ -68,31 +68,26 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Warm up the backend (Render free tier cold start can take 30-60s)
     const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
-    const startTime = Date.now();
-    let backendReady = false;
-    try {
-      const warmup = await fetch(`${backendUrl}/health`, { signal: AbortSignal.timeout(50000) });
-      backendReady = warmup.ok;
-      if (!warmup.ok) console.warn("Backend warmup returned:", warmup.status);
-    } catch (warmupErr) {
-      console.warn("Backend warmup failed:", warmupErr);
-    }
-
-    if (!backendReady) {
-      return NextResponse.json(
-        { error: "Our analysis server is waking up (free tier cold start). Please try again in 30 seconds." },
-        { status: 503 }
-      );
-    }
-
-    // Calculate remaining time for extraction (Vercel max is 60s)
-    const elapsed = Date.now() - startTime;
-    const extractTimeout = Math.max(8000, 57000 - elapsed); // at least 8s, up to remaining time
 
     // For guest users, send directly to backend and return inline results
     if (!user) {
+      // Quick warmup check for guest path (needs synchronous response)
+      let backendReady = false;
+      try {
+        const warmup = await fetch(`${backendUrl}/health`, { signal: AbortSignal.timeout(10000) });
+        backendReady = warmup.ok;
+      } catch {
+        backendReady = false;
+      }
+
+      if (!backendReady) {
+        return NextResponse.json(
+          { error: "Our analysis server is waking up (free tier cold start). Please try again in 30 seconds." },
+          { status: 503 }
+        );
+      }
+
       const backendForm = new FormData();
       backendForm.append("file", file);
       backendForm.append("report_id", "guest");
@@ -104,7 +99,7 @@ export async function POST(request: NextRequest) {
         headers: {
           Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
         },
-        signal: AbortSignal.timeout(extractTimeout),
+        signal: AbortSignal.timeout(45000),
       });
 
       if (!backendRes.ok) {
@@ -166,23 +161,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send to FastAPI backend for extraction (fire-and-forget for reliability)
-    // Backend will update the report status in Supabase when done
-    const backendForm = new FormData();
-    backendForm.append("file", file);
-    backendForm.append("report_id", report.id);
-    backendForm.append("user_id", user.id);
-
-    // Fire-and-forget: don't await the backend response
-    // This avoids Vercel's 60s timeout for large PDFs on Render free tier
-    fetch(`${backendUrl}/api/extract`, {
+    // Send lightweight trigger to backend — it will pull file from Supabase Storage
+    // Fire-and-forget: no need to await (backend updates DB when done)
+    fetch(`${backendUrl}/api/extract-async`, {
       method: "POST",
-      body: backendForm,
+      body: JSON.stringify({
+        report_id: report.id,
+        user_id: user.id,
+        file_url: fileName,
+      }),
       headers: {
+        "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
     }).catch((err) => {
-      console.error("Backend extraction fire-and-forget error:", err);
+      console.error("Backend extraction trigger error:", err);
     });
 
     // Deduct credit immediately (skip for founders)
