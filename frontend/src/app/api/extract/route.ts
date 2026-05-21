@@ -166,95 +166,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send to FastAPI backend for extraction (await response)
+    // Send to FastAPI backend for extraction (fire-and-forget for reliability)
+    // Backend will update the report status in Supabase when done
     const backendForm = new FormData();
     backendForm.append("file", file);
     backendForm.append("report_id", report.id);
     backendForm.append("user_id", user.id);
 
-    try {
-      const backendRes = await fetch(`${backendUrl}/api/extract`, {
-        method: "POST",
-        body: backendForm,
-        headers: {
-          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-        },
-        signal: AbortSignal.timeout(extractTimeout),
-      });
+    // Fire-and-forget: don't await the backend response
+    // This avoids Vercel's 60s timeout for large PDFs on Render free tier
+    fetch(`${backendUrl}/api/extract`, {
+      method: "POST",
+      body: backendForm,
+      headers: {
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+    }).catch((err) => {
+      console.error("Backend extraction fire-and-forget error:", err);
+    });
 
-      if (!backendRes.ok) {
-        console.error("Backend extraction failed:", backendRes.status);
-        // Mark report as failed
+    // Deduct credit immediately (skip for founders)
+    if (!isFounder) {
+      const { data: profile } = await adminDb
+        .from("profiles")
+        .select("credits_remaining")
+        .eq("id", user.id)
+        .single();
+
+      if (profile) {
         await adminDb
-          .from("reports")
-          .update({ status: "failed" })
-          .eq("id", report.id);
-        return NextResponse.json(
-          { error: `Extraction failed (server returned ${backendRes.status}). Please try again.` },
-          { status: 502 }
-        );
-      }
-
-      const backendData = await backendRes.json();
-
-      if (backendData.status === "failed") {
-        await adminDb
-          .from("reports")
-          .update({ status: "failed" })
-          .eq("id", report.id);
-        return NextResponse.json(
-          { error: backendData.error || "Extraction failed" },
-          { status: 422 }
-        );
-      }
-
-      // Backend already updates the report in Supabase, but let's return results inline too
-      // so the frontend can show them immediately
-      // Deduct credit (skip for founders)
-      if (!isFounder) {
-        const { data: profile } = await adminDb
           .from("profiles")
-          .select("credits_remaining")
-          .eq("id", user.id)
-          .single();
-
-        if (profile) {
-          await adminDb
-            .from("profiles")
-            .update({ credits_remaining: profile.credits_remaining - 1 })
-            .eq("id", user.id);
-        }
+          .update({ credits_remaining: profile.credits_remaining - 1 })
+          .eq("id", user.id);
       }
-
-      return NextResponse.json({
-        reportId: report.id,
-        message: "Extraction complete!",
-        results: backendData,
-      });
-    } catch (fetchErr) {
-      console.error("Backend fetch error:", fetchErr);
-      // On timeout or network error, the report stays as "processing"
-      // Still deduct credit since we've already uploaded the file
-      if (!isFounder) {
-        const { data: profile } = await adminDb
-          .from("profiles")
-          .select("credits_remaining")
-          .eq("id", user.id)
-          .single();
-
-        if (profile) {
-          await adminDb
-            .from("profiles")
-            .update({ credits_remaining: profile.credits_remaining - 1 })
-            .eq("id", user.id);
-        }
-      }
-
-      return NextResponse.json({
-        reportId: report.id,
-        message: "File uploaded. Processing may take longer — check your dashboard.",
-      });
     }
+
+    return NextResponse.json({
+      reportId: report.id,
+      message: "Processing your report. This may take 1-2 minutes.",
+    });
   } catch {
     return NextResponse.json(
       { error: "Internal server error" },

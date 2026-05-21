@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
+import ProcessingPoller from "./ProcessingPoller";
 import {
   ArrowLeft,
   Download,
@@ -185,9 +186,9 @@ export default async function ResultsPage({ params }: PageProps) {
                 Processing Your Report
               </h2>
               <p className="text-muted">
-                This usually takes 1-2 minutes. Refresh the page to check
-                status.
+                This usually takes 1-2 minutes. The page will refresh automatically.
               </p>
+              <ProcessingPoller />
             </div>
           )}
 
