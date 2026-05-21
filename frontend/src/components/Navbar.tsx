@@ -4,8 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
-import { Menu, X, ChevronDown, User, CreditCard, LogOut } from "lucide-react";
+import { Menu, X, ChevronDown, User, CreditCard, LogOut, Moon, Sun } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface NavUser {
   email: string;
@@ -68,9 +69,10 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
   const displayName = user?.name || user?.email?.split("@")[0] || "";
   const initials = displayName.slice(0, 1).toUpperCase();
   const planLabel = user?.plan || "Free";
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border" style={{ background: "rgba(250,251,249,0.92)", backdropFilter: "blur(16px)" }}>
+    <nav className="sticky top-0 z-50 border-b border-border bg-background/92" style={{ backdropFilter: "blur(16px)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-7">
         <div className="flex justify-between items-center" style={{ height: 58 }}>
           <Link href="/" className="flex items-center gap-2">
@@ -90,6 +92,15 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                 {link.label}
               </Link>
             ))}
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-border text-muted hover:text-foreground hover:bg-card transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
 
             {/* Profile dropdown */}
             {user ? (
@@ -114,13 +125,13 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                     style={{ borderRadius: 12, width: 240, padding: "8px 0", zIndex: 100 }}
                   >
                     {/* User info */}
-                    <div style={{ padding: "12px 16px", borderBottom: "1px solid #E5E7DF" }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "#1F2937" }}>{displayName}</p>
-                      <p style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{user.email}</p>
+                    <div className="border-b border-border" style={{ padding: "12px 16px" }}>
+                      <p className="text-foreground" style={{ fontSize: 13, fontWeight: 600 }}>{displayName}</p>
+                      <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>{user.email}</p>
                     </div>
 
                     {/* Plan */}
-                    <div style={{ padding: "10px 16px", borderBottom: "1px solid #E5E7DF" }}>
+                    <div className="border-b border-border" style={{ padding: "10px 16px" }}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <CreditCard className="w-3.5 h-3.5 text-muted" />
