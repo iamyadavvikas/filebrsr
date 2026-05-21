@@ -87,7 +87,7 @@ export default function HomePage() {
                 <h1 className="text-white" style={{ fontSize: "clamp(36px, 5vw, 56px)", fontWeight: 800, lineHeight: 1.08, marginBottom: 24, letterSpacing: -2 }}>
                   AI-Powered<br />
                   <span style={{ color: "#E8B931" }}>BRSR Metric</span><br />
-                  Extraction in 60s
+                  Extraction in <span style={{ background: "linear-gradient(120deg, #E8B931 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>60s</span>
                 </h1>
                 <p style={{ fontSize: 17, fontWeight: 400, color: "rgba(255,255,255,0.65)", maxWidth: 460, lineHeight: 1.75, marginBottom: 36 }}>
                   Upload your sustainability report. Get 100% SEBI-aligned BRSR data extracted across all 9 NGRBC principles — in seconds, not weeks.
