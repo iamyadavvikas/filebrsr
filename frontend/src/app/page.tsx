@@ -154,7 +154,7 @@ export default function HomePage() {
         </section>
 
         {/* ═══ STANDARDS BAR ═══ */}
-        <section className="border-b border-border" style={{ padding: "24px 28px", background: "white" }}>
+        <section className="border-b border-border" style={{ padding: "24px 28px", background: "var(--card)" }}>
           <div className="max-w-5xl mx-auto">
             <p className="text-center text-xs text-muted mb-4 font-medium uppercase tracking-wider">Aligned with globally recognised frameworks</p>
             <div className="flex flex-wrap items-center justify-center gap-8 opacity-60">
@@ -166,7 +166,7 @@ export default function HomePage() {
         </section>
 
         {/* ═══ STATS ═══ */}
-        <section style={{ padding: "48px 28px", background: "#FAFBF9" }}>
+        <section style={{ padding: "48px 28px", background: "var(--surface)" }}>
           <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {stats.map((s) => (
               <div key={s.label}>
@@ -302,7 +302,7 @@ export default function HomePage() {
                       {["Section A: 42/42 extracted", "Section B: 28/30 extracted", "Section C: 98/144 extracted"].map((item, i) => (
                         <div key={item} className="flex items-center justify-between">
                           <span className="text-xs text-muted">{item}</span>
-                          <div className="w-24 h-2 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
+                          <div className="w-24 h-2 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
                             <div className="h-full rounded-full" style={{ width: `${[100, 93, 68][i]}%`, background: [100, 93, 68][i] >= 90 ? "#059669" : [100, 93, 68][i] >= 70 ? "#E8B931" : "#EA580C" }} />
                           </div>
                         </div>
@@ -329,7 +329,7 @@ export default function HomePage() {
             <div className="bg-white rounded-2xl border border-border overflow-hidden shadow-sm">
               <table className="w-full">
                 <thead>
-                  <tr style={{ background: "#F9FAFB" }}>
+                  <tr style={{ background: "var(--surface)" }}>
                     <th className="text-left py-4 px-6 text-sm font-bold text-gray-900">Metric</th>
                     <th className="text-center py-4 px-6 text-sm font-bold text-gray-500">Manual / Consultants</th>
                     <th className="text-center py-4 px-6 text-sm font-bold" style={{ color: "#1B4D3E" }}>FileBRSR</th>
@@ -367,7 +367,7 @@ export default function HomePage() {
         </section>
 
         {/* ═══ SOCIAL PROOF ═══ */}
-        <section style={{ padding: "64px 28px", background: "#FAFBF9" }}>
+        <section style={{ padding: "64px 28px", background: "var(--surface)" }}>
           <div className="max-w-4xl mx-auto text-center">
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#2D7A5F", marginBottom: 10 }}>
               BUILT FOR INDIA&apos;S TOP LISTED COMPANIES

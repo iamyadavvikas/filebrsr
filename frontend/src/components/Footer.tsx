@@ -3,15 +3,15 @@ import Image from "next/image";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border" style={{ background: "#FAFBF9" }}>
+    <footer className="border-t border-border" style={{ background: "var(--surface)" }}>
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
           {/* Brand */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-2 mb-3">
               <Image src="/logo-icon.svg" alt="FileBRSR" width={28} height={28} />
-              <span className="font-extrabold" style={{ fontSize: 18, color: "#1B4D3E" }}>
-                file<span style={{ color: "#E8B931" }}>BRSR</span>
+              <span className="font-extrabold" style={{ fontSize: 18, color: "var(--primary)" }}>
+                file<span style={{ color: "var(--accent)" }}>BRSR</span>
               </span>
             </div>
             <p style={{ fontSize: 13, color: "#6B7280", lineHeight: 1.7 }}>

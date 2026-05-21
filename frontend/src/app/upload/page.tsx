@@ -181,11 +181,11 @@ export default function UploadPage() {
               onDrop={handleDrop}
               className={`transition-all ${!uploading ? "cursor-pointer" : ""}`}
               style={{
-                border: `2px dashed ${file ? "#059669" : dragActive ? "#1B4D3E" : "#D1D5DB"}`,
+                border: `2px dashed ${file ? "#059669" : dragActive ? "var(--primary)" : "var(--border)"}`,
                 borderRadius: 16,
                 padding: file ? "20px 24px" : "52px 28px",
                 textAlign: "center",
-                background: file ? "#F0FDF4" : dragActive ? "#F9F6EF" : "white",
+                background: file ? "rgba(5, 150, 105, 0.05)" : dragActive ? "var(--warm)" : "var(--card)",
                 marginBottom: 16,
               }}
             >
