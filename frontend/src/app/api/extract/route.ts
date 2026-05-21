@@ -68,9 +68,28 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Warm up the backend (Render free tier cold start)
+    // Warm up the backend (Render free tier cold start can take 30-60s)
     const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
-    await fetch(`${backendUrl}/docs`, { signal: AbortSignal.timeout(10000) }).catch(() => {});
+    const startTime = Date.now();
+    let backendReady = false;
+    try {
+      const warmup = await fetch(`${backendUrl}/health`, { signal: AbortSignal.timeout(50000) });
+      backendReady = warmup.ok;
+      if (!warmup.ok) console.warn("Backend warmup returned:", warmup.status);
+    } catch (warmupErr) {
+      console.warn("Backend warmup failed:", warmupErr);
+    }
+
+    if (!backendReady) {
+      return NextResponse.json(
+        { error: "Our analysis server is waking up (free tier cold start). Please try again in 30 seconds." },
+        { status: 503 }
+      );
+    }
+
+    // Calculate remaining time for extraction (Vercel max is 60s)
+    const elapsed = Date.now() - startTime;
+    const extractTimeout = Math.max(8000, 57000 - elapsed); // at least 8s, up to remaining time
 
     // For guest users, send directly to backend and return inline results
     if (!user) {
@@ -85,7 +104,7 @@ export async function POST(request: NextRequest) {
         headers: {
           Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
         },
-        signal: AbortSignal.timeout(50000), // 50s (Vercel max is 60s)
+        signal: AbortSignal.timeout(extractTimeout),
       });
 
       if (!backendRes.ok) {
@@ -160,7 +179,7 @@ export async function POST(request: NextRequest) {
         headers: {
           Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
         },
-        signal: AbortSignal.timeout(55000), // 55s (Vercel limit is 60s)
+        signal: AbortSignal.timeout(extractTimeout),
       });
 
       if (!backendRes.ok) {
@@ -171,7 +190,7 @@ export async function POST(request: NextRequest) {
           .update({ status: "failed" })
           .eq("id", report.id);
         return NextResponse.json(
-          { error: "Extraction service unavailable. Please try again." },
+          { error: `Extraction failed (server returned ${backendRes.status}). Please try again.` },
           { status: 502 }
         );
       }
