@@ -484,6 +484,8 @@ def analyze_gaps_v2(extracted_data: dict) -> dict:
         "missing_mandatory": [{"id": dp["id"], "label": dp["label"], "core": dp["core"], "data_type": dp["data_type"], "esrs_ref": dp["esrs_ref"]} for dp in missing_mandatory],
         "missing_core": [{"id": dp["id"], "label": dp["label"], "esrs_ref": dp["esrs_ref"]} for dp in missing_core],
         "recommendations": recommendations[:20],
+        "datapoints_manifest": _build_manifest(extracted_keys),
+        "subsection_scores": _build_subsection_scores(mandatory_dps, extracted_keys),
     }
 
 
@@ -502,3 +504,45 @@ def _matches_extracted(dp: dict, extracted_keys: set) -> bool:
             if len(overlap) >= min(2, len(dp_words)):
                 return True
     return False
+
+
+def _build_manifest(extracted_keys: set) -> list:
+    """Build a complete manifest of all datapoints with their found/missing status."""
+    manifest = []
+    for dp in BRSR_DATAPOINTS:
+        found = _matches_extracted(dp, extracted_keys)
+        manifest.append({
+            "id": dp["id"],
+            "label": dp["label"],
+            "data_type": dp["data_type"],
+            "mandatory": dp["mandatory"],
+            "core": dp["core"],
+            "indicator_type": dp["indicator_type"],
+            "section": dp["section"],
+            "subsection": dp["subsection"],
+            "esrs_ref": dp["esrs_ref"],
+            "paragraph_ref": dp["paragraph_ref"],
+            "conditional": dp["conditional"],
+            "status": "found" if found else "missing",
+        })
+    return manifest
+
+
+def _build_subsection_scores(mandatory_dps: list, extracted_keys: set) -> dict:
+    """Build compliance scores grouped by subsection (maps to principles for Section C)."""
+    from collections import defaultdict
+    groups: dict = defaultdict(lambda: {"total": 0, "found": 0})
+    for dp in mandatory_dps:
+        key = dp["subsection"]
+        groups[key]["total"] += 1
+        if _matches_extracted(dp, extracted_keys):
+            groups[key]["found"] += 1
+    result = {}
+    for key, val in groups.items():
+        result[key] = {
+            "total": val["total"],
+            "found": val["found"],
+            "missing": val["total"] - val["found"],
+            "score": round(val["found"] / val["total"] * 100, 1) if val["total"] > 0 else 0,
+        }
+    return result
