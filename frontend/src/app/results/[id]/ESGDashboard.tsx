@@ -172,6 +172,7 @@ export function ESGDashboard() {
   const [benchmark, setBenchmark] = useState<BenchmarkData | null>(null);
   const [isFounder, setIsFounder] = useState(false);
   const [activeTab, setActiveTab] = useState<ViewTab>("overview");
+  const [selectedPrinciple, setSelectedPrinciple] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -464,9 +465,9 @@ export function ESGDashboard() {
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3">NGRBC Principles</p>
             </div>
             <button
-              onClick={() => setActiveTab("principles")}
+              onClick={() => { setActiveTab("principles"); setSelectedPrinciple(null); }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition ${
-                activeTab === "principles" ? "bg-emerald-50 text-emerald-800" : "text-gray-600 hover:bg-gray-50"
+                activeTab === "principles" && !selectedPrinciple ? "bg-emerald-50 text-emerald-800" : "text-gray-600 hover:bg-gray-50"
               }`}
             >
               <Target className="w-4 h-4" />
@@ -477,8 +478,10 @@ export function ESGDashboard() {
               return (
                 <button
                   key={p.key}
-                  onClick={() => setActiveTab("principles")}
-                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] text-gray-500 hover:bg-gray-50 transition"
+                  onClick={() => { setActiveTab("principles"); setSelectedPrinciple(p.key); }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] transition ${
+                    activeTab === "principles" && selectedPrinciple === p.key ? "bg-emerald-50 text-emerald-700 font-semibold" : "text-gray-500 hover:bg-gray-50"
+                  }`}
                 >
                   <Icon className="w-3.5 h-3.5" style={{ color: p.color }} />
                   <span className="truncate">{p.short} — {p.name}</span>
@@ -545,7 +548,7 @@ export function ESGDashboard() {
           {(activeTab === "section_a" || activeTab === "section_b" || activeTab === "section_c") && <SectionPanel sectionKey={activeTab} data={filteredDatapoints} searchQuery={searchQuery} filterStatus={filterStatus} />}
           {activeTab === "gaps" && <GapsPanel gaps={gaps} recommendations={filteredRecommendations} filterPriority={filterPriority} searchQuery={searchQuery} extractedData={data} />}
           {activeTab === "benchmark" && <BenchmarkPanel benchmark={benchmark} />}
-          {activeTab === "principles" && <PrinciplesPanel stats={stats} gaps={gaps} principleChartData={principleChartData} extractedData={data} />}
+          {activeTab === "principles" && <PrinciplesPanel stats={stats} gaps={gaps} principleChartData={principleChartData} extractedData={data} selectedPrinciple={selectedPrinciple} onSelectPrinciple={setSelectedPrinciple} />}
         </main>
       </div>
     </div>
@@ -1309,16 +1312,18 @@ function BenchmarkPanel({ benchmark }: { benchmark: BenchmarkData | null }) {
 // Principles Panel — Interactive Drill-Down per Principle
 // ══════════════════════════════════════════════════════════════════
 function PrinciplesPanel({
-  stats, gaps, principleChartData, extractedData,
+  stats, gaps, principleChartData, extractedData, selectedPrinciple, onSelectPrinciple,
 }: {
   stats: DatapointsStats | null;
   gaps: GapAnalysis | null;
   principleChartData: Array<{ principle: string; name: string; datapoints: number; fullMark: number }>;
   extractedData: ExtractedData | null;
+  selectedPrinciple: string | null;
+  onSelectPrinciple: (key: string | null) => void;
 }) {
-  const [expandedPrinciple, setExpandedPrinciple] = useState<string | null>(null);
   const [principleFilter, setPrincipleFilter] = useState<"all" | "found" | "missing">("all");
   const [principleSearch, setPrincipleSearch] = useState("");
+  const [coreOnlyFilter, setCoreOnlyFilter] = useState(false);
   const [selectedDp, setSelectedDp] = useState<DatapointItem | null>(null);
 
   // Always compute manifest from client-side data
@@ -1356,28 +1361,231 @@ function PrinciplesPanel({
   const totalFound = principleStats.reduce((a, b) => a + b.found, 0);
   const totalMissing = principleStats.reduce((a, b) => a + b.missing, 0);
 
+  // Currently active principle detail
+  const activePrinciple = selectedPrinciple ? principleStats.find(p => p.key === selectedPrinciple) : null;
+
+  // If a specific principle is selected, show focused single-principle view
+  if (activePrinciple) {
+    const filteredDps = activePrinciple.dps.filter((dp) => {
+      if (principleFilter === "found" && dp.status !== "found") return false;
+      if (principleFilter === "missing" && dp.status !== "missing") return false;
+      if (coreOnlyFilter && !dp.core) return false;
+      if (principleSearch) {
+        const q = principleSearch.toLowerCase();
+        return dp.label.toLowerCase().includes(q) || dp.id.toLowerCase().includes(q) || (dp.esrs_ref || "").toLowerCase().includes(q);
+      }
+      return true;
+    });
+
+    const Icon = activePrinciple.icon;
+
+    return (
+      <div className="max-w-6xl space-y-4">
+        {/* Back + Principle Header */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => onSelectPrinciple(null)}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 transition font-medium"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              All Principles
+            </button>
+            <div className="h-5 w-px bg-gray-200" />
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${activePrinciple.color}15` }}>
+                <Icon className="w-5 h-5" style={{ color: activePrinciple.color }} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-gray-400">{activePrinciple.short}</span>
+                  <h2 className="text-base font-bold text-gray-900">{activePrinciple.name}</h2>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">{activePrinciple.total} datapoints • {activePrinciple.found} disclosed • {activePrinciple.missing} gaps</p>
+              </div>
+            </div>
+            <ScoreCircle value={activePrinciple.pct} label="Score" size={56} />
+          </div>
+
+          {/* Mini stats row */}
+          <div className="grid grid-cols-4 gap-3 mt-4">
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-lg font-black text-gray-900">{activePrinciple.total}</p>
+              <p className="text-[10px] text-gray-500 font-medium">Total</p>
+            </div>
+            <div className="bg-emerald-50 rounded-lg p-3 text-center">
+              <p className="text-lg font-black text-emerald-700">{activePrinciple.found}</p>
+              <p className="text-[10px] text-emerald-600 font-medium">Disclosed</p>
+            </div>
+            <div className="bg-red-50 rounded-lg p-3 text-center">
+              <p className="text-lg font-black text-red-700">{activePrinciple.missing}</p>
+              <p className="text-[10px] text-red-600 font-medium">Missing</p>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-3 text-center">
+              <p className="text-lg font-black text-blue-700">{activePrinciple.coreFound}/{activePrinciple.coreCount}</p>
+              <p className="text-[10px] text-blue-600 font-medium">Core</p>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="mt-4 h-2.5 rounded-full bg-gray-100 overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${activePrinciple.pct}%`, background: activePrinciple.color }} />
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-center gap-3">
+          <div className="flex bg-gray-100 rounded-lg p-0.5">
+            {(["all", "found", "missing"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setPrincipleFilter(f)}
+                className={`px-3 py-1.5 text-[11px] font-semibold rounded-md transition-all ${
+                  principleFilter === f ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {f === "all" ? `All (${activePrinciple.total})` : f === "found" ? `Disclosed (${activePrinciple.found})` : `Missing (${activePrinciple.missing})`}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setCoreOnlyFilter(!coreOnlyFilter)}
+            className={`px-3 py-1.5 text-[11px] font-semibold rounded-lg border transition-all ${
+              coreOnlyFilter ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white border-gray-200 text-gray-500"
+            }`}
+          >
+            Core Only ({activePrinciple.coreCount})
+          </button>
+          <div className="relative flex-1 max-w-xs">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search datapoints..."
+              value={principleSearch}
+              onChange={(e) => setPrincipleSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:border-emerald-300 outline-none transition"
+            />
+          </div>
+          <span className="text-[10px] text-gray-400 ml-auto">{filteredDps.length} results</span>
+        </div>
+
+        {/* Datapoints Table */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="max-h-[500px] overflow-y-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-8">Status</th>
+                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-16">ID</th>
+                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase">Datapoint</th>
+                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-20">Type</th>
+                  <th className="text-center py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-14">Core</th>
+                  <th className="text-left py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase w-28">ESRS Ref</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredDps.map((dp) => (
+                  <tr
+                    key={dp.id}
+                    onClick={() => setSelectedDp(dp)}
+                    className={`cursor-pointer transition-colors ${dp.status === "found" ? "bg-emerald-50/60 hover:bg-emerald-100/80" : "bg-red-50/40 hover:bg-red-100/60"}`}
+                  >
+                    <td className="py-2.5 px-4">
+                      {dp.status === "found" ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-red-500" />}
+                    </td>
+                    <td className="py-2.5 px-4 text-[11px] font-mono text-gray-600 font-semibold">{dp.id}</td>
+                    <td className="py-2.5 px-4 text-[11px] text-gray-800 font-medium">{dp.label}</td>
+                    <td className="py-2.5 px-4">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
+                    </td>
+                    <td className="py-2.5 px-4 text-center">
+                      {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
+                    </td>
+                    <td className="py-2.5 px-4 text-[10px] text-gray-500">{dp.esrs_ref || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredDps.length === 0 && (
+              <div className="py-12 text-center text-gray-400 text-sm">No datapoints match the current filters</div>
+            )}
+          </div>
+        </div>
+
+        {/* Datapoint Detail Modal */}
+        {selectedDp && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setSelectedDp(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ background: selectedDp.status === "found" ? "#F0FDF4" : "#FEF2F2" }}>
+                <div className="flex items-center gap-2">
+                  {selectedDp.status === "found" ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <XCircle className="w-5 h-5 text-red-500" />}
+                  <span className="text-xs font-bold" style={{ color: selectedDp.status === "found" ? "#166534" : "#991B1B" }}>
+                    {selectedDp.status === "found" ? "DISCLOSED" : "NOT DISCLOSED"}
+                  </span>
+                </div>
+                <button onClick={() => setSelectedDp(null)} className="text-gray-400 hover:text-gray-600"><XCircle className="w-5 h-5" /></button>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                <div>
+                  <p className="text-xs font-mono text-gray-400">{selectedDp.id}</p>
+                  <h3 className="text-base font-bold text-gray-900 mt-1">{selectedDp.label}</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">Data Type</p>
+                    <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDp.data_type}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">Indicator</p>
+                    <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDp.indicator_type}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">Paragraph</p>
+                    <p className="text-sm font-semibold text-gray-800 mt-0.5">{selectedDp.paragraph_ref}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase">Section</p>
+                    <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDp.section.replace("_", " ")}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {selectedDp.mandatory && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">Mandatory</span>}
+                  {selectedDp.core && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">BRSR Core</span>}
+                  {selectedDp.conditional && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Conditional</span>}
+                  {selectedDp.esrs_ref && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">ESRS: {selectedDp.esrs_ref}</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── All Principles Overview (no specific principle selected) ──
   return (
     <div className="max-w-6xl space-y-5">
       {/* ── Top Summary ── */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-base font-bold text-gray-900">NGRBC Principles — Detailed Datapoint Tracking</h2>
+            <h2 className="text-base font-bold text-gray-900">NGRBC Principles — Overview</h2>
             <p className="text-xs text-gray-500 mt-0.5">9 Principles • {totalDatapoints} datapoints • {totalFound} disclosed • {totalMissing} gaps</p>
+            <p className="text-[10px] text-gray-400 mt-1">Click any principle to see its datapoints →</p>
           </div>
           <div className="flex items-center gap-3">
             <ScoreCircle value={totalDatapoints > 0 ? Math.round((totalFound / totalDatapoints) * 100) : 0} label="Coverage" size={60} />
           </div>
         </div>
 
-        {/* Heat strip — all 9 principles at a glance */}
+        {/* Heat strip */}
         <div className="flex gap-1 h-8 rounded-lg overflow-hidden">
           {principleStats.map((p) => (
             <button
               key={p.key}
-              onClick={() => setExpandedPrinciple(expandedPrinciple === p.key ? null : p.key)}
-              className="relative flex-1 group transition-all hover:flex-[2]"
-              style={{ background: p.pct >= 75 ? "#DCFCE7" : p.pct >= 50 ? "#FEF3C7" : p.pct >= 25 ? "#FEE2E2" : "#FEE2E2" }}
+              onClick={() => onSelectPrinciple(p.key)}
+              className="relative flex-1 group transition-all hover:flex-[2] cursor-pointer"
+              style={{ background: p.pct >= 75 ? "#DCFCE7" : p.pct >= 50 ? "#FEF3C7" : "#FEE2E2" }}
               title={`${p.short}: ${p.pct}%`}
             >
               <div className="absolute bottom-0 left-0 right-0 transition-all" style={{ height: `${p.pct}%`, background: p.color, opacity: 0.7 }} />
@@ -1409,30 +1617,17 @@ function PrinciplesPanel({
         </div>
       )}
 
-      {/* ── Principle Cards — Expandable Accordion ── */}
+      {/* ── Principle Cards — Click to drill-down ── */}
       <div className="space-y-3">
         {principleStats.map((p) => {
           const Icon = p.icon;
-          const isExpanded = expandedPrinciple === p.key;
-
-          // Filter datapoints within this principle
-          const filteredDps = p.dps.filter((dp) => {
-            if (principleFilter === "found" && dp.status !== "found") return false;
-            if (principleFilter === "missing" && dp.status !== "missing") return false;
-            if (principleSearch) {
-              const q = principleSearch.toLowerCase();
-              return dp.label.toLowerCase().includes(q) || dp.id.toLowerCase().includes(q);
-            }
-            return true;
-          });
-
           return (
-            <div key={p.key} className="bg-white rounded-xl border border-gray-200 overflow-hidden transition-all">
-              {/* Principle Header */}
-              <button
-                onClick={() => setExpandedPrinciple(isExpanded ? null : p.key)}
-                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-gray-50/50 transition-colors"
-              >
+            <button
+              key={p.key}
+              onClick={() => onSelectPrinciple(p.key)}
+              className="w-full bg-white rounded-xl border border-gray-200 overflow-hidden transition-all hover:shadow-md hover:border-emerald-200"
+            >
+              <div className="flex items-center gap-4 px-5 py-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${p.color}15` }}>
                   <Icon className="w-5 h-5" style={{ color: p.color }} />
                 </div>
@@ -1448,7 +1643,6 @@ function PrinciplesPanel({
                     {p.coreCount > 0 && <span className="text-[10px] text-blue-600">Core: {p.coreFound}/{p.coreCount}</span>}
                   </div>
                 </div>
-                {/* Score badge */}
                 <div className="hidden sm:flex items-center gap-3">
                   <div className="w-20">
                     <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -1457,131 +1651,12 @@ function PrinciplesPanel({
                   </div>
                   <span className="text-sm font-black w-10 text-right" style={{ color: p.pct >= 75 ? "#059669" : p.pct >= 50 ? "#D97706" : "#DC2626" }}>{p.pct}%</span>
                 </div>
-                <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
-              </button>
-
-              {/* Expanded: Datapoints List */}
-              {isExpanded && (
-                <div className="border-t border-gray-100">
-                  {/* Sub-filters */}
-                  <div className="px-5 py-3 bg-gray-50/50 flex flex-wrap items-center gap-2 border-b border-gray-100">
-                    <div className="flex bg-white rounded-lg p-0.5 border border-gray-200">
-                      {(["all", "found", "missing"] as const).map((f) => (
-                        <button
-                          key={f}
-                          onClick={() => setPrincipleFilter(f)}
-                          className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-all ${
-                            principleFilter === f ? "bg-gray-100 text-gray-900" : "text-gray-500"
-                          }`}
-                        >
-                          {f === "all" ? "All" : f === "found" ? "Disclosed" : "Missing"}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="relative flex-1 max-w-xs">
-                      <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search datapoints..."
-                        value={principleSearch}
-                        onChange={(e) => setPrincipleSearch(e.target.value)}
-                        className="w-full pl-6 pr-3 py-1.5 text-[11px] border border-gray-200 rounded-lg bg-white focus:border-emerald-300 outline-none"
-                      />
-                    </div>
-                    <span className="text-[10px] text-gray-400">{filteredDps.length} of {p.total}</span>
-                  </div>
-
-                  {/* Datapoints */}
-                  <div className="max-h-[400px] overflow-y-auto divide-y divide-gray-50">
-                    {filteredDps.length === 0 ? (
-                      <div className="py-8 text-center text-gray-400 text-xs">No datapoints match filters</div>
-                    ) : (
-                      filteredDps.map((dp) => (
-                        <button
-                          key={dp.id}
-                          onClick={() => setSelectedDp(dp)}
-                          className={`w-full flex items-center gap-3 px-5 py-3 transition-colors text-left ${
-                            dp.status === "found"
-                              ? "bg-green-50/60 hover:bg-green-100/80"
-                              : "bg-red-50/40 hover:bg-red-100/60"
-                          }`}
-                        >
-                          {dp.status === "found" ? (
-                            <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                          ) : (
-                            <XCircle className="w-4 h-4 text-red-500 shrink-0" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-[11px] font-medium leading-tight ${dp.status === "found" ? "text-green-800" : "text-red-800"}`}>{dp.label}</p>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <span className="text-[9px] font-mono text-gray-500">{dp.id}</span>
-                              {dp.esrs_ref && <span className="text-[9px] text-purple-600 font-medium">• {dp.esrs_ref}</span>}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {dp.core && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
-                            <span className="text-[8px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
-                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${dp.status === "found" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                              {dp.status === "found" ? "✓" : "✗"}
-                            </span>
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </div>
+            </button>
           );
         })}
       </div>
-
-      {/* ── Datapoint Detail Modal ── */}
-      {selectedDp && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setSelectedDp(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ background: selectedDp.status === "found" ? "#F0FDF4" : "#FEF2F2" }}>
-              <div className="flex items-center gap-2">
-                {selectedDp.status === "found" ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <XCircle className="w-5 h-5 text-red-500" />}
-                <span className="text-xs font-bold" style={{ color: selectedDp.status === "found" ? "#166534" : "#991B1B" }}>
-                  {selectedDp.status === "found" ? "DISCLOSED" : "NOT DISCLOSED"}
-                </span>
-              </div>
-              <button onClick={() => setSelectedDp(null)} className="text-gray-400 hover:text-gray-600"><XCircle className="w-5 h-5" /></button>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <p className="text-xs font-mono text-gray-400">{selectedDp.id}</p>
-                <h3 className="text-base font-bold text-gray-900 mt-1">{selectedDp.label}</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Data Type</p>
-                  <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDp.data_type}</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Principle</p>
-                  <p className="text-sm font-semibold text-gray-800 mt-0.5">{selectedDp.subsection.replace("principle_", "P")}</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Indicator</p>
-                  <p className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{selectedDp.indicator_type}</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">Paragraph</p>
-                  <p className="text-sm font-semibold text-gray-800 mt-0.5">{selectedDp.paragraph_ref}</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {selectedDp.mandatory && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">Mandatory</span>}
-                {selectedDp.core && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">BRSR Core</span>}
-                {selectedDp.conditional && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Conditional</span>}
-                {selectedDp.esrs_ref && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">ESRS: {selectedDp.esrs_ref}</span>}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
