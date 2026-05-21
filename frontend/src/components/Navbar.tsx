@@ -72,7 +72,7 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border bg-background/92" style={{ backdropFilter: "blur(16px)" }}>
+    <nav className="sticky top-0 z-50 border-b border-border" style={{ background: "var(--nav-bg)", backdropFilter: "blur(16px)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-7">
         <div className="flex justify-between items-center" style={{ height: 58 }}>
           <Link href="/" className="flex items-center gap-2">

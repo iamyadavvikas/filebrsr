@@ -13,6 +13,7 @@
   --warm: #F9F6EF;
   --success: #059669;
   --surface: #F8FAFB;
+  --nav-bg: rgba(250, 251, 249, 0.92);
 }
 
 .dark {
@@ -28,6 +29,7 @@
   --warm: #1C1F24;
   --success: #3FB950;
   --surface: #161B22;
+  --nav-bg: rgba(15, 20, 25, 0.92);
 }
 
 @theme inline {
@@ -178,11 +180,11 @@ html {
 .dark input,
 .dark select,
 .dark textarea {
-  background-color: var(--surface);
-  border-color: var(--border);
-  color: var(--foreground);
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
 }
-.dark input::placeholder { color: var(--muted-light); }
+.dark input::placeholder { color: var(--muted-light) !important; }
 
 /* Shadows in dark mode */
 .dark .shadow-sm,
@@ -209,4 +211,39 @@ html {
 /* Card hover in dark */
 .dark .card-hover:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* ═══ Dark mode: page-level overrides ═══ */
+/* Major page sections */
+.dark main section {
+  color: var(--foreground);
+}
+
+/* Tables in dark mode */
+.dark table {
+  color: var(--foreground);
+}
+.dark thead {
+  background-color: var(--surface) !important;
+}
+.dark th {
+  color: #8B949E !important;
+}
+.dark td {
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+/* Footer dark mode */
+.dark footer {
+  background: var(--card) !important;
+  color: var(--foreground);
+  border-color: var(--border) !important;
+}
+
+/* Dropdown menus */
+.dark [role="menu"],
+.dark .absolute[style*="zIndex"] {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
 }

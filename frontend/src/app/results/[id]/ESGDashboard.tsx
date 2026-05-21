@@ -333,9 +333,9 @@ export function ESGDashboard() {
   // Render
   // ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#F8FAFB] flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--surface)" }}>
       {/* Top Header Bar */}
-      <header className="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-4 shrink-0 z-50 sticky top-0">
+      <header className="h-14 border-b border-gray-200 flex items-center px-4 gap-4 shrink-0 z-50 sticky top-0" style={{ background: "var(--card)" }}>
         <Link href="/upload" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition">
           <ArrowLeft className="w-4 h-4" />
           <span className="hidden sm:inline">Back</span>
@@ -422,7 +422,7 @@ export function ESGDashboard() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* ─── Left Sidebar ─── */}
-        <aside className={`${sidebarOpen ? "w-56" : "w-0"} shrink-0 bg-white border-r border-gray-200 overflow-y-auto transition-all duration-200 hidden lg:block`}>
+        <aside className={`${sidebarOpen ? "w-56" : "w-0"} shrink-0 border-r border-gray-200 overflow-y-auto transition-all duration-200 hidden lg:block`} style={{ background: "var(--card)" }}>
           <nav className="p-3 space-y-1">
             {/* Overview */}
             <button
