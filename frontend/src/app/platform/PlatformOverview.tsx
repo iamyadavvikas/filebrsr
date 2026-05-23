@@ -91,18 +91,22 @@ export default function PlatformOverview({ userId }: OverviewProps) {
   async function fetchReports() {
     try {
       const supabase = createClient();
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("reports")
-        .select("id, file_name, status, created_at")
+        .select("id, file_name, status, created_at, company_name, financial_year")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(20);
+      if (error) {
+        console.error("fetchReports error:", error);
+      }
       if (data) {
         setReports(data);
         const completedReports = data.filter((r) => r.status === "completed");
         setStats((prev) => ({ ...prev, totalExtracted: completedReports.length }));
       }
     } catch (e) {
+      console.error("fetchReports exception:", e);
       // Silently handle
     }
   }
@@ -244,9 +248,10 @@ export default function PlatformOverview({ userId }: OverviewProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {report.file_name || "BRSR Report"}
+                      {(report as any).company_name || report.file_name || "BRSR Report"}
                     </p>
                     <p className="text-xs text-gray-400">
+                      {(report as any).financial_year ? `${(report as any).financial_year} · ` : ""}
                       {new Date(report.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                     </p>
                   </div>

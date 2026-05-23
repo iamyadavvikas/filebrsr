@@ -319,7 +319,7 @@ export default function UploadExtractClient({ userId }: { userId: string }) {
       )}
 
       {/* Past Extractions */}
-      {!uploading && !success && <PastExtractions userId={userId} />}
+      {!uploading && <PastExtractions userId={userId} />}
 
       <style jsx>{`
         @keyframes progress {
@@ -355,11 +355,14 @@ function PastExtractions({ userId }: { userId: string }) {
     setLoaded(true);
   }
 
-  if (!loaded || reports.length === 0) return null;
+  if (!loaded) return null;
 
   return (
     <div className="mt-8">
-      <h2 className="text-sm font-semibold text-gray-700 mb-3">Past Reports</h2>
+      <h2 className="text-sm font-semibold text-gray-700 mb-3">Previous Extractions</h2>
+      {reports.length === 0 ? (
+        <p className="text-sm text-gray-400 py-4 text-center">No extractions yet. Upload a report above to get started.</p>
+      ) : (
       <div className="space-y-2">
         {reports.map((r) => {
           const reportName = r.company_name
@@ -406,6 +409,7 @@ function PastExtractions({ userId }: { userId: string }) {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
