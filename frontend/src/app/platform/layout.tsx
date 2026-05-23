@@ -32,6 +32,8 @@ import {
   ClipboardList,
   MessageSquare,
   PieChart,
+  Menu,
+  X,
 } from "lucide-react";
 
 // Grouped by ESG compliance workflow priority
@@ -97,6 +99,7 @@ export default function PlatformLayout({
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
 
   useEffect(() => {
@@ -106,14 +109,102 @@ export default function PlatformLayout({
     });
   }, []);
 
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Find current page name for mobile header
+  const currentPage = navGroups
+    .flatMap((g) => g.items)
+    .find((item) => pathname === item.href || (item.href !== "/platform" && pathname?.startsWith(item.href)));
+
   return (
     <AnalyticsProvider userId={userId}>
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
+
+      {/* Mobile Header Bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center h-14 px-3 border-b border-border" style={{ background: "var(--nav-bg)", backdropFilter: "blur(16px)" }}>
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="w-10 h-10 flex items-center justify-center rounded-lg text-foreground"
+          aria-label="Open menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="flex-1 flex items-center justify-center">
+          <span className="text-sm font-semibold text-foreground truncate">{currentPage?.name || "Platform"}</span>
+        </div>
+        <Link href="/platform" className="w-10 h-10 flex items-center justify-center">
+          <Image src="/logo-icon.svg" alt="FileBRSR" width={24} height={24} />
+        </Link>
+      </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-50">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setMobileOpen(false)}
+          />
+          {/* Sidebar panel */}
+          <aside
+            className="absolute left-0 top-0 bottom-0 w-72 text-white flex flex-col overflow-y-auto"
+            style={{ background: "linear-gradient(180deg, #0B2B22 0%, #0F3D2E 40%, #1B4D3E 100%)", animation: "slideRight 0.2s ease-out" }}
+          >
+            {/* Header with close button */}
+            <div className="p-4 flex items-center justify-between border-b border-white/10">
+              <Image src="/logo.svg" alt="FileBRSR" width={140} height={36} />
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Navigation */}
+            <nav className="flex-1 py-3 overflow-y-auto">
+              {navGroups.map((group, gi) => (
+                <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-white/10" : ""}>
+                  {group.label && (
+                    <span className="px-4 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                      {group.label}
+                    </span>
+                  )}
+                  {group.items.map((item) => {
+                    const isActive =
+                      pathname === item.href ||
+                      (item.href !== "/platform" && pathname?.startsWith(item.href));
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileOpen(false)}
+                        className={`flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg transition-colors ${
+                          isActive
+                            ? "bg-emerald-600/30 text-emerald-300"
+                            : "text-gray-300 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        <item.icon className="w-4 h-4 flex-shrink-0" />
+                        <span className="text-sm">{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ))}
+            </nav>
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop Sidebar */}
       <aside
-        className={`${
+        className={`hidden md:flex ${
           collapsed ? "w-16" : "w-64"
-        } text-white flex flex-col transition-all duration-300 ease-in-out`}
+        } text-white flex-col transition-all duration-300 ease-in-out`}
         style={{ background: "linear-gradient(180deg, #0B2B22 0%, #0F3D2E 40%, #1B4D3E 100%)" }}
       >
         {/* Logo - links back to home */}
@@ -174,7 +265,7 @@ export default function PlatformLayout({
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
         {children}
       </main>
     </div>

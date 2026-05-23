@@ -420,19 +420,31 @@ html {
 
   /* ─── Platform pages ─── */
 
-  /* Platform header: stack title and select */
-  .flex.items-center.justify-between.mb-8 {
+  /* Platform page headers: stack title and actions */
+  .flex.items-center.justify-between.mb-8,
+  .flex.items-center.justify-between.mb-6 {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
 
-  .flex.items-center.justify-between.mb-8 h1 {
+  .flex.items-center.justify-between.mb-8 h1,
+  .flex.items-center.justify-between.mb-6 h1 {
     font-size: 20px;
   }
 
-  .flex.items-center.justify-between.mb-8 p {
+  .flex.items-center.justify-between.mb-8 p,
+  .flex.items-center.justify-between.mb-6 p {
     font-size: 13px;
+  }
+
+  /* Platform page containers: reduce padding */
+  .p-6.lg\:p-8 {
+    padding: 16px;
+  }
+
+  .space-y-6 > * + * {
+    margin-top: 16px;
   }
 
   /* Platform metric grid: 2 columns on mobile */
@@ -591,5 +603,17 @@ html {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Mobile sidebar slide-right animation */
+@keyframes slideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
