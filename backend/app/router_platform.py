@@ -1065,3 +1065,27 @@ async def board_dashboard(financial_year: str = "FY2025-26", authorization: str 
             "blockers": blockers,
         },
     }
+
+
+# ═══════════════════════════════════════════════════════════════
+# REPORT DELETE API
+# ═══════════════════════════════════════════════════════════════
+
+@router.delete("/reports/{report_id}")
+async def delete_report(report_id: str, authorization: str = Header(None)):
+    """Delete a report by ID (only if owned by the user)."""
+    from supabase import create_client as create_supabase_client
+    settings = get_settings()
+    supabase = create_supabase_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+    
+    user_id = authorization.replace("Bearer ", "") if authorization else None
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    # Verify ownership
+    report = supabase.table("reports").select("id, user_id").eq("id", report_id).single().execute()
+    if not report.data or report.data.get("user_id") != user_id:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    supabase.table("reports").delete().eq("id", report_id).execute()
+    return {"status": "deleted"}
