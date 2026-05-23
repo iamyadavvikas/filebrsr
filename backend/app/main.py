@@ -462,3 +462,38 @@ async def generate_pdf_report(req: PDFReportRequest):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+class SEBIFilingRequest(BaseModel):
+    extracted_data: dict
+    company_name: str = "Company"
+    financial_year: str = "FY 2024-25"
+    cin: str = ""
+
+
+@app.post("/api/report/sebi-filing")
+async def generate_sebi_filing(req: SEBIFilingRequest, authorization: str = Header(...)):
+    """Generate SEBI BRSR Annexure II format PDF — the actual stock exchange filing."""
+    from fastapi.responses import Response
+    from app.sebi_pdf_generator import generate_sebi_brsr_filing
+
+    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
+    if authorization != expected_token:
+        # Allow user JWTs too
+        token = authorization.replace("Bearer ", "")
+        if not token:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+    pdf_bytes = generate_sebi_brsr_filing(
+        extracted_data=req.extracted_data,
+        company_name=req.company_name,
+        financial_year=req.financial_year,
+        cin=req.cin,
+    )
+
+    filename = f"BRSR_Filing_{req.company_name.replace(' ', '_')}_{req.financial_year}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
