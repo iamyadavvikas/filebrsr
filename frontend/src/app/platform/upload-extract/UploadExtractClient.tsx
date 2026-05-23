@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAnalytics } from "@/lib/analytics";
 import {
@@ -20,7 +20,7 @@ const PROGRESS_STEPS = [
   { label: "Analyze", desc: "Gap analysis" },
 ];
 
-export default function UploadExtractClient({ userId }: { userId: string }) {
+export default function UploadExtractClient({ userId, initialReports }: { userId: string; initialReports: any[] }) {
   const { track } = useAnalytics();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -319,7 +319,7 @@ export default function UploadExtractClient({ userId }: { userId: string }) {
       )}
 
       {/* Past Extractions */}
-      {!uploading && !success && <PastExtractions userId={userId} />}
+      {!uploading && <PastExtractions userId={userId} initialReports={initialReports} />}
 
       <style jsx>{`
         @keyframes progress {
@@ -331,14 +331,9 @@ export default function UploadExtractClient({ userId }: { userId: string }) {
   );
 }
 
-function PastExtractions({ userId }: { userId: string }) {
-  const [reports, setReports] = useState<any[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    fetchReports();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+function PastExtractions({ userId, initialReports }: { userId: string; initialReports: any[] }) {
+  const [reports, setReports] = useState<any[]>(initialReports);
+  const [loaded, setLoaded] = useState(true);
 
   async function fetchReports() {
     try {
@@ -355,16 +350,19 @@ function PastExtractions({ userId }: { userId: string }) {
     setLoaded(true);
   }
 
-  if (!loaded || reports.length === 0) return null;
+  if (!loaded) return null;
 
   return (
     <div className="mt-8">
-      <h2 className="text-sm font-semibold text-gray-700 mb-3">Past Reports</h2>
+      <h2 className="text-sm font-semibold text-gray-700 mb-3">Previous Extractions</h2>
+      {reports.length === 0 ? (
+        <p className="text-sm text-gray-400 py-4 text-center">No extractions yet. Upload a report above to get started.</p>
+      ) : (
       <div className="space-y-2">
         {reports.map((r) => {
           const reportName = r.company_name
-            ? `${r.company_name} ${r.financial_year || ""}`
-            : r.file_name;
+            ? `${r.company_name} ${r.financial_year ? `(${r.financial_year})` : ""}`
+            : r.file_name || "Uploaded Report";
           const extractedAt = new Date(r.created_at);
           const timeAgo = getTimeAgo(extractedAt);
 
@@ -379,6 +377,7 @@ function PastExtractions({ userId }: { userId: string }) {
                 <div>
                   <p className="text-sm font-medium text-gray-800">{reportName}</p>
                   <p className="text-xs text-gray-400">
+                    {r.file_name && r.company_name ? <span className="text-gray-500">{r.file_name} · </span> : null}
                     {extractedAt.toLocaleDateString("en-IN", {
                       day: "numeric",
                       month: "short",
@@ -391,10 +390,11 @@ function PastExtractions({ userId }: { userId: string }) {
                   </p>
                 </div>
               </div>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  r.status === "completed"
-                    ? "bg-emerald-100 text-emerald-700"
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    r.status === "completed"
+                      ? "bg-emerald-100 text-emerald-700"
                     : r.status === "failed"
                     ? "bg-red-100 text-red-700"
                     : "bg-amber-100 text-amber-700"
@@ -402,10 +402,15 @@ function PastExtractions({ userId }: { userId: string }) {
               >
                 {r.status}
               </span>
+              {r.status === "completed" && (
+                <span className="text-xs text-emerald-600 font-medium group-hover:underline">View →</span>
+              )}
+              </div>
             </a>
           );
         })}
       </div>
+      )}
     </div>
   );
 }

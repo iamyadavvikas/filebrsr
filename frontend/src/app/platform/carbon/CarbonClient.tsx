@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Calculator,
   Plus,
@@ -12,7 +12,10 @@ import {
   CloudRain,
   TrendingDown,
   Info,
+  Save,
+  CheckCircle2,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 const FUEL_TYPES = [
   { value: "coal", label: "Coal", unit: "MT" },
@@ -25,31 +28,60 @@ const FUEL_TYPES = [
   { value: "petrol", label: "Petrol (Vehicles)", unit: "KL" },
   { value: "diesel", label: "Diesel (Vehicles)", unit: "KL" },
   { value: "cng", label: "CNG (Vehicles)", unit: "kg" },
+  { value: "biomass", label: "Biomass / Briquettes", unit: "MT" },
+  { value: "propane", label: "Propane", unit: "KL" },
+  { value: "kerosene", label: "Kerosene", unit: "KL" },
+  { value: "wood_charcoal", label: "Wood / Charcoal", unit: "MT" },
+];
+
+const SCOPE2_CATEGORIES = [
+  { value: "purchased_electricity", label: "Purchased Electricity (Location-based)", unit: "MWh", subcategory: "location_based" },
+  { value: "purchased_electricity_market", label: "Purchased Electricity (Market-based)", unit: "MWh", subcategory: "market_based" },
+  { value: "purchased_steam", label: "Purchased Steam / Heat", unit: "GJ", subcategory: "location_based" },
+  { value: "purchased_cooling", label: "Purchased Cooling", unit: "GJ", subcategory: "location_based" },
+  { value: "renewable_electricity_ppa", label: "Renewable (PPA / Open Access)", unit: "MWh", subcategory: "market_based" },
+  { value: "renewable_electricity_rec", label: "Renewable (REC Certificates)", unit: "MWh", subcategory: "market_based" },
+  { value: "captive_solar", label: "Captive Solar Power", unit: "MWh", subcategory: "market_based" },
+  { value: "captive_wind", label: "Captive Wind Power", unit: "MWh", subcategory: "market_based" },
 ];
 
 const SCOPE3_CATEGORIES = [
   { value: "business_travel_air_domestic", label: "Air Travel (Domestic)", unit: "passenger-km" },
-  { value: "business_travel_air_long_haul", label: "Air Travel (International)", unit: "passenger-km" },
+  { value: "business_travel_air_short_haul", label: "Air Travel (Short-haul International)", unit: "passenger-km" },
+  { value: "business_travel_air_long_haul", label: "Air Travel (Long-haul International)", unit: "passenger-km" },
   { value: "business_travel_rail", label: "Rail Travel", unit: "passenger-km" },
+  { value: "business_travel_taxi", label: "Taxi / Cab Travel", unit: "km" },
   { value: "employee_commute_car", label: "Employee Commute (Car)", unit: "km" },
   { value: "employee_commute_two_wheeler", label: "Employee Commute (2-Wheeler)", unit: "km" },
   { value: "employee_commute_bus", label: "Employee Commute (Bus)", unit: "passenger-km" },
+  { value: "employee_commute_metro", label: "Employee Commute (Metro/Rail)", unit: "passenger-km" },
   { value: "waste_landfill", label: "Waste to Landfill", unit: "MT" },
+  { value: "waste_incineration", label: "Waste Incineration", unit: "MT" },
   { value: "waste_recycling", label: "Waste Recycled", unit: "MT" },
-  { value: "water_supply", label: "Water Supply", unit: "KL" },
+  { value: "water_supply", label: "Water Supply & Treatment", unit: "KL" },
   { value: "freight_road", label: "Freight (Road)", unit: "tonne-km" },
   { value: "freight_rail", label: "Freight (Rail)", unit: "tonne-km" },
+  { value: "freight_sea", label: "Freight (Sea)", unit: "tonne-km" },
+  { value: "freight_air", label: "Freight (Air)", unit: "tonne-km" },
+  { value: "purchased_goods", label: "Purchased Goods & Services", unit: "₹ Lakhs spent" },
+  { value: "capital_goods", label: "Capital Goods", unit: "₹ Lakhs spent" },
 ];
 
 const STATES = [
-  { value: "national", label: "National Average (CEA)" },
+  { value: "national", label: "National Average (CEA 2024)" },
   { value: "maharashtra", label: "Maharashtra" },
   { value: "karnataka", label: "Karnataka" },
   { value: "tamil_nadu", label: "Tamil Nadu" },
   { value: "gujarat", label: "Gujarat" },
-  { value: "delhi", label: "Delhi" },
+  { value: "delhi", label: "Delhi NCR" },
   { value: "rajasthan", label: "Rajasthan" },
   { value: "andhra_pradesh", label: "Andhra Pradesh" },
+  { value: "telangana", label: "Telangana" },
+  { value: "uttar_pradesh", label: "Uttar Pradesh" },
+  { value: "west_bengal", label: "West Bengal" },
+  { value: "madhya_pradesh", label: "Madhya Pradesh" },
+  { value: "kerala", label: "Kerala" },
+  { value: "punjab", label: "Punjab" },
 ];
 
 interface EmissionEntry {
@@ -59,13 +91,20 @@ interface EmissionEntry {
   result?: { total_tco2e: number };
 }
 
+interface Scope2Entry {
+  id: string;
+  category: string;
+  quantity: number;
+  state: string;
+}
+
 export default function CarbonClient() {
-  const [financialYear, setFinancialYear] = useState("FY2024-25");
+  const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [scope1Entries, setScope1Entries] = useState<EmissionEntry[]>([
     { id: "1", type: "diesel_dg_set", quantity: 0 },
   ]);
-  const [scope2Entries, setScope2Entries] = useState([
-    { id: "1", mwh: 0, state: "national" },
+  const [scope2Entries, setScope2Entries] = useState<Scope2Entry[]>([
+    { id: "1", category: "purchased_electricity", quantity: 0, state: "national" },
   ]);
   const [scope3Entries, setScope3Entries] = useState<EmissionEntry[]>([
     { id: "1", type: "business_travel_air_domestic", quantity: 0 },
@@ -73,12 +112,81 @@ export default function CarbonClient() {
   const [revenueCrores, setRevenueCrores] = useState<number>(0);
   const [results, setResults] = useState<any>(null);
   const [calculating, setCalculating] = useState(false);
+  const [calcError, setCalcError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Load saved data on mount
+  useEffect(() => {
+    loadSavedData();
+  }, [financialYear]);
+
+  async function loadSavedData() {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("brsr_entries")
+        .select("datapoint_id, value")
+        .eq("user_id", user.id)
+        .eq("financial_year", financialYear)
+        .like("datapoint_id", "CARBON_%");
+      if (data && data.length > 0) {
+        const carbonData = data.reduce((acc: any, d: any) => {
+          acc[d.datapoint_id] = d.value;
+          return acc;
+        }, {});
+        if (carbonData.CARBON_SCOPE1) {
+          try { setScope1Entries(JSON.parse(carbonData.CARBON_SCOPE1)); } catch {}
+        }
+        if (carbonData.CARBON_SCOPE2) {
+          try { setScope2Entries(JSON.parse(carbonData.CARBON_SCOPE2)); } catch {}
+        }
+        if (carbonData.CARBON_SCOPE3) {
+          try { setScope3Entries(JSON.parse(carbonData.CARBON_SCOPE3)); } catch {}
+        }
+        if (carbonData.CARBON_REVENUE) {
+          setRevenueCrores(parseFloat(carbonData.CARBON_REVENUE) || 0);
+        }
+      }
+    } catch {}
+  }
+
+  async function saveData() {
+    setSaving(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const entries = [
+        { datapoint_id: "CARBON_SCOPE1", value: JSON.stringify(scope1Entries) },
+        { datapoint_id: "CARBON_SCOPE2", value: JSON.stringify(scope2Entries) },
+        { datapoint_id: "CARBON_SCOPE3", value: JSON.stringify(scope3Entries) },
+        { datapoint_id: "CARBON_REVENUE", value: String(revenueCrores) },
+      ];
+      if (results) {
+        entries.push({ datapoint_id: "CARBON_RESULTS", value: JSON.stringify(results) });
+      }
+      for (const entry of entries) {
+        await supabase.from("brsr_entries").upsert({
+          user_id: user.id,
+          financial_year: financialYear,
+          datapoint_id: entry.datapoint_id,
+          value: entry.value,
+        }, { onConflict: "user_id,financial_year,datapoint_id" });
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {}
+    setSaving(false);
+  }
 
   async function calculateAll() {
     setCalculating(true);
+    setCalcError("");
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
-      const res = await fetch(`${backendUrl}/api/platform/carbon/summary`, {
+      const res = await fetch("/backend/api/platform/carbon/summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -87,8 +195,8 @@ export default function CarbonClient() {
             .filter((e) => e.quantity > 0)
             .map((e) => ({ fuel_type: e.type, quantity: e.quantity })),
           scope2_entries: scope2Entries
-            .filter((e) => e.mwh > 0)
-            .map((e) => ({ electricity_mwh: e.mwh, state: e.state })),
+            .filter((e) => e.quantity > 0)
+            .map((e) => ({ category: e.category, electricity_mwh: e.quantity, state: e.state })),
           scope3_entries: scope3Entries
             .filter((e) => e.quantity > 0)
             .map((e) => ({ category: e.type, quantity: e.quantity })),
@@ -97,9 +205,12 @@ export default function CarbonClient() {
       });
       if (res.ok) {
         setResults(await res.json());
+      } else {
+        const text = await res.text();
+        setCalcError(`Calculation failed (${res.status}): ${text.slice(0, 200)}`);
       }
-    } catch (err) {
-      console.error("Calculation failed:", err);
+    } catch (err: any) {
+      setCalcError(`Network error: ${err.message}`);
     }
     setCalculating(false);
   }
@@ -127,9 +238,11 @@ export default function CarbonClient() {
           onChange={(e) => setFinancialYear(e.target.value)}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
         >
-          <option value="FY2024-25">FY 2024-25</option>
+          <option value="FY2022-23">FY 2022-23</option>
           <option value="FY2023-24">FY 2023-24</option>
+          <option value="FY2024-25">FY 2024-25</option>
           <option value="FY2025-26">FY 2025-26</option>
+          <option value="FY2026-27">FY 2026-27</option>
         </select>
       </div>
 
@@ -208,14 +321,38 @@ export default function CarbonClient() {
               <Zap className="w-4 h-4 text-amber-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">Scope 2 — Indirect Emissions (Electricity)</h3>
-              <p className="text-xs text-gray-500">Purchased electricity × CEA grid emission factor</p>
+              <h3 className="font-semibold text-gray-900">Scope 2 — Indirect Emissions (Energy)</h3>
+              <p className="text-xs text-gray-500">Purchased electricity, steam, heat & cooling (Location-based & Market-based)</p>
             </div>
           </div>
 
           <div className="space-y-3">
             {scope2Entries.map((entry, idx) => (
-              <div key={entry.id} className="flex items-center gap-3">
+              <div key={entry.id} className="flex items-center gap-3 flex-wrap">
+                <select
+                  value={entry.category}
+                  onChange={(e) => {
+                    const updated = [...scope2Entries];
+                    updated[idx].category = e.target.value;
+                    setScope2Entries(updated);
+                  }}
+                  className="flex-1 min-w-[200px] px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <optgroup label="Location-based">
+                    {SCOPE2_CATEGORIES.filter(c => c.subcategory === "location_based").map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label} ({c.unit})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Market-based">
+                    {SCOPE2_CATEGORIES.filter(c => c.subcategory === "market_based").map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label} ({c.unit})
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
                 <select
                   value={entry.state}
                   onChange={(e) => {
@@ -223,7 +360,7 @@ export default function CarbonClient() {
                     updated[idx].state = e.target.value;
                     setScope2Entries(updated);
                   }}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-44 px-3 py-2 border border-gray-200 rounded-lg text-sm"
                 >
                   {STATES.map((s) => (
                     <option key={s.value} value={s.value}>
@@ -231,22 +368,31 @@ export default function CarbonClient() {
                     </option>
                   ))}
                 </select>
-                <div className="relative w-48">
-                  <input
-                    type="number"
-                    placeholder="Electricity (MWh)"
-                    value={entry.mwh || ""}
-                    onChange={(e) => {
-                      const updated = [...scope2Entries];
-                      updated[idx].mwh = parseFloat(e.target.value) || 0;
-                      setScope2Entries(updated);
-                    }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">MWh</span>
-                </div>
+                <input
+                  type="number"
+                  placeholder={`Qty (${SCOPE2_CATEGORIES.find(c => c.value === entry.category)?.unit || "MWh"})`}
+                  value={entry.quantity || ""}
+                  onChange={(e) => {
+                    const updated = [...scope2Entries];
+                    updated[idx].quantity = parseFloat(e.target.value) || 0;
+                    setScope2Entries(updated);
+                  }}
+                  className="w-40 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                />
+                <button
+                  onClick={() => setScope2Entries(scope2Entries.filter((_, i) => i !== idx))}
+                  className="p-2 text-gray-400 hover:text-red-500"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             ))}
+            <button
+              onClick={() => setScope2Entries([...scope2Entries, { id: Date.now().toString(), category: "purchased_electricity", quantity: 0, state: "national" }])}
+              className="flex items-center gap-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+            >
+              <Plus className="w-4 h-4" /> Add energy source
+            </button>
           </div>
         </div>
 
@@ -324,15 +470,32 @@ export default function CarbonClient() {
           </div>
         </div>
 
-        {/* Calculate Button */}
-        <button
-          onClick={calculateAll}
-          disabled={calculating}
-          className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          <Calculator className="w-5 h-5" />
-          {calculating ? "Calculating..." : "Calculate Total Carbon Footprint"}
-        </button>
+        {/* Calculate & Save Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={calculateAll}
+            disabled={calculating}
+            className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <Calculator className="w-5 h-5" />
+            {calculating ? "Calculating..." : "Calculate Total Carbon Footprint"}
+          </button>
+          <button
+            onClick={saveData}
+            disabled={saving}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saved ? <CheckCircle2 className="w-5 h-5" /> : <Save className="w-5 h-5" />}
+            {saving ? "Saving..." : saved ? "Saved!" : "Save"}
+          </button>
+        </div>
+
+        {/* Error Display */}
+        {calcError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+            <strong>Error:</strong> {calcError}
+          </div>
+        )}
 
         {/* Results */}
         {results && (

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import UploadExtractClient from "./UploadExtractClient";
 
 export default async function UploadExtractPage() {
@@ -10,5 +10,14 @@ export default async function UploadExtractPage() {
 
   if (!user) redirect("/login");
 
-  return <UploadExtractClient userId={user.id} />;
+  // Fetch reports server-side using admin client (bypasses RLS)
+  const admin = createAdminClient();
+  const { data: reports } = await admin
+    .from("reports")
+    .select("id, file_name, status, created_at, company_name, financial_year")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  return <UploadExtractClient userId={user.id} initialReports={reports || []} />;
 }

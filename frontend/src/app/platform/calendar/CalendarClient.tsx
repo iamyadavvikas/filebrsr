@@ -28,12 +28,17 @@ const REGULATORY_COLORS: Record<string, string> = {
   GRI: "bg-amber-100 text-amber-800",
   Internal: "bg-gray-100 text-gray-700",
   "S&P Global": "bg-indigo-100 text-indigo-800",
+  TCFD: "bg-teal-100 text-teal-800",
+  MSCI: "bg-violet-100 text-violet-800",
+  Sustainalytics: "bg-orange-100 text-orange-800",
+  MCA: "bg-rose-100 text-rose-800",
 };
 
 export default function CalendarClient() {
-  const [financialYear, setFinancialYear] = useState("FY2024-25");
+  const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterBody, setFilterBody] = useState("all");
 
   useEffect(() => {
     fetchDeadlines();
@@ -79,31 +84,49 @@ export default function CalendarClient() {
   }
 
   // Sort by due date
-  const sortedDeadlines = [...deadlines].sort((a, b) => {
-    if (!a.due_date) return 1;
-    if (!b.due_date) return -1;
-    return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-  });
+  const sortedDeadlines = [...deadlines]
+    .filter((d) => filterBody === "all" || d.regulatory_body === filterBody)
+    .sort((a, b) => {
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    });
+
+  const regulatoryBodies = [...new Set(deadlines.map((d) => d.regulatory_body))];
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Compliance Calendar</h1>
           <p className="text-gray-500 mt-1">
             SEBI filing deadlines, audit schedules, and regulatory timelines
           </p>
         </div>
-        <select
-          value={financialYear}
-          onChange={(e) => setFinancialYear(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
-        >
-          <option value="FY2024-25">FY 2024-25</option>
-          <option value="FY2023-24">FY 2023-24</option>
-          <option value="FY2025-26">FY 2025-26</option>
-        </select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <select
+            value={filterBody}
+            onChange={(e) => setFilterBody(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+          >
+            <option value="all">All Regulators</option>
+            {regulatoryBodies.map((body) => (
+              <option key={body} value={body}>{body}</option>
+            ))}
+          </select>
+          <select
+            value={financialYear}
+            onChange={(e) => setFinancialYear(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+          >
+            <option value="FY2022-23">FY 2022-23</option>
+            <option value="FY2023-24">FY 2023-24</option>
+            <option value="FY2024-25">FY 2024-25</option>
+            <option value="FY2025-26">FY 2025-26</option>
+            <option value="FY2026-27">FY 2026-27</option>
+          </select>
+        </div>
       </div>
 
       {/* Urgent Banner */}

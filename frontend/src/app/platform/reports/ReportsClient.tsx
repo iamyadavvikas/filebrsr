@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -66,18 +66,14 @@ const FORMAT_OPTIONS = [
   { id: "docx", label: "Word", icon: FileType, desc: "Editable document" },
 ];
 
-export default function ReportsClient() {
-  const [financialYear, setFinancialYear] = useState("FY2024-25");
+export default function ReportsClient({ initialReports }: { initialReports: ExtractionReport[] }) {
+  const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedFormat, setSelectedFormat] = useState("pdf");
   const [generating, setGenerating] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<any>(null);
   const [tab, setTab] = useState<"extractions" | "generate">("extractions");
-  const [reports, setReports] = useState<ExtractionReport[]>([]);
-
-  useEffect(() => {
-    fetchExtractions();
-  }, []);
+  const [reports, setReports] = useState<ExtractionReport[]>(initialReports);
 
   async function fetchExtractions() {
     try {
@@ -137,9 +133,11 @@ export default function ReportsClient() {
           onChange={(e) => setFinancialYear(e.target.value)}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
         >
-          <option value="FY2024-25">FY 2024-25</option>
+          <option value="FY2022-23">FY 2022-23</option>
           <option value="FY2023-24">FY 2023-24</option>
+          <option value="FY2024-25">FY 2024-25</option>
           <option value="FY2025-26">FY 2025-26</option>
+          <option value="FY2026-27">FY 2026-27</option>
         </select>
       </div>
 
@@ -197,10 +195,11 @@ export default function ReportsClient() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">
                       {report.company_name
-                        ? `${report.company_name} ${report.financial_year || ""}`
-                        : report.file_name || "BRSR Report"}
+                        ? `${report.company_name} ${report.financial_year ? `(${report.financial_year})` : ""}`
+                        : report.file_name || "Uploaded Report"}
                     </p>
                     <p className="text-sm text-gray-500">
+                      {report.file_name && report.company_name ? <span className="text-gray-400">{report.file_name} · </span> : null}
                       {new Date(report.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                       {" "}&middot;{" "}
                       <span className={report.status === "completed" ? "text-emerald-600" : "text-amber-600"}>

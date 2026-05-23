@@ -23,6 +23,7 @@ import { createClient } from "@/lib/supabase/client";
 
 interface OverviewProps {
   userId: string;
+  initialReports: any[];
 }
 
 interface ExtractionReport {
@@ -34,10 +35,10 @@ interface ExtractionReport {
   total_extracted?: number;
 }
 
-export default function PlatformOverview({ userId }: OverviewProps) {
-  const [financialYear, setFinancialYear] = useState("FY2024-25");
+export default function PlatformOverview({ userId, initialReports }: OverviewProps) {
+  const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState<ExtractionReport[]>([]);
+  const [reports, setReports] = useState<ExtractionReport[]>(initialReports as ExtractionReport[]);
   const [stats, setStats] = useState({
     completion: 0,
     coreCompletion: 0,
@@ -91,18 +92,22 @@ export default function PlatformOverview({ userId }: OverviewProps) {
   async function fetchReports() {
     try {
       const supabase = createClient();
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("reports")
-        .select("id, file_name, status, created_at")
+        .select("id, file_name, status, created_at, company_name, financial_year")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(20);
+      if (error) {
+        console.error("fetchReports error:", error);
+      }
       if (data) {
         setReports(data);
         const completedReports = data.filter((r) => r.status === "completed");
         setStats((prev) => ({ ...prev, totalExtracted: completedReports.length }));
       }
     } catch (e) {
+      console.error("fetchReports exception:", e);
       // Silently handle
     }
   }
@@ -122,9 +127,11 @@ export default function PlatformOverview({ userId }: OverviewProps) {
           onChange={(e) => setFinancialYear(e.target.value)}
           className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium bg-white self-start"
         >
-          <option value="FY2024-25">FY 2024-25</option>
+          <option value="FY2022-23">FY 2022-23</option>
           <option value="FY2023-24">FY 2023-24</option>
+          <option value="FY2024-25">FY 2024-25</option>
           <option value="FY2025-26">FY 2025-26</option>
+          <option value="FY2026-27">FY 2026-27</option>
         </select>
       </div>
 
@@ -242,9 +249,10 @@ export default function PlatformOverview({ userId }: OverviewProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {report.file_name || "BRSR Report"}
+                      {(report as any).company_name || report.file_name || "BRSR Report"}
                     </p>
                     <p className="text-xs text-gray-400">
+                      {(report as any).financial_year ? `${(report as any).financial_year} · ` : ""}
                       {new Date(report.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                     </p>
                   </div>
