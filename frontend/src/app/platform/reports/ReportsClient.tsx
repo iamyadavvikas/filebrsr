@@ -100,7 +100,7 @@ export default function ReportsClient() {
     if (!selectedType) return;
     setGenerating(true);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://filebrsr-api.onrender.com";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
       const res = await fetch(`${backendUrl}/api/platform/reports/generate`, {
         method: "POST",
         headers: {

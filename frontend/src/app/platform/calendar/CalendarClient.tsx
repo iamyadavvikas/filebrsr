@@ -42,7 +42,7 @@ export default function CalendarClient() {
   async function fetchDeadlines() {
     setLoading(true);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://filebrsr-api.onrender.com";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
       const res = await fetch(
         `${backendUrl}/api/platform/calendar/sebi-deadlines?financial_year=${financialYear}`
       );

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 
-// Cloud Run allows up to 300s (or more). Remove Vercel limit.
 export const maxDuration = 300;
 
 // Admin client that bypasses RLS (for server-side DB operations)
