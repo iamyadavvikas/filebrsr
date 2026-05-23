@@ -184,8 +184,7 @@ export default function CarbonClient() {
   async function calculateAll() {
     setCalculating(true);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
-      const res = await fetch(`${backendUrl}/api/platform/carbon/summary`, {
+      const res = await fetch("/backend/api/platform/carbon/summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
