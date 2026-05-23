@@ -366,8 +366,8 @@ function PastExtractions({ userId }: { userId: string }) {
       <div className="space-y-2">
         {reports.map((r) => {
           const reportName = r.company_name
-            ? `${r.company_name} ${r.financial_year || ""}`
-            : r.file_name;
+            ? `${r.company_name} ${r.financial_year ? `(${r.financial_year})` : ""}`
+            : r.file_name || "Uploaded Report";
           const extractedAt = new Date(r.created_at);
           const timeAgo = getTimeAgo(extractedAt);
 
@@ -382,6 +382,7 @@ function PastExtractions({ userId }: { userId: string }) {
                 <div>
                   <p className="text-sm font-medium text-gray-800">{reportName}</p>
                   <p className="text-xs text-gray-400">
+                    {r.file_name && r.company_name ? <span className="text-gray-500">{r.file_name} · </span> : null}
                     {extractedAt.toLocaleDateString("en-IN", {
                       day: "numeric",
                       month: "short",
@@ -394,10 +395,11 @@ function PastExtractions({ userId }: { userId: string }) {
                   </p>
                 </div>
               </div>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  r.status === "completed"
-                    ? "bg-emerald-100 text-emerald-700"
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    r.status === "completed"
+                      ? "bg-emerald-100 text-emerald-700"
                     : r.status === "failed"
                     ? "bg-red-100 text-red-700"
                     : "bg-amber-100 text-amber-700"
@@ -405,6 +407,10 @@ function PastExtractions({ userId }: { userId: string }) {
               >
                 {r.status}
               </span>
+              {r.status === "completed" && (
+                <span className="text-xs text-emerald-600 font-medium group-hover:underline">View →</span>
+              )}
+              </div>
             </a>
           );
         })}

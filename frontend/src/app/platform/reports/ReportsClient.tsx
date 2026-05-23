@@ -199,10 +199,11 @@ export default function ReportsClient() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">
                       {report.company_name
-                        ? `${report.company_name} ${report.financial_year || ""}`
-                        : report.file_name || "BRSR Report"}
+                        ? `${report.company_name} ${report.financial_year ? `(${report.financial_year})` : ""}`
+                        : report.file_name || "Uploaded Report"}
                     </p>
                     <p className="text-sm text-gray-500">
+                      {report.file_name && report.company_name ? <span className="text-gray-400">{report.file_name} · </span> : null}
                       {new Date(report.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                       {" "}&middot;{" "}
                       <span className={report.status === "completed" ? "text-emerald-600" : "text-amber-600"}>
