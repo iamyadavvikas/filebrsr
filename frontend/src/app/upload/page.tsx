@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { Loader2, FileText, Upload, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { trackEvent } from "@/lib/posthog";
 
 const PROGRESS_STEPS = [
   { label: "Upload", desc: "Sending PDF" },
@@ -92,6 +93,7 @@ export default function UploadPage() {
     setSuccess("");
     setProgress("Uploading PDF...");
     setProgressStep(0);
+    trackEvent("upload_started", { file_size: file.size, file_name: file.name });
 
     const formData = new FormData();
     formData.append("file", file);
@@ -132,6 +134,7 @@ export default function UploadPage() {
 
       setSuccess(data.results ? "Extraction complete! Redirecting..." : "Report submitted! Redirecting...");
       setProgress("");
+      trackEvent("extraction_complete", { has_results: !!data.results, report_id: data.reportId });
 
       // Store results and redirect to interactive dashboard
       if (data.results) {

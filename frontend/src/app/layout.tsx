@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { PostHogProvider } from "@/lib/posthog";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -73,9 +74,11 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+        <PostHogProvider>
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
+        </PostHogProvider>
       </body>
     </html>
   );

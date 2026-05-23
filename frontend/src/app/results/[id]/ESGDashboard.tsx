@@ -343,6 +343,31 @@ export function ESGDashboard() {
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadSEBIFiling = async () => {
+    try {
+      const res = await fetch("/api/report/sebi-filing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${(await createClient().auth.getSession()).data.session?.access_token || ""}` },
+        body: JSON.stringify({
+          extracted_data: data,
+          company_name: data?.section_a?.company_name || "Company",
+          financial_year: data?.section_a?.financial_year || "FY 2024-25",
+          cin: data?.section_a?.cin || "",
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `BRSR_Filing_${(data?.section_a?.company_name || "Company").replace(/\s+/g, "_")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Failed to generate SEBI filing PDF. Please try again.");
+    }
+  };
+
   if (!data) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -429,6 +454,13 @@ export function ESGDashboard() {
             <FileSpreadsheet className="w-3.5 h-3.5" />
             Excel
           </a>
+          <button
+            onClick={handleDownloadSEBIFiling}
+            className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 transition"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            SEBI Filing PDF
+          </button>
           <button
             onClick={handleDownloadJSON}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg text-white transition"
