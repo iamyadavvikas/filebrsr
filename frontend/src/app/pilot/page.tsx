@@ -42,7 +42,7 @@ export default function PilotPage() {
     });
 
     try {
-      await fetch("/api/platform/leads/capture", {
+      await fetch("/backend/api/platform/leads/capture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
