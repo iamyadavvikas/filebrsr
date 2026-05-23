@@ -143,6 +143,73 @@ TEMPLATES = {
         </div>
         """,
     },
+    "supplier_invite": {
+        "subject": "{buyer_company} needs your ESG assessment",
+        "html": """
+        <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #1B4D3E; font-size: 24px; margin: 0;">FileBRSR</h1>
+                <p style="color: #6B7280; font-size: 14px;">Supply Chain ESG Platform</p>
+            </div>
+            <div style="background: #EFF6FF; border-radius: 12px; padding: 30px; border: 1px solid #BFDBFE;">
+                <h2 style="color: #1E40AF; margin-top: 0;">ESG Assessment Request</h2>
+                <p style="color: #374151; line-height: 1.6;">
+                    Hi {contact_person},
+                </p>
+                <p style="color: #374151; line-height: 1.6;">
+                    <strong>{buyer_company}</strong> has requested an ESG assessment of <strong>{supplier_name}</strong>
+                    as part of their SEBI BRSR supply chain disclosure requirements.
+                </p>
+                <div style="background: white; border-radius: 8px; padding: 16px; margin: 16px 0;">
+                    <p style="margin: 4px 0; color: #374151;">✓ Takes only <strong>5 minutes</strong></p>
+                    <p style="margin: 4px 0; color: #374151;">✓ <strong>No signup</strong> required</p>
+                    <p style="margin: 4px 0; color: #374151;">✓ Get a <strong>free ESG scorecard</strong> & badge</p>
+                    <p style="margin: 4px 0; color: #374151;">✓ Prove ESG readiness to <strong>all your buyers</strong></p>
+                </div>
+                <a href="{assessment_url}" style="display: inline-block; background: #1B4D3E; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px;">
+                    Complete Assessment →
+                </a>
+                <p style="color: #9CA3AF; font-size: 12px; margin-top: 20px;">
+                    This assessment is confidential. Only aggregated scores are shared with {buyer_company}.
+                    Fill once — your badge works for all buyers.
+                </p>
+            </div>
+        </div>
+        """,
+    },
+    "readiness_report": {
+        "subject": "Your BRSR Readiness Score: {score}% ({readiness_level})",
+        "html": """
+        <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #1B4D3E; font-size: 24px; margin: 0;">FileBRSR</h1>
+            </div>
+            <div style="background: #F0FDF4; border-radius: 12px; padding: 30px; border: 1px solid #BBF7D0;">
+                <h2 style="color: #166534; margin-top: 0;">Your BRSR Readiness Report</h2>
+                <p style="color: #374151; line-height: 1.6;">
+                    Hi {name}, here's your readiness assessment for <strong>{company}</strong>:
+                </p>
+                <div style="text-align: center; margin: 24px 0;">
+                    <div style="display: inline-block; width: 100px; height: 100px; border-radius: 50%; border: 6px solid #059669; line-height: 88px; font-size: 28px; font-weight: 800; color: #059669;">
+                        {score}%
+                    </div>
+                    <p style="font-size: 18px; font-weight: 700; color: #374151; margin-top: 8px;">{readiness_level}</p>
+                </div>
+                <div style="background: white; border-radius: 8px; padding: 16px; margin: 16px 0;">
+                    <p style="margin: 4px 0; color: #374151;"><strong>BRSR Filing:</strong> {phase_scores[phase1]}%</p>
+                    <p style="margin: 4px 0; color: #374151;"><strong>Supply Chain ESG:</strong> {phase_scores[phase2]}%</p>
+                    <p style="margin: 4px 0; color: #374151;"><strong>Carbon Market:</strong> {phase_scores[phase3]}%</p>
+                </div>
+                <a href="https://filebrsr.com/signup" style="display: inline-block; background: #1B4D3E; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                    Start Closing Gaps →
+                </a>
+                <p style="color: #9CA3AF; font-size: 12px; margin-top: 20px;">
+                    FY2026-27 deadline approaching. Companies scoring below 60% face compliance risk.
+                </p>
+            </div>
+        </div>
+        """,
+    },
 }
 
 

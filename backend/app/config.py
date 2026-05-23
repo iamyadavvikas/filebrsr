@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_SECRET: str = ""
     ALLOWED_ORIGINS: str = "http://localhost:3000"
     MAX_FILE_SIZE_MB: int = 50
+    SENTRY_DSN: str = ""
+    ENVIRONMENT: str = "development"
+    RESEND_API_KEY: str = ""
 
     class Config:
         env_file = str(Path(__file__).resolve().parent.parent / ".env")

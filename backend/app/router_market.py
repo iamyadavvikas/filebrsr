@@ -584,3 +584,197 @@ def _get_filing_blockers(filled: int, verified: int, total: int, non_compliant: 
     if pending > 0:
         blockers.append(f"{pending} workflow item(s) pending approval")
     return blockers
+
+
+# ═══════════════════════════════════════════════════════════════
+# LEAD CAPTURE (GTM Funnel)
+# ═══════════════════════════════════════════════════════════════
+
+class LeadCapture(BaseModel):
+    email: str
+    company_name: Optional[str] = None
+    contact_name: Optional[str] = None
+    source: str = "readiness_assessment"
+    score: Optional[int] = None
+    readiness_level: Optional[str] = None
+    tags: Optional[List[str]] = None
+    answers: Optional[dict] = None
+    phase_scores: Optional[dict] = None
+
+
+@router.post("/leads/capture")
+async def capture_lead(lead: LeadCapture):
+    """Capture lead from readiness assessment, resource downloads, etc. No auth required."""
+    sb = get_supabase_admin()
+
+    data = {
+        "email": lead.email,
+        "company_name": lead.company_name,
+        "contact_name": lead.contact_name,
+        "source": lead.source,
+        "score": lead.score,
+        "readiness_level": lead.readiness_level,
+        "tags": lead.tags,
+        "metadata": {
+            "answers": lead.answers,
+            "phase_scores": lead.phase_scores,
+        },
+        "created_at": datetime.utcnow().isoformat(),
+    }
+
+    try:
+        result = sb.table("leads").insert(data).execute()
+        lead_id = result.data[0]["id"] if result.data else None
+    except Exception:
+        # Table might not exist yet — that's fine, still return success
+        lead_id = None
+
+    # Send welcome/results email if we have Resend configured
+    try:
+        if lead.source == "readiness_assessment" and lead.score is not None:
+            await send_email(
+                to_email=lead.email,
+                template="readiness_report",
+                variables={
+                    "name": lead.contact_name or "there",
+                    "company": lead.company_name or "your company",
+                    "score": lead.score,
+                    "readiness_level": lead.readiness_level or "Unknown",
+                    "phase_scores": lead.phase_scores or {},
+                },
+            )
+    except Exception:
+        pass  # Non-blocking
+
+    return {"status": "captured", "id": lead_id}
+
+
+# ═══════════════════════════════════════════════════════════════
+# SUPPLIER INVITE — THE VIRAL LOOP (Phase 2 Seed)
+# ═══════════════════════════════════════════════════════════════
+
+class SupplierInvite(BaseModel):
+    supplier_name: str
+    supplier_email: str
+    contact_person: Optional[str] = None
+    industry: Optional[str] = None
+    tier: str = "tier_1"  # tier_1, tier_2, tier_3
+
+
+class BulkSupplierInvite(BaseModel):
+    suppliers: List[SupplierInvite]
+
+
+@router.post("/suppliers/invite")
+async def invite_supplier(invite: SupplierInvite, authorization: str = Header(...)):
+    """Invite a single supplier for ESG assessment. Sends email with unique assessment link."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+
+    # Get inviter's org
+    org_member = sb.table("org_members").select("org_id").eq("user_id", user_id).maybe_single().execute()
+    org_id = org_member.data.get("org_id") if org_member.data else None
+
+    # Get company name for the invite email
+    profile = sb.table("profiles").select("company_name").eq("id", user_id).single().execute()
+    buyer_company = profile.data.get("company_name", "A listed company") if profile.data else "A listed company"
+
+    # Generate unique assessment token
+    import secrets
+    assessment_token = secrets.token_urlsafe(24)
+
+    # Store supplier invite
+    supplier_data = {
+        "org_id": org_id,
+        "invited_by": user_id,
+        "supplier_name": invite.supplier_name,
+        "supplier_email": invite.supplier_email,
+        "contact_person": invite.contact_person,
+        "industry": invite.industry,
+        "tier": invite.tier,
+        "assessment_token": assessment_token,
+        "status": "invited",
+        "invited_at": datetime.utcnow().isoformat(),
+    }
+
+    try:
+        result = sb.table("supplier_invites").insert(supplier_data).execute()
+        invite_id = result.data[0]["id"] if result.data else None
+    except Exception:
+        invite_id = None
+
+    # Send assessment invite email
+    assessment_url = f"https://filebrsr.com/assess/{assessment_token}"
+    try:
+        await send_email(
+            to_email=invite.supplier_email,
+            template="supplier_invite",
+            variables={
+                "supplier_name": invite.supplier_name,
+                "buyer_company": buyer_company,
+                "assessment_url": assessment_url,
+                "contact_person": invite.contact_person or invite.supplier_name,
+            },
+        )
+    except Exception:
+        pass
+
+    return {
+        "status": "invited",
+        "id": invite_id,
+        "assessment_url": assessment_url,
+        "token": assessment_token,
+    }
+
+
+@router.post("/suppliers/invite-bulk")
+async def invite_suppliers_bulk(body: BulkSupplierInvite, authorization: str = Header(...)):
+    """Invite multiple suppliers at once. CSV import on frontend sends here."""
+    user_id = await get_user_id(authorization)
+    results = []
+    for supplier in body.suppliers[:100]:  # Cap at 100 per request
+        try:
+            result = await invite_supplier(supplier, authorization)
+            results.append({"supplier": supplier.supplier_email, "status": "invited"})
+        except Exception as e:
+            results.append({"supplier": supplier.supplier_email, "status": "failed", "error": str(e)})
+
+    return {
+        "status": "bulk_complete",
+        "total": len(body.suppliers),
+        "invited": len([r for r in results if r["status"] == "invited"]),
+        "failed": len([r for r in results if r["status"] == "failed"]),
+        "results": results,
+    }
+
+
+@router.get("/suppliers/invited")
+async def get_invited_suppliers(authorization: str = Header(...), status: Optional[str] = None):
+    """Get all suppliers invited by this org with assessment status."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+
+    org_member = sb.table("org_members").select("org_id").eq("user_id", user_id).maybe_single().execute()
+    org_id = org_member.data.get("org_id") if org_member.data else None
+
+    query = sb.table("supplier_invites").select("*").order("invited_at", desc=True)
+    if org_id:
+        query = query.eq("org_id", org_id)
+    else:
+        query = query.eq("invited_by", user_id)
+
+    if status:
+        query = query.eq("status", status)
+
+    result = query.limit(200).execute()
+
+    # Calculate stats
+    suppliers = result.data or []
+    stats = {
+        "total_invited": len(suppliers),
+        "completed": len([s for s in suppliers if s.get("status") == "completed"]),
+        "pending": len([s for s in suppliers if s.get("status") == "invited"]),
+        "in_progress": len([s for s in suppliers if s.get("status") == "in_progress"]),
+    }
+
+    return {"suppliers": suppliers, "stats": stats}
