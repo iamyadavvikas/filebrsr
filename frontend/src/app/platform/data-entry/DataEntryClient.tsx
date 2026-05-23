@@ -78,7 +78,7 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
 
   async function loadSavedEntries() {
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://filebrsr-api.onrender.com";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
       const res = await fetch(
         `${backendUrl}/api/platform/data-entry/${financialYear}?user_id=${userId}`,
         { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""}` } }
@@ -128,7 +128,7 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
     setImporting(true);
     setImportResult(null);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://filebrsr-api.onrender.com";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
       const res = await fetch(
         `${backendUrl}/api/platform/data-entry/import-extraction/${reportId}`,
         {
@@ -151,7 +151,7 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
   async function handleSave() {
     setSaving(true);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://filebrsr-api.onrender.com";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
       const entries = currentSubsection.fields
         .filter((f) => formData[f.id]?.trim())
         .map((f) => ({
@@ -190,7 +190,7 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
   async function handleSaveAll() {
     setSaving(true);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://filebrsr-api.onrender.com";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
       const entries = Object.entries(formData)
         .filter(([, val]) => val?.trim())
         .map(([id, val]) => ({
@@ -228,7 +228,7 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
 
   async function handleDownloadExcel() {
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://filebrsr-api.onrender.com";
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
       const res = await fetch(
         `${backendUrl}/api/platform/data-entry/${financialYear}/download-excel?user_id=${userId}`,
         { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""}` } }
