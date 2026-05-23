@@ -319,6 +319,156 @@ BRSR_DATAPOINTS = [
     {"id": "C.P9.L.1", "label": "Whether entity provides information on environmental/social parameters of products to consumers", "data_type": "boolean", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-2", "conditional": False, "paragraph_ref": "P9 Leadership Q1"},
     {"id": "C.P9.L.2", "label": "Whether entity conducts consumer surveys/feedback mechanisms", "data_type": "boolean", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-2", "conditional": False, "paragraph_ref": "P9 Leadership Q2"},
     {"id": "C.P9.L.3", "label": "Turnover from products/services incorporating social/environmental risks/concerns (%)", "data_type": "percent", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_9", "esrs_ref": None, "conditional": False, "paragraph_ref": "P9 Leadership Q3"},
+
+    # ═══════════════════════════════════════════════════════════
+    # ADDITIONAL DATAPOINTS — Full SEBI BRSR Coverage
+    # (Missing fields from the above, completing all questions)
+    # ═══════════════════════════════════════════════════════════
+
+    # SECTION A — Additional fields
+    {"id": "A.III.9", "label": "Number of locations - Total (National)", "data_type": "integer", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_a", "subsection": "operations", "esrs_ref": None, "conditional": False, "paragraph_ref": "Section A.III"},
+    {"id": "A.III.10", "label": "Number of locations - Total (International)", "data_type": "integer", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_a", "subsection": "operations", "esrs_ref": None, "conditional": False, "paragraph_ref": "Section A.III"},
+    {"id": "A.IV.23", "label": "Total employees (D+E) - Male", "data_type": "integer", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_a", "subsection": "employees", "esrs_ref": "ESRS S1-6", "conditional": False, "paragraph_ref": "Section A.IV"},
+    {"id": "A.IV.24", "label": "Total employees (D+E) - Female", "data_type": "integer", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_a", "subsection": "employees", "esrs_ref": "ESRS S1-6", "conditional": False, "paragraph_ref": "Section A.IV"},
+    {"id": "A.IV.25", "label": "Total employees (D+E) - Total", "data_type": "integer", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_a", "subsection": "employees", "esrs_ref": "ESRS S1-6", "conditional": False, "paragraph_ref": "Section A.IV"},
+    {"id": "A.IV.26", "label": "Total workers (F+G) - Male", "data_type": "integer", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_a", "subsection": "employees", "esrs_ref": "ESRS S1-6", "conditional": False, "paragraph_ref": "Section A.IV"},
+    {"id": "A.IV.27", "label": "Total workers (F+G) - Female", "data_type": "integer", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_a", "subsection": "employees", "esrs_ref": "ESRS S1-6", "conditional": False, "paragraph_ref": "Section A.IV"},
+    {"id": "A.IV.28", "label": "Total workers (F+G) - Total", "data_type": "integer", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_a", "subsection": "employees", "esrs_ref": "ESRS S1-6", "conditional": False, "paragraph_ref": "Section A.IV"},
+
+    # PRINCIPLE 1 — Additional (Open-ness of business sub-fields)
+    {"id": "C.P1.E.15", "label": "Purchases from trading houses as % of total purchases", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
+    {"id": "C.P1.E.16", "label": "Number of trading houses where purchases are made from", "data_type": "integer", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
+    {"id": "C.P1.E.17", "label": "Sales to dealers/distributors as % of total sales", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
+    {"id": "C.P1.E.18", "label": "Number of dealers/distributors to whom sales are made", "data_type": "integer", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
+    {"id": "C.P1.E.19", "label": "Sales to top 10 dealers/distributors as % of total sales", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
+    {"id": "C.P1.E.20", "label": "Purchases with related parties as % of Total Purchases (RPT)", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
+    {"id": "C.P1.E.21", "label": "Sales to related parties as % of Total Sales (RPT)", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
+    {"id": "C.P1.E.22", "label": "Loans & advances to related parties as % of Total Loans & advances (RPT)", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
+    {"id": "C.P1.E.23", "label": "Investments in related parties as % of Total Investments (RPT)", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
+
+    # PRINCIPLE 3 — Additional essential & leadership
+    {"id": "C.P3.E.26", "label": "% of plants/offices assessed for working conditions", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_3", "esrs_ref": None, "conditional": False, "paragraph_ref": "P3 Essential Q14"},
+    {"id": "C.P3.E.27", "label": "Corrective actions taken/underway to address safety-related incidents", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_3", "esrs_ref": "ESRS S1-14", "conditional": False, "paragraph_ref": "P3 Essential Q15"},
+    {"id": "C.P3.E.28", "label": "Processes used to identify work-related hazards and assess risks", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_3", "esrs_ref": "ESRS S1-14.88(a)", "conditional": False, "paragraph_ref": "P3 Essential Q10b"},
+    {"id": "C.P3.E.29", "label": "Whether workers can report work-related hazards and remove themselves from risks (Y/N)", "data_type": "boolean", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_3", "esrs_ref": "ESRS S1-14", "conditional": False, "paragraph_ref": "P3 Essential Q10c"},
+    {"id": "C.P3.E.30", "label": "Whether employees/workers have access to non-occupational medical/healthcare services (Y/N)", "data_type": "boolean", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_3", "esrs_ref": "ESRS S1-14", "conditional": False, "paragraph_ref": "P3 Essential Q10d"},
+    {"id": "C.P3.E.31", "label": "Complaints on Working Conditions - Filed/Pending/Resolved (current + preceding FY)", "data_type": "table", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_3", "esrs_ref": "ESRS S1-17", "conditional": False, "paragraph_ref": "P3 Essential Q13"},
+    {"id": "C.P3.L.5", "label": "Measures undertaken to ensure statutory dues deposited by value chain partners", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_3", "esrs_ref": None, "conditional": False, "paragraph_ref": "P3 Leadership Q2"},
+    {"id": "C.P3.L.6", "label": "% of value chain partners assessed for health and safety practices", "data_type": "percent", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_3", "esrs_ref": None, "conditional": False, "paragraph_ref": "P3 Leadership Q5"},
+    {"id": "C.P3.L.7", "label": "% of value chain partners assessed for working conditions", "data_type": "percent", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_3", "esrs_ref": None, "conditional": False, "paragraph_ref": "P3 Leadership Q5"},
+    {"id": "C.P3.L.8", "label": "Corrective actions for significant risks from value chain H&S assessments", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_3", "esrs_ref": None, "conditional": False, "paragraph_ref": "P3 Leadership Q6"},
+
+    # PRINCIPLE 4 — Additional leadership
+    {"id": "C.P4.L.3", "label": "Details of engagement with vulnerable/marginalized stakeholder groups", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_4", "esrs_ref": "ESRS S3-3", "conditional": False, "paragraph_ref": "P4 Leadership Q3"},
+
+    # PRINCIPLE 5 — Additional essential & leadership
+    {"id": "C.P5.E.14", "label": "Whether focal point (Individual/Committee) exists for addressing human rights impacts (Y/N)", "data_type": "boolean", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": "ESRS S1-4", "conditional": False, "paragraph_ref": "P5 Essential Q4"},
+    {"id": "C.P5.E.15", "label": "Internal mechanisms to redress grievances related to human rights issues", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": "ESRS S1-3", "conditional": False, "paragraph_ref": "P5 Essential Q5"},
+    {"id": "C.P5.E.16", "label": "Complaints on Other human rights issues - Filed/Pending/Resolved", "data_type": "table", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": "ESRS S1-17", "conditional": False, "paragraph_ref": "P5 Essential Q6"},
+    {"id": "C.P5.E.17", "label": "POSH complaints as % of female employees/workers", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Essential Q7"},
+    {"id": "C.P5.E.18", "label": "Number of POSH complaints upheld", "data_type": "integer", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Essential Q7"},
+    {"id": "C.P5.E.19", "label": "Mechanisms to prevent adverse consequences to complainant in discrimination/harassment cases", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": "ESRS S1-3", "conditional": False, "paragraph_ref": "P5 Essential Q8"},
+    {"id": "C.P5.E.20", "label": "Whether human rights requirements form part of business agreements/contracts (Y/N)", "data_type": "boolean", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": "ESRS S1-4", "conditional": False, "paragraph_ref": "P5 Essential Q9"},
+    {"id": "C.P5.E.21", "label": "% of plants/offices assessed for child labour", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Essential Q10"},
+    {"id": "C.P5.E.22", "label": "% of plants/offices assessed for forced/involuntary labour", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Essential Q10"},
+    {"id": "C.P5.E.23", "label": "% of plants/offices assessed for sexual harassment", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Essential Q10"},
+    {"id": "C.P5.E.24", "label": "% of plants/offices assessed for discrimination at workplace", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Essential Q10"},
+    {"id": "C.P5.E.25", "label": "% of plants/offices assessed for wages compliance", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Essential Q10"},
+    {"id": "C.P5.E.26", "label": "Corrective actions from HR assessments (Q10 above)", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_5", "esrs_ref": "ESRS S1-4", "conditional": False, "paragraph_ref": "P5 Essential Q11"},
+    {"id": "C.P5.L.3", "label": "Whether premises accessible to differently abled visitors (Rights of PwD Act 2016)", "data_type": "boolean", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_5", "esrs_ref": "ESRS S1-12", "conditional": False, "paragraph_ref": "P5 Leadership Q3"},
+    {"id": "C.P5.L.4", "label": "% of value chain partners assessed for sexual harassment", "data_type": "percent", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Leadership Q4"},
+    {"id": "C.P5.L.5", "label": "% of value chain partners assessed for discrimination at workplace", "data_type": "percent", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Leadership Q4"},
+    {"id": "C.P5.L.6", "label": "% of value chain partners assessed for child labour", "data_type": "percent", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Leadership Q4"},
+    {"id": "C.P5.L.7", "label": "% of value chain partners assessed for forced/involuntary labour", "data_type": "percent", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Leadership Q4"},
+    {"id": "C.P5.L.8", "label": "% of value chain partners assessed for wages compliance", "data_type": "percent", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Leadership Q4"},
+    {"id": "C.P5.L.9", "label": "Corrective actions from value chain HR assessments", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_5", "esrs_ref": None, "conditional": False, "paragraph_ref": "P5 Leadership Q5"},
+
+    # PRINCIPLE 6 — Additional essential (Energy, Water, Air Emissions, Waste details)
+    {"id": "C.P6.E.39", "label": "Energy consumption through other renewable sources (GJ)", "data_type": "energy", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-5.38(a)", "conditional": False, "paragraph_ref": "P6 Essential Q1"},
+    {"id": "C.P6.E.40", "label": "Total energy consumed from renewable sources (A+B+C) (GJ)", "data_type": "energy", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-5.38(a)", "conditional": False, "paragraph_ref": "P6 Essential Q1"},
+    {"id": "C.P6.E.41", "label": "Energy consumption through other non-renewable sources (GJ)", "data_type": "energy", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-5.38(b)", "conditional": False, "paragraph_ref": "P6 Essential Q1"},
+    {"id": "C.P6.E.42", "label": "Total energy consumed from non-renewable sources (D+E+F) (GJ)", "data_type": "energy", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-5.38(b)", "conditional": False, "paragraph_ref": "P6 Essential Q1"},
+    {"id": "C.P6.E.43", "label": "Total energy consumed (all sources) (GJ)", "data_type": "energy", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-5.37", "conditional": False, "paragraph_ref": "P6 Essential Q1"},
+    {"id": "C.P6.E.44", "label": "Energy intensity adjusted for Purchasing Power Parity (PPP)", "data_type": "intensity", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-5.40", "conditional": False, "paragraph_ref": "P6 Essential Q1"},
+    {"id": "C.P6.E.45", "label": "Energy intensity in terms of physical output", "data_type": "intensity", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-5.40", "conditional": False, "paragraph_ref": "P6 Essential Q1"},
+    {"id": "C.P6.E.46", "label": "Whether independent assessment of energy data (Y/N) + agency name", "data_type": "narrative", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": None, "conditional": False, "paragraph_ref": "P6 Essential Q1"},
+    {"id": "C.P6.E.47", "label": "PAT Scheme - Whether targets achieved (Y/N) + remedial actions if not", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": None, "conditional": True, "paragraph_ref": "P6 Essential Q2"},
+    {"id": "C.P6.E.48", "label": "Water withdrawal - Seawater/desalinated water (KL)", "data_type": "volume", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E3-4.28(a)", "conditional": False, "paragraph_ref": "P6 Essential Q3"},
+    {"id": "C.P6.E.49", "label": "Water withdrawal - Others (KL)", "data_type": "volume", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E3-4.28(a)", "conditional": False, "paragraph_ref": "P6 Essential Q3"},
+    {"id": "C.P6.E.50", "label": "Water intensity adjusted for Purchasing Power Parity (PPP)", "data_type": "intensity", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E3-4.29", "conditional": False, "paragraph_ref": "P6 Essential Q3"},
+    {"id": "C.P6.E.51", "label": "Water intensity in terms of physical output", "data_type": "intensity", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E3-4.29", "conditional": False, "paragraph_ref": "P6 Essential Q3"},
+    {"id": "C.P6.E.52", "label": "Whether independent assessment of water data (Y/N) + agency name", "data_type": "narrative", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": None, "conditional": False, "paragraph_ref": "P6 Essential Q3"},
+    {"id": "C.P6.E.53", "label": "Total water discharged (KL)", "data_type": "volume", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E3-4.28(c)", "conditional": False, "paragraph_ref": "P6 Essential Q4"},
+    {"id": "C.P6.E.54", "label": "Whether entity has implemented Zero Liquid Discharge (Y/N) + coverage details", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E3-4", "conditional": False, "paragraph_ref": "P6 Essential Q5"},
+    # Air Emissions (other than GHG) — Q6 in SEBI format
+    {"id": "C.P6.E.55", "label": "Air emissions - NOx (specify unit)", "data_type": "mass", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E2-4.28", "conditional": False, "paragraph_ref": "P6 Essential Q6"},
+    {"id": "C.P6.E.56", "label": "Air emissions - SOx (specify unit)", "data_type": "mass", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E2-4.28", "conditional": False, "paragraph_ref": "P6 Essential Q6"},
+    {"id": "C.P6.E.57", "label": "Air emissions - Particulate Matter PM (specify unit)", "data_type": "mass", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E2-4.28", "conditional": False, "paragraph_ref": "P6 Essential Q6"},
+    {"id": "C.P6.E.58", "label": "Air emissions - Persistent Organic Pollutants POP (specify unit)", "data_type": "mass", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E2-4.28", "conditional": False, "paragraph_ref": "P6 Essential Q6"},
+    {"id": "C.P6.E.59", "label": "Air emissions - Volatile Organic Compounds VOC (specify unit)", "data_type": "mass", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E2-4.28", "conditional": False, "paragraph_ref": "P6 Essential Q6"},
+    {"id": "C.P6.E.60", "label": "Air emissions - Hazardous Air Pollutants HAP (specify unit)", "data_type": "mass", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E2-4.28", "conditional": False, "paragraph_ref": "P6 Essential Q6"},
+    {"id": "C.P6.E.61", "label": "Air emissions - Others (specify unit)", "data_type": "mass", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E2-4.28", "conditional": False, "paragraph_ref": "P6 Essential Q6"},
+    {"id": "C.P6.E.62", "label": "Whether independent assessment of air emissions data (Y/N) + agency name", "data_type": "narrative", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": None, "conditional": False, "paragraph_ref": "P6 Essential Q6"},
+    # GHG additional
+    {"id": "C.P6.E.63", "label": "GHG Scope 1+2 intensity adjusted for Purchasing Power Parity (PPP)", "data_type": "intensity", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-6.53", "conditional": False, "paragraph_ref": "P6 Essential Q7"},
+    {"id": "C.P6.E.64", "label": "GHG Scope 1+2 intensity in terms of physical output", "data_type": "intensity", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-6.53", "conditional": False, "paragraph_ref": "P6 Essential Q7"},
+    {"id": "C.P6.E.65", "label": "Whether independent assessment of GHG emissions data (Y/N) + agency name", "data_type": "narrative", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": None, "conditional": False, "paragraph_ref": "P6 Essential Q7"},
+    {"id": "C.P6.E.66", "label": "Details of GHG emission reduction projects (if registered under CDM/voluntary)", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": None, "conditional": True, "paragraph_ref": "P6 Essential Q8"},
+    # Waste additional
+    {"id": "C.P6.E.67", "label": "Waste intensity adjusted for Purchasing Power Parity (PPP)", "data_type": "intensity", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E5-5", "conditional": False, "paragraph_ref": "P6 Essential Q9"},
+    {"id": "C.P6.E.68", "label": "Waste intensity in terms of physical output", "data_type": "intensity", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E5-5", "conditional": False, "paragraph_ref": "P6 Essential Q9"},
+    {"id": "C.P6.E.69", "label": "Each category of waste - Disposed by other disposal operations (MT)", "data_type": "table", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E5-5.37(c)", "conditional": False, "paragraph_ref": "P6 Essential Q9"},
+    {"id": "C.P6.E.70", "label": "Total waste recovered (recycled + reused + other recovery) (MT)", "data_type": "mass", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E5-5.37(b)", "conditional": False, "paragraph_ref": "P6 Essential Q9"},
+    {"id": "C.P6.E.71", "label": "Total waste disposed (incineration + landfill + other) (MT)", "data_type": "mass", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E5-5.37(c)", "conditional": False, "paragraph_ref": "P6 Essential Q9"},
+    {"id": "C.P6.E.72", "label": "Whether independent assessment of waste data (Y/N) + agency name", "data_type": "narrative", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": None, "conditional": False, "paragraph_ref": "P6 Essential Q9"},
+    {"id": "C.P6.E.73", "label": "Waste management practices adopted + strategy to reduce hazardous/toxic chemicals", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E5-2", "conditional": False, "paragraph_ref": "P6 Essential Q10"},
+    {"id": "C.P6.E.74", "label": "Details of operations in ecologically sensitive areas - Location/Type/Compliance status", "data_type": "table", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E4-5.35", "conditional": True, "paragraph_ref": "P6 Essential Q11"},
+    {"id": "C.P6.E.75", "label": "Whether entity compliant with Water Act, Air Act, EP Act (Y/N) + non-compliance details", "data_type": "table", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E2-6", "conditional": False, "paragraph_ref": "P6 Essential Q13"},
+    # P6 Leadership additional
+    {"id": "C.P6.L.6", "label": "Water withdrawal/consumption/discharge in areas of water stress (detailed by facility)", "data_type": "table", "mandatory": False, "core": True, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E3-4.28(b)", "conditional": True, "paragraph_ref": "P6 Leadership Q1"},
+    {"id": "C.P6.L.7", "label": "Scope 3 emissions intensity per rupee of turnover", "data_type": "intensity", "mandatory": False, "core": True, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-6.53", "conditional": False, "paragraph_ref": "P6 Leadership Q2"},
+    {"id": "C.P6.L.8", "label": "Scope 3 emissions intensity (optional metric selected by entity)", "data_type": "intensity", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-6.53", "conditional": False, "paragraph_ref": "P6 Leadership Q2"},
+    {"id": "C.P6.L.9", "label": "Whether independent assessment of Scope 3 data (Y/N) + agency name", "data_type": "narrative", "mandatory": False, "core": True, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_6", "esrs_ref": None, "conditional": False, "paragraph_ref": "P6 Leadership Q2"},
+    {"id": "C.P6.L.10", "label": "Significant direct/indirect impact on biodiversity - prevention and remediation activities", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E4-5", "conditional": True, "paragraph_ref": "P6 Leadership Q3"},
+    {"id": "C.P6.L.11", "label": "Initiatives/innovative technology to improve resource efficiency or reduce emissions/waste", "data_type": "table", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-3.29", "conditional": False, "paragraph_ref": "P6 Leadership Q4"},
+    {"id": "C.P6.L.12", "label": "Whether entity has business continuity and disaster management plan (details/web link)", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_6", "esrs_ref": None, "conditional": False, "paragraph_ref": "P6 Leadership Q5"},
+    {"id": "C.P6.L.13", "label": "Significant adverse environmental impact from value chain + mitigation/adaptation measures", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_6", "esrs_ref": "ESRS E1-9", "conditional": False, "paragraph_ref": "P6 Leadership Q6"},
+    {"id": "C.P6.L.14", "label": "% of value chain partners assessed for environmental impacts", "data_type": "percent", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_6", "esrs_ref": None, "conditional": False, "paragraph_ref": "P6 Leadership Q7"},
+
+    # PRINCIPLE 7 — Additional
+    {"id": "C.P7.E.3", "label": "Number of affiliations with trade and industry chambers/associations", "data_type": "integer", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_7", "esrs_ref": "ESRS G1-5.27", "conditional": False, "paragraph_ref": "P7 Essential Q1"},
+    {"id": "C.P7.E.4", "label": "Corrective action on anti-competitive conduct (from adverse orders)", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_7", "esrs_ref": "ESRS G1-4", "conditional": True, "paragraph_ref": "P7 Essential Q2"},
+
+    # PRINCIPLE 8 — Additional essential & leadership
+    {"id": "C.P8.E.8", "label": "Job creation in smaller towns - wages paid (Rural/Semi-urban/Urban/Metro as % of total)", "data_type": "table", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_8", "esrs_ref": None, "conditional": False, "paragraph_ref": "P8 Essential Q5"},
+    {"id": "C.P8.L.5", "label": "Actions taken to mitigate negative social impacts from SIAs", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_8", "esrs_ref": "ESRS S3-4", "conditional": True, "paragraph_ref": "P8 Leadership Q1"},
+    {"id": "C.P8.L.6", "label": "CSR projects in aspirational districts (State/District/Amount spent)", "data_type": "table", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_8", "esrs_ref": None, "conditional": False, "paragraph_ref": "P8 Leadership Q2"},
+    {"id": "C.P8.L.7", "label": "Details of benefits from intellectual properties based on traditional knowledge", "data_type": "table", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_8", "esrs_ref": None, "conditional": False, "paragraph_ref": "P8 Leadership Q4"},
+    {"id": "C.P8.L.8", "label": "Corrective actions on adverse orders in IP disputes involving traditional knowledge", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_8", "esrs_ref": None, "conditional": True, "paragraph_ref": "P8 Leadership Q5"},
+
+    # PRINCIPLE 9 — Additional essential & leadership
+    {"id": "C.P9.E.11", "label": "Mechanisms in place to receive and respond to consumer complaints/feedback (description)", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-3", "conditional": False, "paragraph_ref": "P9 Essential Q1"},
+    {"id": "C.P9.E.12", "label": "Turnover from products carrying environmental/social parameters info (%)", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-2", "conditional": False, "paragraph_ref": "P9 Essential Q2"},
+    {"id": "C.P9.E.13", "label": "Turnover from products carrying safe/responsible usage info (%)", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-2", "conditional": False, "paragraph_ref": "P9 Essential Q2"},
+    {"id": "C.P9.E.14", "label": "Turnover from products carrying recycling/safe disposal info (%)", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-2", "conditional": False, "paragraph_ref": "P9 Essential Q2"},
+    {"id": "C.P9.E.15", "label": "Corrective actions on advertising/delivery of essential services issues", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-4", "conditional": False, "paragraph_ref": "P9 Essential Q6"},
+    {"id": "C.P9.E.16", "label": "Corrective actions on cyber security and data privacy issues", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-4", "conditional": False, "paragraph_ref": "P9 Essential Q6"},
+    {"id": "C.P9.E.17", "label": "Corrective actions on re-occurrence of product recalls", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_9", "esrs_ref": None, "conditional": True, "paragraph_ref": "P9 Essential Q6"},
+    {"id": "C.P9.E.18", "label": "Corrective actions on penalty/action by regulatory authorities on product safety", "data_type": "narrative", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_9", "esrs_ref": None, "conditional": True, "paragraph_ref": "P9 Essential Q6"},
+    {"id": "C.P9.E.19", "label": "Number of instances of data breaches", "data_type": "integer", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-4", "conditional": False, "paragraph_ref": "P9 Essential Q7"},
+    {"id": "C.P9.E.20", "label": "% of data breaches involving personally identifiable information of customers", "data_type": "percent", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-4", "conditional": False, "paragraph_ref": "P9 Essential Q7"},
+    {"id": "C.P9.E.21", "label": "Impact of data breaches (description)", "data_type": "narrative", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-4", "conditional": True, "paragraph_ref": "P9 Essential Q7"},
+    {"id": "C.P9.L.4", "label": "Steps taken to inform/educate consumers about safe and responsible usage of products", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-2", "conditional": False, "paragraph_ref": "P9 Leadership Q2"},
+    {"id": "C.P9.L.5", "label": "Mechanisms to inform consumers of risk of disruption/discontinuation of essential services", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-2", "conditional": False, "paragraph_ref": "P9 Leadership Q3"},
+    {"id": "C.P9.L.6", "label": "Whether entity displays product information beyond what is mandated by local laws (Y/N)", "data_type": "boolean", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-2", "conditional": False, "paragraph_ref": "P9 Leadership Q4"},
+    {"id": "C.P9.L.7", "label": "Whether consumer satisfaction survey conducted (Y/N) + details", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-2", "conditional": False, "paragraph_ref": "P9 Leadership Q4"},
+    {"id": "C.P9.L.8", "label": "Channels/platforms where products/services info can be accessed (web link)", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_9", "esrs_ref": "ESRS S4-2", "conditional": False, "paragraph_ref": "P9 Leadership Q1"},
+
+    # SECTION B — Additional (missing questions for incomplete policies)
+    {"id": "B.15", "label": "Reasons why entity does not consider certain Principles material to business (P1-P9)", "data_type": "table", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_b", "subsection": "policy_management", "esrs_ref": None, "conditional": True, "paragraph_ref": "Section B.12"},
+    {"id": "B.16", "label": "Whether entity not at stage to formulate/implement policies on certain principles (P1-P9)", "data_type": "table", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_b", "subsection": "policy_management", "esrs_ref": None, "conditional": True, "paragraph_ref": "Section B.12"},
+    {"id": "B.17", "label": "Whether entity lacks financial/human/technical resources for certain principles (P1-P9)", "data_type": "table", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_b", "subsection": "policy_management", "esrs_ref": None, "conditional": True, "paragraph_ref": "Section B.12"},
+    {"id": "B.18", "label": "Whether planned to be done in next FY for certain principles (P1-P9)", "data_type": "table", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_b", "subsection": "policy_management", "esrs_ref": None, "conditional": True, "paragraph_ref": "Section B.12"},
 ]
 
 
@@ -491,19 +641,241 @@ def analyze_gaps_v2(extracted_data: dict) -> dict:
 
 def _matches_extracted(dp: dict, extracted_keys: set) -> bool:
     """Check if a data point was captured in extracted keys (fuzzy matching)."""
-    # Generate possible key variants from the data point
+    import re as _re
+
+    # 1. Check explicit mapping first (fast path)
+    dp_id = dp["id"]
+    for key in extracted_keys:
+        if key in _FIELD_TO_DATAPOINT_MAP and dp_id in _FIELD_TO_DATAPOINT_MAP[key]:
+            return True
+
+    # 2. Fuzzy word matching with improved tokenization
     label_lower = dp["label"].lower()
+    # Strip punctuation and split on non-alphanumeric (handles parentheses, slashes, etc.)
+    dp_words = set(w for w in _re.split(r'[^a-z0-9]+', label_lower) if len(w) > 2)
 
     for key in extracted_keys:
         key_lower = key.lower().replace("_", " ")
-        # Check for significant keyword overlap
-        dp_words = set(w for w in label_lower.split() if len(w) > 3)
-        key_words = set(w for w in key_lower.split() if len(w) > 3)
+        key_words = set(w for w in _re.split(r'[^a-z0-9]+', key_lower) if len(w) > 2)
         if dp_words and key_words:
             overlap = dp_words & key_words
-            if len(overlap) >= min(2, len(dp_words)):
+            # Require at least 2 matching words, or 1 if the dp label is very short
+            threshold = min(2, max(1, len(dp_words) - 1))
+            if len(overlap) >= threshold:
                 return True
+            # Also check if any key word is a substring of dp words or vice versa
+            for kw in key_words:
+                for dw in dp_words:
+                    if len(kw) >= 4 and len(dw) >= 4:
+                        if kw in dw or dw in kw:
+                            overlap_with_substr = overlap | {kw}
+                            if len(overlap_with_substr) >= threshold:
+                                return True
     return False
+
+
+# ═══════════════════════════════════════════════════════════
+# Explicit field → datapoint ID mapping
+# Maps extraction field names to their corresponding BRSR datapoint IDs
+# ═══════════════════════════════════════════════════════════
+_FIELD_TO_DATAPOINT_MAP: dict[str, set[str]] = {
+    # Section A - General Disclosures
+    "cin": {"A.I.1"},
+    "company_name": {"A.I.2"},
+    "year_of_incorporation": {"A.I.3"},
+    "registered_office": {"A.I.4"},
+    "corporate_office": {"A.I.5"},
+    "email": {"A.I.6"},
+    "telephone": {"A.I.7"},
+    "website": {"A.I.8"},
+    "financial_year": {"A.I.9"},
+    "stock_exchange": {"A.I.10"},
+    "paid_up_capital": {"A.I.11"},
+    "contact_person": {"A.I.12"},
+    "reporting_boundary": {"A.I.13"},
+    "assurance_provider": {"A.I.14"},
+    "assurance_type": {"A.I.15"},
+    "business_activities": {"A.II.1"},
+    "products_services": {"A.II.2"},
+    "nic_codes": {"A.II.3"},
+    "num_plants_national": {"A.III.1"},
+    "num_plants_international": {"A.III.2"},
+    "num_offices_national": {"A.III.3"},
+    "num_offices_international": {"A.III.4"},
+    "markets_states_uts": {"A.III.5"},
+    "markets_countries": {"A.III.6"},
+    "exports_pct_of_turnover": {"A.III.7"},
+    "types_of_customers": {"A.III.8"},
+    "employees_permanent_male": {"A.IV.1"},
+    "employees_permanent_female": {"A.IV.2"},
+    "employees_permanent_total": {"A.IV.3"},
+    "employees_permanent": {"A.IV.3"},
+    "employees_contract_male": {"A.IV.4"},
+    "employees_contract_female": {"A.IV.5"},
+    "employees_contract_total": {"A.IV.6"},
+    "employees_contract": {"A.IV.6"},
+    "workers_permanent_male": {"A.IV.7"},
+    "workers_permanent_female": {"A.IV.8"},
+    "workers_permanent_total": {"A.IV.9"},
+    "workers_contract_male": {"A.IV.10"},
+    "workers_contract_female": {"A.IV.11"},
+    "workers_contract_total": {"A.IV.12"},
+    "differently_abled_employees": {"A.IV.13"},
+    "women_employees_pct": {"A.IV.2", "A.IV.1"},
+    "turnover": {"A.V.1"},
+    "net_worth": {"A.V.2"},
+    "subsidiaries_count": {"A.V.3"},
+    "csr_applicable": {"A.V.4"},
+    "csr_turnover_threshold": {"A.V.4"},
+    # Section B - Management & Process
+    "policy_p1_ethics": {"B.1"},
+    "policy_p2_product": {"B.1"},
+    "policy_p3_wellbeing": {"B.1"},
+    "policy_p4_stakeholder": {"B.1"},
+    "policy_p5_human_rights": {"B.1"},
+    "policy_p6_environment": {"B.1"},
+    "policy_p7_advocacy": {"B.1"},
+    "policy_p8_inclusive": {"B.1"},
+    "policy_p9_consumer": {"B.1"},
+    "policy_available": {"B.1"},
+    "policies_approved_by_board": {"B.2"},
+    "policy_approved_by_board": {"B.2"},
+    "policy_board_approved": {"B.2"},
+    "policies_conform_to_national_guidelines": {"B.3"},
+    "policies_extended_to_value_chain": {"B.4"},
+    "policy_extends_value_chain": {"B.4"},
+    "committee_of_board_for_esg": {"B.5"},
+    "sustainability_committee": {"B.5"},
+    "esg_committee_details": {"B.5"},
+    "compliance_violations_fines": {"B.6"},
+    "complaints_sexual_harassment_filed": {"B.7"},
+    "complaints_sexual_harassment_resolved": {"B.7"},
+    "complaints_discrimination_filed": {"B.8"},
+    "complaints_child_labour_filed": {"B.9"},
+    "complaints_forced_labour_filed": {"B.10"},
+    "complaints_wages_filed": {"B.11"},
+    "grievance_redressal_mechanism": {"B.12"},
+    "grievance_mechanism": {"B.12"},
+    "stakeholder_grievances_filed": {"B.13"},
+    "stakeholder_grievances_resolved": {"B.13"},
+    "directors_with_esg_training": {"B.14"},
+    "policy_web_link": {"B.1"},
+    "policy_translated_to_procedures": {"B.3"},
+    "ngrbc_review_frequency": {"B.3"},
+    # Section C - Principle 1 (Ethics)
+    "code_of_conduct": {"C.P1.E.1"},
+    "code_of_conduct_for_all": {"C.P1.E.1"},
+    "anti_corruption_policy": {"C.P1.E.2"},
+    "whistle_blower_policy": {"C.P1.E.3"},
+    "ethics_complaints_current_fy": {"C.P1.E.4"},
+    "ethics_complaints_previous_fy": {"C.P1.E.4"},
+    "complaints_ethics": {"C.P1.E.4"},
+    "conflicts_of_interest_cases": {"C.P1.E.5"},
+    "disciplinary_actions_corruption": {"C.P1.E.6"},
+    "anti_competitive_cases": {"C.P1.E.7"},
+    # Section C - Principle 2 (Products)
+    "r_and_d_spend": {"C.P2.E.1"},
+    "r_and_d_capex_pct": {"C.P2.E.1"},
+    "sustainable_sourcing_pct": {"C.P2.E.2"},
+    "recycled_input_pct": {"C.P2.E.3"},
+    "products_with_epr": {"C.P2.E.4"},
+    "products_recyclable_pct": {"C.P2.E.5"},
+    "products_reusable_pct": {"C.P2.E.5"},
+    "lis_certification": {"C.P2.E.6"},
+    "environmental_social_risks_assessed": {"C.P2.E.7"},
+    # Section C - Principle 3 (Employee Wellbeing)
+    "employee_turnover_rate": {"C.P3.E.1"},
+    "worker_turnover_rate": {"C.P3.E.1"},
+    "median_salary_male": {"C.P3.E.2"},
+    "median_salary_female": {"C.P3.E.2"},
+    "gross_wages_female_pct": {"C.P3.E.3"},
+    "safety_incidents_ltifr": {"C.P3.E.4"},
+    "safety_incidents": {"C.P3.E.4"},
+    "safety_fatalities": {"C.P3.E.5"},
+    "training_hours_per_employee": {"C.P3.E.6"},
+    "training_hours_per_worker": {"C.P3.E.6"},
+    "health_insurance_coverage_pct": {"C.P3.E.7"},
+    "maternity_benefits_pct": {"C.P3.E.8"},
+    "paternity_benefits_pct": {"C.P3.E.8"},
+    "disability_benefits": {"C.P3.E.9"},
+    "return_to_work_retention_rate": {"C.P3.E.10"},
+    "employees_in_union_pct": {"C.P3.E.11"},
+    "minimum_wages_paid": {"C.P3.E.12"},
+    # Section C - Principle 4 (Stakeholders)
+    "stakeholder_groups_identified": {"C.P4.E.1"},
+    "stakeholder_engagement_frequency": {"C.P4.E.2"},
+    "vulnerable_groups_identified": {"C.P4.E.3"},
+    "special_initiatives_vulnerable": {"C.P4.E.4"},
+    # Section C - Principle 5 (Human Rights)
+    "human_rights_training_employees_pct": {"C.P5.E.1"},
+    "human_rights_training_workers_pct": {"C.P5.E.1"},
+    "human_rights_training_pct": {"C.P5.E.1"},
+    "minimum_wage_compliance": {"C.P5.E.2"},
+    "child_labor_complaints": {"C.P5.E.3"},
+    "forced_labor_complaints": {"C.P5.E.4"},
+    "wages_complaints": {"C.P5.E.5"},
+    "human_rights_due_diligence": {"C.P5.E.6"},
+    "remediation_mechanisms": {"C.P5.E.7"},
+    # Section C - Principle 6 (Environment)
+    "energy_consumption_total": {"C.P6.E.1"},
+    "energy_consumption_total_gj": {"C.P6.E.1"},
+    "energy_from_renewable_gj": {"C.P6.E.2"},
+    "renewable_energy_pct": {"C.P6.E.3"},
+    "energy_intensity_per_rupee": {"C.P6.E.4"},
+    "pat_scheme_participation": {"C.P6.E.5"},
+    "water_withdrawal": {"C.P6.E.6"},
+    "water_withdrawal_kl": {"C.P6.E.6"},
+    "water_recycled_kl": {"C.P6.E.7"},
+    "water_recycled_pct": {"C.P6.E.8"},
+    "zero_liquid_discharge": {"C.P6.E.9"},
+    "ghg_scope1": {"C.P6.E.10"},
+    "ghg_scope1_tco2e": {"C.P6.E.10"},
+    "ghg_scope2": {"C.P6.E.11"},
+    "ghg_scope2_tco2e": {"C.P6.E.11"},
+    "ghg_scope3_tco2e": {"C.P6.L.7"},
+    "ghg_intensity_per_rupee": {"C.P6.E.12"},
+    "waste_generated": {"C.P6.E.13"},
+    "waste_generated_mt": {"C.P6.E.13"},
+    "waste_recycled_mt": {"C.P6.E.14"},
+    "waste_recycled_pct": {"C.P6.E.15"},
+    "hazardous_waste_mt": {"C.P6.E.16"},
+    "single_use_plastic_reduced": {"C.P6.E.17"},
+    "biodiversity_impact_assessed": {"C.P6.E.18"},
+    "air_emissions_nox": {"C.P6.E.19"},
+    "air_emissions_sox": {"C.P6.E.20"},
+    "air_emissions_pm": {"C.P6.E.21"},
+    "environmental_compliance_violations": {"C.P6.E.75"},
+    # Section C - Principle 7 (Advocacy)
+    "trade_associations": {"C.P7.E.1"},
+    "trade_associations_member": {"C.P7.E.1"},
+    "advocacy_on_public_policy": {"C.P7.E.2"},
+    "anti_competitive_conduct_cases": {"C.P7.E.4"},
+    "public_policy_positions": {"C.P7.E.2"},
+    # Section C - Principle 8 (Inclusive Growth)
+    "csr_spend": {"C.P8.E.1"},
+    "csr_spend_current_fy": {"C.P8.E.1"},
+    "csr_spend_previous_fy": {"C.P8.E.1"},
+    "csr_obligation": {"C.P8.E.2"},
+    "community_beneficiaries": {"C.P8.E.3"},
+    "local_procurement_pct": {"C.P8.E.4"},
+    "input_from_msme_pct": {"C.P8.E.5"},
+    "input_from_small_producers_pct": {"C.P8.E.6"},
+    "csr_projects_count": {"C.P8.E.7"},
+    "social_impact_assessments": {"C.P8.L.1"},
+    "rehabilitation_resettlement": {"C.P8.L.2"},
+    # Section C - Principle 9 (Consumer)
+    "consumer_complaints": {"C.P9.E.1"},
+    "consumer_complaints_current_fy": {"C.P9.E.1"},
+    "consumer_complaints_resolved_pct": {"C.P9.E.2"},
+    "consumer_complaints_pending": {"C.P9.E.3"},
+    "product_recalls": {"C.P9.E.4"},
+    "data_privacy_complaints": {"C.P9.E.5"},
+    "data_breaches": {"C.P9.E.19"},
+    "cyber_security_policy": {"C.P9.E.6"},
+    "advertising_complaints": {"C.P9.E.7"},
+    "product_quality_certifications": {"C.P9.E.8"},
+    "customer_satisfaction_survey": {"C.P9.L.7"},
+}
 
 
 def _build_manifest(extracted_keys: set) -> list:

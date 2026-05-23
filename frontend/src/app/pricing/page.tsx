@@ -38,55 +38,34 @@ interface RazorpayResponse {
 const plans = [
   {
     key: "free",
-    name: "Free Trial",
+    name: "Free",
     price: "₹0",
     period: "forever",
-    desc: "Try the extraction engine",
-    reports: "3 reports total",
-    features: ["3 free extractions", "Basic gap analysis", "CSV download", "All 9 NGRBC Principles"],
+    desc: "For suppliers / SMEs getting assessed",
+    reports: "Unlimited self-assessments",
+    features: ["ESG self-assessment", "Basic scorecard", "1 shareable badge", "Industry benchmark", "3 AI extractions"],
     cta: "Start Free",
     popular: false,
     ctaBg: "white", ctaColor: "#1B4D3E", ctaBorder: "1px solid #E5E7DF",
   },
   {
-    key: "starter",
-    name: "Starter",
-    price: "₹25,000",
+    key: "pro",
+    name: "Pro",
+    price: "₹50,000",
     period: "/year",
-    monthlyEquiv: "₹2,083/month",
-    desc: "For individual compliance managers",
-    reports: "5 reports/month",
+    monthlyEquiv: "₹4,167/month",
+    desc: "For mid-size companies assessing suppliers",
+    reports: "25 suppliers + 10 AI reports/month",
     features: [
-      "5 reports per month",
-      "Full gap analysis + ESRS mapping",
+      "Assess 25 suppliers",
+      "Full BRSR filing (AI extraction)",
+      "10 AI reports per month",
+      "Gap analysis & scoring",
+      "Multi-framework mapping (GRI, CDP, TCFD)",
       "NIFTY 50 sector benchmarks",
-      "PDF compliance reports",
-      "CSV + XBRL-JSON export",
-      "Extraction history",
+      "Carbon calculator",
+      "PDF + XBRL-JSON export",
       "Email support",
-    ],
-    cta: "Subscribe",
-    popular: false,
-    ctaBg: "white", ctaColor: "#1B4D3E", ctaBorder: "1px solid #E5E7DF",
-  },
-  {
-    key: "professional",
-    name: "Professional",
-    price: "₹1,50,000",
-    period: "/year",
-    monthlyEquiv: "₹12,500/month",
-    desc: "For consulting firms & compliance teams",
-    reports: "50 reports/month",
-    features: [
-      "50 reports per month",
-      "Everything in Starter +",
-      "Multi-user (10 seats)",
-      "Organization dashboard",
-      "Priority support + onboarding",
-      "Year-over-year comparison",
-      "Branded PDF reports",
-      "API access",
-      "Value chain supplier portal",
     ],
     cta: "Subscribe",
     popular: true,
@@ -95,19 +74,22 @@ const plans = [
   {
     key: "enterprise",
     name: "Enterprise",
-    price: "₹5,00,000+",
+    price: "₹5-15L",
     period: "/year",
-    desc: "Group companies, multi-entity orgs",
-    reports: "Unlimited",
+    desc: "For listed companies with large supply chains",
+    reports: "Unlimited suppliers + reports",
     features: [
-      "Unlimited reports",
-      "Everything in Professional +",
-      "Unlimited users + SSO",
-      "Custom integrations",
+      "Unlimited suppliers",
+      "Unlimited AI reports",
+      "Everything in Pro +",
+      "API & SAP integration",
+      "XBRL filing generation",
+      "Workflow approvals (maker-checker)",
+      "Multi-user + SSO",
+      "Audit trail & compliance",
       "White-label option",
       "Dedicated account manager",
       "SLA guarantee",
-      "On-prem deployment available",
     ],
     cta: "Contact Sales",
     popular: false,
@@ -116,15 +98,18 @@ const plans = [
 ];
 
 const comparisonData = [
-  { feature: "Reports per month", free: "3 total", starter: "5", pro: "50", enterprise: "Unlimited" },
-  { feature: "Gap analysis", free: "Basic", starter: "Full", pro: "Full", enterprise: "Full" },
-  { feature: "NIFTY 50 benchmarks", free: "—", starter: "✓", pro: "✓", enterprise: "✓" },
-  { feature: "ESRS cross-reference", free: "—", starter: "✓", pro: "✓", enterprise: "✓" },
-  { feature: "PDF reports", free: "—", starter: "✓", pro: "Branded", enterprise: "White-label" },
-  { feature: "Export formats", free: "CSV", starter: "CSV, XBRL, PDF", pro: "All", enterprise: "All + Custom" },
-  { feature: "Users", free: "1", starter: "1", pro: "10", enterprise: "Unlimited" },
-  { feature: "API access", free: "—", starter: "—", pro: "✓", enterprise: "✓" },
-  { feature: "Support", free: "Email", starter: "Email", pro: "Priority", enterprise: "Dedicated" },
+  { feature: "Supplier assessments", free: "Self only", pro: "25 suppliers", enterprise: "Unlimited" },
+  { feature: "AI report extractions", free: "3 total", pro: "10/month", enterprise: "Unlimited" },
+  { feature: "ESG scorecard & badge", free: "✓", pro: "✓", enterprise: "✓" },
+  { feature: "Gap analysis", free: "Basic", pro: "Full", enterprise: "Full" },
+  { feature: "Multi-framework mapping", free: "—", pro: "✓", enterprise: "✓" },
+  { feature: "NIFTY 50 benchmarks", free: "—", pro: "✓", enterprise: "✓" },
+  { feature: "Carbon calculator", free: "—", pro: "✓", enterprise: "✓" },
+  { feature: "XBRL filing", free: "—", pro: "—", enterprise: "✓" },
+  { feature: "Workflow approvals", free: "—", pro: "—", enterprise: "✓" },
+  { feature: "API access", free: "—", pro: "—", enterprise: "✓" },
+  { feature: "Users", free: "1", pro: "5", enterprise: "Unlimited + SSO" },
+  { feature: "Support", free: "Community", pro: "Email", enterprise: "Dedicated" },
 ];
 
 export default function PricingPage() {
@@ -142,7 +127,7 @@ export default function PricingPage() {
 
     setLoadingPlan(planKey);
     try {
-      const isSubscription = ["starter", "professional"].includes(planKey);
+      const isSubscription = planKey === "pro";
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const endpoint = isSubscription
         ? `${backendUrl}/api/billing/create-subscription`
@@ -226,7 +211,7 @@ export default function PricingPage() {
         {/* Plans Grid */}
         <section style={{ padding: "0 28px 64px" }}>
           <div className="max-w-[1100px] mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5" style={{ alignItems: "start" }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5" style={{ alignItems: "start" }}>
               {plans.map((p) => (
                 <div
                   key={p.key}
@@ -330,8 +315,7 @@ export default function PricingPage() {
                   <tr style={{ background: "var(--surface)" }}>
                     <th style={{ padding: "14px 16px", textAlign: "left", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Feature</th>
                     <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Free</th>
-                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Starter</th>
-                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>Professional</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>Pro</th>
                     <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Enterprise</th>
                   </tr>
                 </thead>
@@ -340,7 +324,6 @@ export default function PricingPage() {
                     <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
                       <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500, color: "var(--foreground)" }}>{row.feature}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.free}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.starter}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", fontWeight: 600, color: "var(--primary)" }}>{row.pro}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.enterprise}</td>
                     </tr>

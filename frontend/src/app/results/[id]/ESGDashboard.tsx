@@ -17,7 +17,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { BRSR_DATAPOINTS, SECTION_LABELS, SUBSECTION_LABELS, type BRSRDatapoint } from "@/lib/brsr-datapoints";
+import { BRSR_DATAPOINTS, SECTION_LABELS, SUBSECTION_LABELS, FIELD_TO_DATAPOINT_MAP, type BRSRDatapoint } from "@/lib/brsr-datapoints";
 
 // ──────────────────────────────────────────────────────────────────
 // Types
@@ -142,17 +142,43 @@ function buildClientManifest(extractedData: ExtractedData | null, backendManifes
   }
 
   return BRSR_DATAPOINTS.map((dp) => {
-    // Match by checking if extracted keys contain words from the label
-    const labelWords = dp.label.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+    // 1. Check explicit mapping first
     let found = false;
     for (const key of extractedKeys) {
-      const keyWords = key.replace(/_/g, " ").toLowerCase().split(/\s+/).filter((w) => w.length > 3);
-      if (labelWords.length > 0 && keyWords.length > 0) {
-        const overlap = labelWords.filter((w) => keyWords.includes(w));
-        if (overlap.length >= Math.min(2, labelWords.length)) {
-          found = true;
-          break;
+      if (FIELD_TO_DATAPOINT_MAP[key]?.includes(dp.id)) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      // 2. Fuzzy word matching with improved tokenization (strip punctuation)
+      const labelWords = dp.label.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+      for (const key of extractedKeys) {
+        const keyWords = key.replace(/_/g, " ").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+        if (labelWords.length > 0 && keyWords.length > 0) {
+          const overlap = labelWords.filter((w) => keyWords.includes(w));
+          const threshold = Math.min(2, Math.max(1, labelWords.length - 1));
+          if (overlap.length >= threshold) {
+            found = true;
+            break;
+          }
+          // Substring matching for compound words
+          for (const kw of keyWords) {
+            if (kw.length >= 4) {
+              for (const lw of labelWords) {
+                if (lw.length >= 4 && (kw.includes(lw) || lw.includes(kw))) {
+                  const overlapWithSubstr = new Set([...overlap, kw]);
+                  if (overlapWithSubstr.size >= threshold) {
+                    found = true;
+                    break;
+                  }
+                }
+              }
+            }
+            if (found) break;
+          }
         }
+        if (found) break;
       }
     }
     return {
@@ -283,11 +309,12 @@ export function ESGDashboard() {
               dp.section === section && dp.label.toLowerCase().includes(q)
             );
             if (matchingDp) {
-              // Check if this key corresponds to this datapoint
-              const keyWords = key.replace(/_/g, " ").toLowerCase().split(/\s+/).filter(w => w.length > 3);
-              const dpWords = matchingDp.label.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+              // Check if this key corresponds to this datapoint via explicit map or fuzzy match
+              if (FIELD_TO_DATAPOINT_MAP[key.toLowerCase()]?.includes(matchingDp.id)) return true;
+              const keyWords = key.replace(/_/g, " ").toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2);
+              const dpWords = matchingDp.label.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2);
               const overlap = keyWords.filter(w => dpWords.includes(w));
-              if (overlap.length >= Math.min(2, dpWords.length)) return true;
+              if (overlap.length >= Math.min(2, Math.max(1, dpWords.length - 1))) return true;
             }
             return false;
           }
@@ -824,6 +851,7 @@ function GapsPanel({
   const [viewMode, setViewMode] = useState<"overview" | "datapoints" | "recommendations">("overview");
   const [dpFilter, setDpFilter] = useState<"all" | "found" | "missing">("all");
   const [dpCoreFilter, setDpCoreFilter] = useState<"all" | "core" | "non-core">("all");
+  const [dpMandatoryFilter, setDpMandatoryFilter] = useState<"all" | "mandatory" | "voluntary">("all");
   const [selectedDatapoint, setSelectedDatapoint] = useState<DatapointItem | null>(null);
 
   // Auto-switch to datapoints view when search is active
@@ -872,6 +900,8 @@ function GapsPanel({
     if (dpFilter === "missing" && dp.status !== "missing") return false;
     if (dpCoreFilter === "core" && !dp.core) return false;
     if (dpCoreFilter === "non-core" && dp.core) return false;
+    if (dpMandatoryFilter === "mandatory" && !dp.mandatory) return false;
+    if (dpMandatoryFilter === "voluntary" && dp.mandatory) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return dp.label.toLowerCase().includes(q) || dp.id.toLowerCase().includes(q) || (dp.esrs_ref || "").toLowerCase().includes(q);
@@ -1037,6 +1067,7 @@ function GapsPanel({
                                     )}
                                     <span className={`text-[11px] flex-1 leading-tight font-medium ${dp.status === "found" ? "text-green-800" : "text-red-800"}`}>{dp.label}</span>
                                     <div className="flex items-center gap-1.5 shrink-0">
+                                      {dp.mandatory && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">SEBI</span>}
                                       {dp.core && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
                                       <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
                                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${dp.status === "found" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
@@ -1089,6 +1120,19 @@ function GapsPanel({
                   </button>
                 ))}
               </div>
+              <div className="flex bg-gray-100 rounded-lg p-0.5">
+                {(["all", "mandatory", "voluntary"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setDpMandatoryFilter(f)}
+                    className={`px-3 py-1.5 text-[11px] font-semibold rounded-md transition-all ${
+                      dpMandatoryFilter === f ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {f === "all" ? "All" : f === "mandatory" ? "SEBI Mandatory" : "Voluntary"}
+                  </button>
+                ))}
+              </div>
               <span className="text-[10px] text-muted-light ml-auto">{filteredManifest.length} results</span>
             </div>
 
@@ -1101,6 +1145,7 @@ function GapsPanel({
                     <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase w-20">ID</th>
                     <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase">Datapoint</th>
                     <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase w-24">Type</th>
+                    <th className="text-center py-3 px-4 text-xs font-bold text-muted-light uppercase w-24">SEBI</th>
                     <th className="text-center py-3 px-4 text-xs font-bold text-muted-light uppercase w-16">Core</th>
                     <th className="text-left py-3 px-4 text-xs font-bold text-muted-light uppercase w-32">ESRS Ref</th>
                   </tr>
@@ -1119,6 +1164,9 @@ function GapsPanel({
                       <td className="py-3 px-4 text-sm text-foreground font-medium">{dp.label}</td>
                       <td className="py-3 px-4">
                         <span className="text-[11px] px-2 py-0.5 rounded font-medium" style={{ background: `${dataTypeBadgeColor[dp.data_type] || "#6B7280"}15`, color: dataTypeBadgeColor[dp.data_type] || "#6B7280" }}>{dp.data_type}</span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {dp.mandatory ? <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">Mandatory</span> : <span className="text-[10px] px-2 py-0.5 rounded bg-gray-50 text-gray-500 border border-gray-200">Voluntary</span>}
                       </td>
                       <td className="py-3 px-4 text-center">
                         {dp.core && <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">CORE</span>}
@@ -1204,7 +1252,8 @@ function GapsPanel({
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                {selectedDatapoint.mandatory && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">Mandatory</span>}
+                {selectedDatapoint.mandatory && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">SEBI Mandatory</span>}
+                {!selectedDatapoint.mandatory && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-gray-50 text-gray-500 border border-gray-200">Voluntary (Leadership)</span>}
                 {selectedDatapoint.core && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">BRSR Core</span>}
                 {selectedDatapoint.conditional && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Conditional</span>}
                 {selectedDatapoint.esrs_ref && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">ESRS: {selectedDatapoint.esrs_ref}</span>}
@@ -1549,7 +1598,8 @@ function PrinciplesPanel({
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {selectedDp.mandatory && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">Mandatory</span>}
+                  {selectedDp.mandatory && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">SEBI Mandatory</span>}
+                  {!selectedDp.mandatory && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-gray-50 text-gray-500 border border-gray-200">Voluntary (Leadership)</span>}
                   {selectedDp.core && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">BRSR Core</span>}
                   {selectedDp.conditional && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Conditional</span>}
                   {selectedDp.esrs_ref && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">ESRS: {selectedDp.esrs_ref}</span>}

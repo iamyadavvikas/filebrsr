@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 
-// Vercel Hobby plan max is 60s
-export const maxDuration = 60;
+// Cloud Run allows up to 300s (or more). Remove Vercel limit.
+export const maxDuration = 300;
 
 // Admin client that bypasses RLS (for server-side DB operations)
 function getAdminClient() {
@@ -20,11 +20,8 @@ export async function POST(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Allow guest usage for testing
-  const userId = user?.id || "guest";
-
   // Founder emails get unlimited access
-  const FOUNDER_EMAILS = ["ydvikasiitkgp@gmail.com", "ydvikas.iitkgp@gmail.com", "vkyadav.iitkgp@gmail.com", "vikaskashi896@gmail.com"];
+  const FOUNDER_EMAILS = ["ydvikasiitkgp@gmail.com", "ydvikas.iitkgp@gmail.com", "vkyadav.iitkgp@gmail.com", "vikaskashi896@gmail.com", "yvikas.free@gmail.com"];
   const isFounder = user && FOUNDER_EMAILS.includes(user.email || "");
 
   // Check user credits only for authenticated non-founder users
@@ -50,7 +47,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
-  // Validate file type
   if (file.type !== "application/pdf") {
     return NextResponse.json(
       { error: "Only PDF files are accepted" },
@@ -58,7 +54,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Validate file size (50MB max)
   const maxSize = 50 * 1024 * 1024;
   if (file.size > maxSize) {
     return NextResponse.json(
@@ -70,24 +65,8 @@ export async function POST(request: NextRequest) {
   try {
     const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
 
-    // For guest users, send directly to backend and return inline results
+    // Guest: send directly to backend, return inline results
     if (!user) {
-      // Quick warmup check for guest path (needs synchronous response)
-      let backendReady = false;
-      try {
-        const warmup = await fetch(`${backendUrl}/health`, { signal: AbortSignal.timeout(10000) });
-        backendReady = warmup.ok;
-      } catch {
-        backendReady = false;
-      }
-
-      if (!backendReady) {
-        return NextResponse.json(
-          { error: "Our analysis server is waking up (free tier cold start). Please try again in 30 seconds." },
-          { status: 503 }
-        );
-      }
-
       const backendForm = new FormData();
       backendForm.append("file", file);
       backendForm.append("report_id", "guest");
@@ -99,7 +78,7 @@ export async function POST(request: NextRequest) {
         headers: {
           Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
         },
-        signal: AbortSignal.timeout(45000),
+        signal: AbortSignal.timeout(120000),
       });
 
       if (!backendRes.ok) {
@@ -127,7 +106,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Upload to Supabase Storage
+    // Authenticated user: upload to storage, call backend, wait for result
     const fileName = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
     const { error: uploadError } = await adminDb.storage
       .from("brsr-reports")
@@ -141,7 +120,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create report record (use admin client to bypass RLS)
+    // Create report record
     const { data: report, error: reportError } = await adminDb
       .from("reports")
       .insert({
@@ -161,9 +140,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send lightweight trigger to backend — it will pull file from Supabase Storage
-    // Fire-and-forget: no need to await (backend updates DB when done)
-    fetch(`${backendUrl}/api/extract-async`, {
+    // Call backend synchronously (Cloud Run has no 60s limit)
+    const backendRes = await fetch(`${backendUrl}/api/extract-async`, {
       method: "POST",
       body: JSON.stringify({
         report_id: report.id,
@@ -174,11 +152,20 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
-    }).catch((err) => {
-      console.error("Backend extraction trigger error:", err);
+      signal: AbortSignal.timeout(240000), // 4 min timeout
     });
 
-    // Deduct credit immediately (skip for founders)
+    const backendData = await backendRes.json().catch(() => ({}));
+
+    if (!backendRes.ok || backendData.status === "failed") {
+      // Backend already marks report as failed in DB
+      return NextResponse.json({
+        reportId: report.id,
+        message: "Extraction failed. Check results page for details.",
+      });
+    }
+
+    // Deduct credit (skip for founders)
     if (!isFounder) {
       const { data: profile } = await adminDb
         .from("profiles")
@@ -196,7 +183,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       reportId: report.id,
-      message: "Processing your report. This may take 1-2 minutes.",
+      message: "Extraction complete.",
     });
   } catch {
     return NextResponse.json(

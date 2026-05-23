@@ -45,9 +45,8 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
   }, [userProp]);
 
   const navLinks = [
-    { href: "/upload", label: "Extract" },
+    { href: "/platform", label: "Platform" },
     { href: "/pricing", label: "Pricing" },
-    ...(user ? [{ href: "/dashboard", label: "Dashboard" }] : []),
   ];
 
   const handleSignOut = async () => {
@@ -74,13 +73,13 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
   return (
     <nav className="sticky top-0 z-50 border-b border-border" style={{ background: "var(--nav-bg)", backdropFilter: "blur(16px)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-7">
-        <div className="flex justify-between items-center" style={{ height: 58 }}>
+        <div className="flex items-center" style={{ height: 58 }}>
           <Link href="/" className="flex items-center gap-2">
             <Image src="/logo.svg" alt="fileBRSR" width={160} height={40} priority />
           </Link>
 
-          {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-7">
+          {/* Desktop nav - left aligned after logo */}
+          <div className="hidden md:flex items-center gap-7 ml-8">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -92,6 +91,10 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                 {link.label}
               </Link>
             ))}
+          </div>
+
+          {/* Right side: theme toggle + profile */}
+          <div className="hidden md:flex items-center gap-4 ml-auto">
 
             {/* Theme toggle */}
             <button
@@ -155,12 +158,12 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                     {/* Links */}
                     <div style={{ padding: "4px 0" }}>
                       <Link
-                        href="/dashboard"
+                        href="/platform"
                         onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-gray-50 transition-colors"
                       >
                         <User className="w-3.5 h-3.5 text-muted" />
-                        Dashboard
+                        Platform
                       </Link>
                       <Link
                         href="/pricing"

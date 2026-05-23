@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.extraction import extract_with_regex, calculate_confidence
 from app.extraction_enhanced import extract_enhanced
 from app.ai_extraction import extract_with_ai
+from app.agent_extraction import extract_with_agent
 from app.brsr_framework import analyze_gaps, BRSR_FRAMEWORK, get_mandatory_fields, get_core_fields
 from app.brsr_datapoints import BRSR_DATAPOINTS, get_datapoints_stats, analyze_gaps_v2, get_esrs_mapped_datapoints
 from app.nifty50_benchmarks import (
@@ -18,20 +19,30 @@ from app.nifty50_benchmarks import (
 from app.billing import router as billing_router
 from app.pdf_generator import generate_compliance_pdf
 from app.router_v2 import router as v2_router
+from app.router_platform import router as platform_router
+from app.router_advanced import router as advanced_router
+from app.router_org import router as org_router
+from app.router_moat import router as moat_router
+from app.router_market import router as market_router
 
-app = FastAPI(title="FileBRSR Extraction API", version="2.0.0")
+app = FastAPI(title="FileBRSR Platform API", version="4.0.0")
 
 settings = get_settings()
 
 # Register routers
 app.include_router(billing_router)
 app.include_router(v2_router)
+app.include_router(platform_router)
+app.include_router(advanced_router)
+app.include_router(org_router)
+app.include_router(moat_router)
+app.include_router(market_router)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS.split(","),
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -75,14 +86,29 @@ async def extract_brsr(
             ).execute()
             return {"status": "failed", "error": "No text could be extracted from PDF"}
 
-        # Dual extraction: regex + AI + enhanced
+        # Dual extraction: regex + AI agent + enhanced
         regex_results = extract_with_regex(text)
         enhanced_results = extract_enhanced(text)
+
+        # Use multi-pass agent (primary) with single-shot fallback
         try:
-            ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
+            ai_results = await extract_with_agent(text, settings.GROQ_API_KEY)
+            agent_fields = sum(len(v) for v in ai_results.values() if isinstance(v, dict))
+            print(f"Agent extraction: {agent_fields} fields")
+            # If agent got very few fields, try single-shot as supplement
+            if agent_fields < 10:
+                print("Agent got few fields, supplementing with single-shot...")
+                single_shot = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
+                for section in ["section_a", "section_b", "section_c"]:
+                    for k, v in single_shot.get(section, {}).items():
+                        if k not in ai_results.get(section, {}):
+                            ai_results.setdefault(section, {})[k] = v
         except Exception as ai_err:
-            print(f"AI extraction failed (using regex only): {ai_err}")
-            ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
+            print(f"Agent extraction failed, falling back to single-shot: {ai_err}")
+            try:
+                ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
+            except Exception:
+                ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
 
         # Merge results: enhanced base → regex fills → AI takes precedence
         merged = {"section_a": {}, "section_b": {}, "section_c": {}}
@@ -98,28 +124,36 @@ async def extract_brsr(
         company_name = merged.get("section_a", {}).get("company_name", None)
         financial_year = merged.get("section_a", {}).get("financial_year", None)
 
-        # Skip DB update for guest extractions
+        # Benchmark comparison against NIFTY 50 peers
+        benchmark = get_benchmark_comparison(merged)
+        gap_analysis = analyze_gaps_v2(merged)
+        datapoints_stats = get_datapoints_stats()
+
+        # Save full analysis to DB (skip for guest extractions)
         if report_id != "guest":
+            full_extracted = {
+                **merged,
+                "gap_analysis": gap_analysis,
+                "datapoints_stats": datapoints_stats,
+                "benchmark": benchmark,
+            }
             supabase.table("reports").update(
                 {
                     "status": "completed",
-                    "extracted_data": merged,
+                    "extracted_data": full_extracted,
                     "confidence_scores": confidence,
                     "company_name": company_name,
                     "financial_year": financial_year,
                 }
             ).eq("id", report_id).execute()
 
-        # Benchmark comparison against NIFTY 50 peers
-        benchmark = get_benchmark_comparison(merged)
-
         return {
             "status": "completed",
             "report_id": report_id,
             "extracted_data": merged,
             "confidence_scores": confidence,
-            "gap_analysis": analyze_gaps_v2(merged),
-            "datapoints_stats": get_datapoints_stats(),
+            "gap_analysis": gap_analysis,
+            "datapoints_stats": datapoints_stats,
             "benchmark": benchmark,
         }
 
@@ -158,9 +192,19 @@ async def guest_extract_brsr(
         regex_results = extract_with_regex(text)
         enhanced_results = extract_enhanced(text)
         try:
-            ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
+            ai_results = await extract_with_agent(text, settings.GROQ_API_KEY)
+            agent_fields = sum(len(v) for v in ai_results.values() if isinstance(v, dict))
+            if agent_fields < 10:
+                single_shot = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
+                for section in ["section_a", "section_b", "section_c"]:
+                    for k, v in single_shot.get(section, {}).items():
+                        if k not in ai_results.get(section, {}):
+                            ai_results.setdefault(section, {})[k] = v
         except Exception:
-            ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
+            try:
+                ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
+            except Exception:
+                ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
 
         merged = {"section_a": {}, "section_b": {}, "section_c": {}}
         for section in ["section_a", "section_b", "section_c"]:

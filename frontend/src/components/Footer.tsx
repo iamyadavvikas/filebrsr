@@ -15,7 +15,7 @@ export default function Footer() {
               </span>
             </div>
             <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7 }}>
-              #1 AI-powered BRSR compliance platform for Indian listed companies.
+              India&apos;s supply chain ESG platform. Assess suppliers, file BRSR, prove compliance.
             </p>
           </div>
 
@@ -24,9 +24,10 @@ export default function Footer() {
             <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Platform</h4>
             <ul className="space-y-2.5">
               {[
-                { label: "Upload & Extract", href: "/upload" },
-                { label: "Pricing", href: "/pricing" },
+                { label: "Supply Chain Assessment", href: "/signup" },
+                { label: "AI BRSR Filing", href: "/upload" },
                 { label: "Dashboard", href: "/dashboard" },
+                { label: "Pricing", href: "/pricing" },
               ].map((l) => (
                 <li key={l.label}>
                   <Link href={l.href} className="text-sm text-muted hover:text-foreground transition-colors">{l.label}</Link>

@@ -2,409 +2,605 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ChevronDown } from "lucide-react";
 
-const productSuite = [
-  {
-    name: "fileBRSR.extract",
-    title: "AI Metric Extraction",
-    desc: "Upload any sustainability report PDF. AI extracts all 216 SEBI BRSR data points across 9 NGRBC Principles in 60 seconds.",
-    icon: "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z",
-    color: "#059669",
+/* ═══════════════════════════════════════════════════════════════
+   DATA
+═══════════════════════════════════════════════════════════════ */
+
+const painPoints = {
+  enterprise: {
+    label: "Enterprise (Listed Company)",
+    icon: "🏢",
+    color: "#DC2626",
+    pains: [
+      { problem: "200–2,000 suppliers to assess", detail: "Across India, different industries and sizes" },
+      { problem: "SEBI asks \"what % assessed?\"", detail: "Most currently answer 0% or make estimates" },
+      { problem: "Manual assessment costs ₹5–15L", detail: "Consultants send Excel questionnaires, compile over months" },
+      { problem: "No standardized scoring", detail: "Each consultant uses different methodology" },
+      { problem: "Annual audit pressure", detail: "Assurance providers ask \"show me your process\" — they have none" },
+    ],
+    result: "Compliance officers are panicking. Deadline is FY 2026-27.",
   },
-  {
-    name: "fileBRSR.gaps",
-    title: "Gap Analysis & Compliance",
-    desc: "Instant gap analysis against SEBI's mandatory framework. Know exactly which disclosures are missing before your assurance audit.",
-    icon: "M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-    color: "#E8B931",
-  },
-  {
-    name: "fileBRSR.benchmark",
-    title: "NIFTY 50 Benchmarking",
-    desc: "Compare your BRSR performance against sector peers in the NIFTY 50. Identify where you lead and where you lag.",
-    icon: "M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z",
+  supplier: {
+    label: "Supplier (SME)",
+    icon: "🏭",
     color: "#2563EB",
+    pains: [
+      { problem: "5–10 different questionnaires", detail: "From different buyers, all different formats" },
+      { problem: "No ESG team", detail: "Most SMEs have zero sustainability infrastructure" },
+      { problem: "No way to prove ESG readiness", detail: "Cannot differentiate from competitors" },
+      { problem: "Risk of losing contracts", detail: "Big companies will delist non-compliant suppliers" },
+    ],
+    result: "SMEs are confused, overwhelmed, and at risk of losing business.",
+  },
+  filing: {
+    label: "Filing Company",
+    icon: "📋",
+    color: "#7C3AED",
+    pains: [
+      { problem: "337 mandatory data points", detail: "Across 9 NGRBC Principles" },
+      { problem: "Data scattered across departments", detail: "HR has social data, ops has environmental, legal has governance" },
+      { problem: "Manual compilation takes 4–8 weeks", detail: "Consultants charge ₹5–15L per company per year" },
+      { problem: "Gap analysis is guesswork", detail: "\"Are we compliant?\" — no one knows until audit" },
+      { problem: "Multiple frameworks required", detail: "Multinational buyers also ask for GRI, CDP, TCFD" },
+    ],
+    result: "Companies pay lakhs annually for what should be automated.",
+  },
+};
+
+const solutions = [
+  {
+    id: "supply-chain",
+    title: "Supply Chain Assessment",
+    subtitle: "For Enterprises",
+    pain: "How do I assess 500 suppliers' ESG?",
+    icon: "M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6",
+    color: "#059669",
+    steps: [
+      "Enterprise adds suppliers to dashboard (name, industry, contact)",
+      "Clicks \"Invite\" — generates unique assessment link",
+      "Supplier receives link (WhatsApp/email) — no signup needed",
+      "Supplier answers 20 BRSR-aligned questions (5 mins)",
+      "Auto-scored: E (40%) + S (35%) + G (25%) = Overall score",
+      "Enterprise sees real-time dashboard with all supplier scores",
+    ],
+    metrics: [
+      { before: "Months", after: "5 minutes", label: "per supplier" },
+      { before: "₹5–15L consulting", after: "₹50K/year", label: "unlimited assessments" },
+      { before: "No audit trail", after: "Structured data", label: "timestamps & responses" },
+    ],
   },
   {
-    name: "fileBRSR.export",
-    title: "Audit-Ready Reports",
-    desc: "Download PDF reports, Excel workbooks, and XBRL-JSON exports. Full data lineage for third-party assurance providers.",
-    icon: "M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z",
+    id: "badges",
+    title: "ESG Badges & Scorecards",
+    subtitle: "For Suppliers",
+    pain: "I keep filling different forms for different buyers",
+    icon: "M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.996.178-1.768.563-2.25 1.014m16.5-1.014c.996.178 1.768.563 2.25 1.014M12 2.25c3.314 0 6 1.343 6 3s-2.686 3-6 3-6-1.343-6-3 2.686-3 6-3z",
     color: "#7C3AED",
+    steps: [
+      "Supplier fills ONE assessment on FileBRSR",
+      "Gets a public scorecard URL: filebrsr.com/scorecard/{id}",
+      "Earns Platinum/Gold/Silver/Bronze medal based on percentile",
+      "Shares badge with ALL buyers — fill once, prove everywhere",
+      "Badge becomes competitive advantage for winning new business",
+    ],
+    metrics: [
+      { before: "5–10 forms", after: "1 assessment", label: "prove to all buyers" },
+      { before: "No differentiation", after: "Public badge", label: "competitive advantage" },
+      { before: "Repeated effort", after: "Fill once", label: "share everywhere" },
+    ],
+  },
+  {
+    id: "ai-filing",
+    title: "AI BRSR Filing",
+    subtitle: "For Compliance Teams",
+    pain: "It takes our team 6 weeks to compile BRSR data",
+    icon: "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z",
+    color: "#E8B931",
+    steps: [
+      "Upload any sustainability PDF (annual report, CSR report)",
+      "AI extracts all 337 data points in 60 seconds",
+      "Instant gap analysis: \"You're missing 47 disclosures\"",
+      "Section-wise scoring: A (92%), B (75%), C (68%)",
+      "Auto-maps to GRI, CDP, TCFD, SASB",
+      "Export: PDF report, Excel, XBRL-JSON (for BSE/NSE filing)",
+    ],
+    metrics: [
+      { before: "6 weeks", after: "60 seconds", label: "extraction time" },
+      { before: "₹5–15L/year", after: "₹50K/year", label: "annual cost" },
+      { before: "Guesswork", after: "AI + source tracing", label: "auditor can verify" },
+    ],
+  },
+  {
+    id: "carbon-market",
+    title: "Carbon Market & Credits",
+    subtitle: "For Net Zero Leaders",
+    pain: "We reduce emissions but can't monetize or prove it",
+    icon: "M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z",
+    color: "#0891B2",
+    steps: [
+      "Platform calculates Scope 1, 2 & 3 emissions from BRSR data",
+      "Tracks year-over-year reductions with India-specific emission factors",
+      "Connects verified reductions to India's Carbon Credit Trading Scheme (CCTS)",
+      "Facilitates carbon credit generation for SME suppliers",
+      "Marketplace: buyers purchase credits from verified supply chain reductions",
+      "Transaction fee model — FileBRSR earns 2% of each trade",
+    ],
+    metrics: [
+      { before: "No monetization", after: "Carbon credits", label: "from your reductions" },
+      { before: "Manual MRV", after: "Auto-verified", label: "from platform data" },
+      { before: "$0 value", after: "$35B market", label: "India carbon market by 2030" },
+    ],
   },
 ];
 
-const highlights = [
-  { title: "100% SEBI Aligned", desc: "Extraction mapped to all 216 mandatory BRSR data points as per latest SEBI circular.", icon: "M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
-  { title: "Cost Efficient", desc: "Replace ₹5-15 lakh consulting fees with instant AI extraction. Start with 3 free reports.", icon: "M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75" },
-  { title: "Auditable Reports", desc: "Every metric includes confidence scores and source tracing. Ready for third-party assurance.", icon: "M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15" },
-  { title: "BRSR Core Ready", desc: "Full support for BRSR Core with reasonable assurance — mandatory for top 250 companies from FY 2026-27.", icon: "M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75" },
+const timeline = [
+  { year: "FY 2023-24", event: "BRSR mandatory for top 1,000", status: "done" },
+  { year: "FY 2024-25", event: "BRSR Core introduced for top 150", status: "done" },
+  { year: "2023", event: "India Carbon Credit Trading Scheme (CCTS) launched", status: "done" },
+  { year: "FY 2026-27", event: "BRSR Core + Reasonable Assurance for top 250 + EU CBAM", status: "current" },
+  { year: "FY 2027-28", event: "Extended to all 1,000 listed companies", status: "upcoming" },
 ];
 
-const stats = [
-  { value: "216", label: "BRSR Data Points" },
-  { value: "9", label: "NGRBC Principles" },
-  { value: "60s", label: "Extraction Time" },
-  { value: "1,000+", label: "Companies Need This" },
+const valueTable = [
+  { pain: "How to assess 500 suppliers?", who: "Enterprise compliance", solution: "One-click invite → auto-scored questionnaire", value: "Months → minutes" },
+  { pain: "I fill 10 different ESG forms", who: "Supplier / SME", solution: "Fill once → shareable badge", value: "One assessment, prove to all" },
+  { pain: "BRSR filing costs ₹15L", who: "Listed company", solution: "AI extracts 337 datapoints from PDF", value: "₹15L → ₹50K" },
+  { pain: "We reduce emissions but can't monetize", who: "Net Zero teams", solution: "Carbon credit generation via India CCTS", value: "Reductions → revenue" },
+  { pain: "Are we compliant?", who: "Board / CFO", solution: "Instant gap analysis + scoring", value: "Real-time visibility" },
+  { pain: "Show your process to auditors", who: "Assurance team", solution: "Structured audit trail", value: "Audit-ready from day 1" },
+];
+
+const platformFeatures = [
+  { title: "Supply Chain ESG Ratings", desc: "Rate and monitor sustainability across your entire supplier base. Auto-scoring aligned to SEBI BRSR.", color: "#059669" },
+  { title: "AI-Powered BRSR Filing", desc: "Upload any sustainability report — AI extracts all 337 data points across 9 NGRBC Principles in 60 seconds.", color: "#E8B931" },
+  { title: "Carbon Market & Credits", desc: "Scope 1/2/3 emissions from BRSR data → verified reductions → carbon credit generation via India CCTS. 2% transaction fee.", color: "#0891B2" },
+  { title: "ESG Badges & Scorecards", desc: "Industry-wide percentile rankings. Platinum/Gold/Silver/Bronze medals. Public badges suppliers showcase to win business.", color: "#7C3AED" },
+  { title: "Supplier Self-Assessment", desc: "Invite suppliers to complete BRSR-aligned ESG questionnaires. No signup needed. Auto-scored with instant results.", color: "#2563EB" },
+  { title: "Multi-Framework Compliance", desc: "One assessment maps to BRSR, GRI, CDP, TCFD, SASB, UN SDGs & ESRS. Single platform for all frameworks.", color: "#DC2626" },
+  { title: "XBRL Filing Generation", desc: "Auto-generate XBRL-formatted filings ready for BSE/NSE submission. Validated output, zero manual tagging.", color: "#4F46E5" },
+  { title: "Workflow Approvals", desc: "Maker-checker workflows for data entry, report approval, and corrective action plans. Full audit trail.", color: "#0D9488" },
+  { title: "Regulatory Tracker", desc: "Track compliance with PAT scheme, EPR, POSH, LODR, Companies Act 135, and environmental clearances.", color: "#B45309" },
 ];
 
 const faqs = [
-  { q: "Which companies need BRSR?", a: "SEBI mandates BRSR for the top 1,000 listed companies by market capitalization. BRSR Core with third-party assurance is mandatory for the top 250 from FY 2026-27." },
-  { q: "What formats does FileBRSR accept?", a: "Any PDF — annual reports, standalone BRSR filings, sustainability reports, or ESG reports from BSE/NSE listed companies." },
-  { q: "Is the extracted data accurate?", a: "FileBRSR uses Gemini AI for high-confidence extraction with audit trails. We recommend human review before filing — our tool eliminates 90% of manual work." },
-  { q: "Can I use this for third-party assurance?", a: "Yes. Every metric includes confidence scores and source references. The structured exports maintain full data lineage for assurance providers." },
-  { q: "Is my data secure?", a: "Reports are processed in real-time and not stored permanently unless you create an account. Your PDFs are analyzed and discarded after extraction." },
+  { q: "What is FileBRSR?", a: "FileBRSR is India's ESG infrastructure platform built on three pillars: AI-powered BRSR filing, supply chain ESG ratings, and carbon market facilitation. We help listed companies automate compliance, assess suppliers, and monetize emission reductions." },
+  { q: "Who needs this?", a: "SEBI mandates the top 1,000 listed companies to disclose value chain ESG data (BRSR Section A.V). This means 50,000–100,000 suppliers need to prove ESG readiness. FileBRSR serves both sides — enterprises assessing suppliers, and SMEs proving compliance." },
+  { q: "How is this different from consultants?", a: "Consultants charge ₹5–15L/year, take months, use Excel, and provide no standardized scoring. FileBRSR automates the entire process — assessment, scoring, gap analysis, and filing — for a fraction of the cost with instant results." },
+  { q: "How do supplier assessments work?", a: "Enterprise users add suppliers and send invite links. Suppliers complete a 20-question ESG questionnaire (no signup needed). Scores are auto-calculated across Environment (40%), Social (35%) & Governance (25%) dimensions." },
+  { q: "What are FileBRSR badges?", a: "Based on assessment scores and industry percentile ranking, suppliers earn Platinum (top 1%), Gold (top 5%), Silver (top 15%), or Bronze (top 35%) badges. These are publicly shareable to attract new business." },
+  { q: "How does the carbon market work?", a: "FileBRSR calculates Scope 1/2/3 emissions from your BRSR data, tracks year-over-year reductions, and connects verified reductions to India's Carbon Credit Trading Scheme (CCTS). Suppliers can generate carbon credits from proven reductions — we facilitate the trade at 2% transaction fee." },
+  { q: "Does it support BRSR filing?", a: "Yes. Upload any sustainability PDF and AI extracts all 337 BRSR datapoints in 60 seconds. Includes gap analysis, scoring, XBRL generation, and multi-framework mapping (GRI, CDP, TCFD, SASB)." },
+  { q: "What's the pricing model?", a: "Suppliers get assessed FREE. Enterprises pay ₹50K/year (Pro) or ₹5–15L/year (Enterprise) based on supplier count and features needed. Carbon market transactions: 2% fee." },
 ];
 
+/* ═══════════════════════════════════════════════════════════════
+   COMPONENT
+═══════════════════════════════════════════════════════════════ */
+
 export default function HomePage() {
+  const [painTab, setPainTab] = useState<"enterprise" | "supplier" | "filing">("enterprise");
+
   return (
     <>
       <Navbar />
       <main className="flex-1">
+
         {/* ═══ HERO ═══ */}
-        <section className="relative overflow-hidden" style={{ background: "linear-gradient(160deg, #0B2B22 0%, #1B4D3E 50%, #2D7A5F 100%)" }}>
-          {/* Grid pattern */}
-          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
-          {/* Glow */}
-          <div className="absolute" style={{ top: 60, right: "10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(232,185,49,0.1), transparent 70%)" }} />
-          <div className="absolute" style={{ bottom: -100, left: "5%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(45,122,95,0.3), transparent 70%)" }} />
+        <section className="relative overflow-hidden" style={{ background: "linear-gradient(160deg, #0A1628 0%, #0F2847 40%, #1B4D3E 100%)" }}>
+          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className="absolute rounded-full animate-pulse" style={{
+                width: 4 + (i % 3) * 2,
+                height: 4 + (i % 3) * 2,
+                background: `rgba(${i % 2 === 0 ? '45,122,95' : '232,185,49'}, ${0.2 + (i % 4) * 0.1})`,
+                top: `${10 + (i * 7) % 80}%`,
+                left: `${5 + (i * 11) % 90}%`,
+                animationDelay: `${i * 0.3}s`,
+              }} />
+            ))}
+          </div>
 
           <div className="relative max-w-7xl mx-auto px-4 sm:px-8 pt-24 pb-16 lg:pt-32 lg:pb-24">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              {/* Left - Text */}
-              <div>
-                <div
-                  className="inline-flex items-center gap-2 mb-6"
-                  style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", background: "rgba(232,185,49,0.12)", color: "#E8B931", padding: "7px 16px", borderRadius: 24, border: "1px solid rgba(232,185,49,0.25)" }}
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#E8B931", display: "inline-block", animation: "pulse 2s infinite" }} />
-                  SEBI BRSR COMPLIANCE PLATFORM
-                </div>
-                <h1 className="text-white" style={{ fontSize: "clamp(36px, 5vw, 56px)", fontWeight: 800, lineHeight: 1.08, marginBottom: 24, letterSpacing: -2 }}>
-                  AI-Powered<br />
-                  <span style={{ color: "#E8B931" }}>BRSR Metric</span><br />
-                  Extraction in <span style={{ background: "linear-gradient(120deg, #E8B931 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>60s</span>
-                </h1>
-                <p style={{ fontSize: 17, fontWeight: 400, color: "rgba(255,255,255,0.65)", maxWidth: 460, lineHeight: 1.75, marginBottom: 36 }}>
-                  Upload your sustainability report. Get 100% SEBI-aligned BRSR data extracted across all 9 NGRBC principles — in seconds, not weeks.
-                </p>
-                <div className="flex gap-3 flex-wrap">
-                  <Link
-                    href="/upload"
-                    style={{ fontSize: 15, fontWeight: 700, padding: "15px 32px", borderRadius: 12, background: "#E8B931", color: "#1B4D3E", display: "inline-flex", alignItems: "center", gap: 8 }}
-                  >
-                    START EXTRACTING — FREE
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                  </Link>
-                  <Link
-                    href="/pricing"
-                    style={{ fontSize: 15, fontWeight: 500, padding: "15px 28px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.9)", display: "inline-block" }}
-                  >
-                    View Plans
-                  </Link>
-                </div>
+            <div className="text-center max-w-4xl mx-auto">
+              <div
+                className="inline-flex items-center gap-2 mb-6"
+                style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", background: "rgba(232,185,49,0.12)", color: "#E8B931", padding: "7px 16px", borderRadius: 24, border: "1px solid rgba(232,185,49,0.25)" }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#E8B931", display: "inline-block", animation: "pulse 2s infinite" }} />
+                BRSR AUTOMATION · SUPPLY CHAIN ESG · CARBON MARKET
               </div>
 
-              {/* Right - Platform mockup */}
-              <div className="relative hidden lg:block">
-                <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10" style={{ background: "rgba(255,255,255,0.03)", backdropFilter: "blur(20px)" }}>
-                  <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/10">
-                    <div className="w-3 h-3 rounded-full bg-red-400/60" />
-                    <div className="w-3 h-3 rounded-full bg-yellow-400/60" />
-                    <div className="w-3 h-3 rounded-full bg-green-400/60" />
-                    <span className="ml-3 text-xs text-white/40">filebrsr.com/results</span>
-                  </div>
-                  <div className="p-6" style={{ background: "rgba(0,0,0,0.2)" }}>
-                    {/* Simulated dashboard */}
-                    <div className="grid grid-cols-3 gap-3 mb-4">
-                      <div className="rounded-xl p-4 text-center" style={{ background: "rgba(5,150,105,0.15)", border: "1px solid rgba(5,150,105,0.3)" }}>
-                        <p className="text-2xl font-bold text-green-400">78%</p>
-                        <p className="text-[10px] text-green-300/70 mt-1">Overall Compliance</p>
-                      </div>
-                      <div className="rounded-xl p-4 text-center" style={{ background: "rgba(232,185,49,0.15)", border: "1px solid rgba(232,185,49,0.3)" }}>
-                        <p className="text-2xl font-bold text-yellow-400">85%</p>
-                        <p className="text-[10px] text-yellow-300/70 mt-1">BRSR Core</p>
-                      </div>
-                      <div className="rounded-xl p-4 text-center" style={{ background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.3)" }}>
-                        <p className="text-2xl font-bold text-red-400">47</p>
-                        <p className="text-[10px] text-red-300/70 mt-1">Gaps Found</p>
-                      </div>
-                    </div>
-                    {/* Bars */}
-                    <div className="space-y-2.5">
-                      {["Section A — General", "Section B — Management", "Section C — Principles"].map((s, i) => (
-                        <div key={s} className="flex items-center gap-3">
-                          <span className="text-[10px] text-white/50 w-36 truncate">{s}</span>
-                          <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                            <div className="h-full rounded-full" style={{ width: `${[92, 75, 68][i]}%`, background: `linear-gradient(90deg, ${["#059669,#34D399", "#E8B931,#FCD34D", "#2563EB,#60A5FA"][i]})` }} />
-                          </div>
-                          <span className="text-xs font-bold text-white/70 w-8">{[92, 75, 68][i]}%</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              <h1 className="text-white" style={{ fontSize: "clamp(36px, 5vw, 60px)", fontWeight: 800, lineHeight: 1.08, marginBottom: 24, letterSpacing: -2 }}>
+                India&apos;s ESG infrastructure.<br />
+                <span style={{ background: "linear-gradient(120deg, #E8B931 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                  One platform. Three pillars.
+                </span>
+              </h1>
+
+              <p style={{ fontSize: 18, fontWeight: 400, color: "rgba(255,255,255,0.6)", maxWidth: 720, lineHeight: 1.75, margin: "0 auto 40px" }}>
+                AI-powered BRSR filing in 60 seconds. Supply chain ESG ratings for 100K+ suppliers.
+                Carbon credit facilitation via India&apos;s CCTS. The only platform combining all three —
+                built for SEBI compliance, priced for scale.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link
+                  href="/signup"
+                  style={{ fontSize: 15, fontWeight: 700, padding: "16px 36px", borderRadius: 12, background: "#E8B931", color: "#1B4D3E", display: "inline-flex", alignItems: "center", gap: 8 }}
+                >
+                  ASSESS MY SUPPLIERS
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </Link>
+                <Link
+                  href="/upload"
+                  style={{ fontSize: 15, fontWeight: 600, padding: "16px 36px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.9)", display: "inline-flex", alignItems: "center", gap: 8 }}
+                >
+                  TRY AI BRSR EXTRACTION
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </Link>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-8 mt-16">
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-white">1,000+</p>
+                  <p className="text-xs text-white/50 mt-1">Listed companies mandated</p>
+                </div>
+                <div className="w-px h-10 bg-white/10" />
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-white">100K+</p>
+                  <p className="text-xs text-white/50 mt-1">Suppliers need assessment</p>
+                </div>
+                <div className="w-px h-10 bg-white/10" />
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-white">337</p>
+                  <p className="text-xs text-white/50 mt-1">BRSR data points mapped</p>
+                </div>
+                <div className="w-px h-10 bg-white/10" />
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-white">60s</p>
+                  <p className="text-xs text-white/50 mt-1">AI extraction time</p>
+                </div>
+                <div className="w-px h-10 bg-white/10" />
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-white">$35B</p>
+                  <p className="text-xs text-white/50 mt-1">India carbon market by 2030</p>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ═══ STANDARDS BAR ═══ */}
+        {/* ═══ TRUST BAR ═══ */}
         <section className="border-b border-border" style={{ padding: "24px 28px", background: "var(--card)" }}>
           <div className="max-w-5xl mx-auto">
-            <p className="text-center text-xs text-muted mb-4 font-medium uppercase tracking-wider">Aligned with globally recognised frameworks</p>
+            <p className="text-center text-xs text-muted mb-4 font-medium uppercase tracking-wider">Aligned with global sustainability frameworks</p>
             <div className="flex flex-wrap items-center justify-center gap-8 opacity-60">
-              {["SEBI BRSR", "NGRBC", "BRSR Core", "GRI", "ESRS", "XBRL"].map((s) => (
+              {["SEBI BRSR", "GRI", "CDP", "TCFD", "SASB", "UN SDGs", "ESRS", "ISO 26000"].map((s) => (
                 <span key={s} className="text-sm font-bold text-foreground/70 tracking-wide">{s}</span>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ═══ STATS ═══ */}
-        <section style={{ padding: "48px 28px", background: "var(--surface)" }}>
-          <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            {stats.map((s) => (
-              <div key={s.label}>
-                <p style={{ fontSize: 36, fontWeight: 800, color: "var(--primary)", letterSpacing: -1 }}>{s.value}</p>
-                <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4, fontWeight: 500 }}>{s.label}</p>
-              </div>
-            ))}
+        {/* ═══ THE REGULATION ═══ */}
+        <section style={{ padding: "80px 28px" }}>
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-14">
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#DC2626", marginBottom: 10 }}>
+                THE REGULATION
+              </p>
+              <h2 style={{ fontSize: "clamp(28px, 3.5vw, 40px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 16 }}>
+                SEBI mandates supply chain ESG disclosure
+              </h2>
+              <p className="text-muted mx-auto" style={{ fontSize: 16, maxWidth: 680, lineHeight: 1.8 }}>
+                SEBI (India&apos;s SEC) mandates <strong>BRSR</strong> for the top 1,000 listed companies.
+                From <strong>FY 2026-27</strong>, the top 250 must also disclose supply chain ESG data with
+                <strong> third-party assurance</strong>.
+              </p>
+            </div>
+
+            <div className="bg-card rounded-2xl border border-border p-8 max-w-3xl mx-auto">
+              <p className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">BRSR Section A.V asks:</p>
+              <blockquote className="text-lg font-medium italic border-l-4 border-emerald-500 pl-5" style={{ color: "var(--foreground)", lineHeight: 1.7 }}>
+                &ldquo;Do you assess the ESG performance of your value chain partners? If yes, what % of your value chain has been assessed?&rdquo;
+              </blockquote>
+              <p className="mt-4 text-sm text-muted">
+                Most companies today answer <strong>&ldquo;0%&rdquo;</strong>. That&apos;s no longer acceptable.
+              </p>
+            </div>
           </div>
         </section>
 
-        {/* ═══ PRODUCT SUITE ═══ */}
+        {/* ═══ THREE PAIN POINTS ═══ */}
+        <section style={{ padding: "80px 28px", background: "var(--surface)" }}>
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-10">
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
+                THE PAIN — THREE LAYERS
+              </p>
+              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 16 }}>
+                Three stakeholders. Three pain points.
+              </h2>
+            </div>
+
+            {/* Tab toggle */}
+            <div className="flex justify-center mb-8">
+              <div className="inline-flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1 gap-1">
+                {(["enterprise", "supplier", "filing"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setPainTab(tab)}
+                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${painTab === tab ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white" : "text-gray-500"}`}
+                  >
+                    {painPoints[tab].icon} {painPoints[tab].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-card rounded-2xl border border-border overflow-hidden">
+              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
+                <div className="p-8">
+                  <h3 className="text-lg font-bold mb-5 flex items-center gap-2">
+                    <span className="text-2xl">{painPoints[painTab].icon}</span>
+                    {painPoints[painTab].label}
+                  </h3>
+                  <div className="space-y-4">
+                    {painPoints[painTab].pains.map((p, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <span className="mt-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: painPoints[painTab].color }}>✕</span>
+                        <div>
+                          <p className="font-semibold text-sm">{p.problem}</p>
+                          <p className="text-xs text-muted mt-0.5">{p.detail}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-8 flex flex-col justify-center" style={{ background: `${painPoints[painTab].color}08` }}>
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: `${painPoints[painTab].color}15`, border: `2px solid ${painPoints[painTab].color}30` }}>
+                      <span className="text-3xl">😰</span>
+                    </div>
+                    <p className="font-bold text-base mb-2" style={{ color: painPoints[painTab].color }}>The Result</p>
+                    <p className="text-sm text-muted leading-relaxed max-w-xs mx-auto">{painPoints[painTab].result}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ═══ THREE SOLUTIONS ═══ */}
         <section style={{ padding: "80px 28px" }}>
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-14">
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
-                OUR PLATFORM
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#059669", marginBottom: 10 }}>
+                HOW FILEBRSR SOLVES IT
               </p>
-              <h2 style={{ fontSize: "clamp(28px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 14 }}>
-                End-to-end BRSR compliance suite
-              </h2>
-              <p className="text-muted mx-auto" style={{ fontSize: 15, maxWidth: 520, lineHeight: 1.7 }}>
-                From PDF upload to audit-ready export — everything your compliance team needs to file BRSR with confidence.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {productSuite.map((p) => (
-                <div
-                  key={p.name}
-                  className="group relative bg-card border border-border hover:border-transparent hover:shadow-xl transition-all duration-300"
-                  style={{ borderRadius: 20, padding: "32px 28px" }}
-                >
-                  <div className="flex items-start gap-4">
-                    <div style={{ width: 48, height: 48, borderRadius: 14, background: `${p.color}12`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <svg style={{ width: 22, height: 22, color: p.color }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d={p.icon} />
-                      </svg>
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 11, fontWeight: 700, color: p.color, letterSpacing: 0.5, marginBottom: 4 }}>{p.name}</p>
-                      <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{p.title}</h3>
-                      <p className="text-muted" style={{ fontSize: 14, lineHeight: 1.7 }}>{p.desc}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="text-center mt-10">
-              <Link
-                href="/upload"
-                style={{ fontSize: 14, fontWeight: 700, padding: "13px 32px", borderRadius: 12, background: "var(--primary)", color: "white", display: "inline-flex", alignItems: "center", gap: 8 }}
-              >
-                TRY THE PLATFORM
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══ HIGHLIGHTS ═══ */}
-        <section style={{ padding: "80px 28px", background: "var(--highlight-bg)" }}>
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-14">
-              <h2 style={{ fontSize: "clamp(26px, 3vw, 34px)", fontWeight: 800, letterSpacing: -0.5 }}>
-                Why compliance teams choose FileBRSR
+              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 14 }}>
+                Four capabilities. Three strategic pillars.
               </h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              {highlights.map((h) => (
-                <div key={h.title} className="bg-card rounded-2xl border border-border p-6 text-center hover:shadow-lg transition-shadow">
-                  <div className="mx-auto mb-4" style={{ width: 48, height: 48, borderRadius: 14, background: "var(--icon-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <svg style={{ width: 22, height: 22, color: "var(--primary)" }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d={h.icon} />
-                    </svg>
-                  </div>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>{h.title}</h3>
-                  <p className="text-muted" style={{ fontSize: 13, lineHeight: 1.65 }}>{h.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
 
-        {/* ═══ PLATFORM DEMO SECTION ═══ */}
-        <section style={{ padding: "80px 28px" }}>
-          <div className="max-w-5xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--accent)", marginBottom: 12 }}>
-                  HOW IT WORKS
-                </p>
-                <h2 style={{ fontSize: "clamp(26px, 3vw, 34px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 20 }}>
-                  Three steps to complete BRSR compliance
-                </h2>
-                <div className="space-y-6">
-                  {[
-                    { n: "01", t: "Upload your PDF", d: "Annual report, BRSR filing, or sustainability report from any BSE/NSE listed company." },
-                    { n: "02", t: "AI extracts all metrics", d: "Our Gemini-powered engine pulls quantitative data across all 9 NGRBC Principles in ~60 seconds." },
-                    { n: "03", t: "Download audit-ready data", d: "Get structured reports — PDF, Excel workbook, or XBRL-JSON — with full data lineage." },
-                  ].map((s) => (
-                    <div key={s.n} className="flex gap-4 items-start">
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--primary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                        {s.n}
-                      </div>
-                      <div>
-                        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>{s.t}</h3>
-                        <p className="text-muted" style={{ fontSize: 13, lineHeight: 1.65 }}>{s.d}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {/* Right illustration */}
-              <div className="relative">
-                <div className="rounded-2xl p-8" style={{ background: "var(--illustration-bg)", border: "1px solid var(--illustration-border)" }}>
-                  <div className="bg-card rounded-xl shadow-sm border border-border p-5">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "var(--icon-soft)" }}>
-                        <svg style={{ width: 20, height: 20, color: "var(--primary)" }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            <div className="space-y-12">
+              {solutions.map((sol, idx) => (
+                <div key={sol.id} className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-xl transition-shadow">
+                  <div className="p-8 md:p-10">
+                    {/* Header */}
+                    <div className="flex items-start gap-4 mb-6">
+                      <div style={{ width: 52, height: 52, borderRadius: 14, background: `${sol.color}12`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <svg style={{ width: 26, height: 26, color: sol.color }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d={sol.icon} />
                         </svg>
                       </div>
                       <div>
-                        <p className="text-sm font-bold">BRSR_Report_2025.pdf</p>
-                        <p className="text-xs text-muted">4.2 MB • Processing complete</p>
-                      </div>
-                      <div className="ml-auto">
-                        <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "var(--icon-soft)", color: "var(--success)" }}>✓ Done</span>
+                        <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: sol.color }}>Solution {idx + 1} — {sol.subtitle}</p>
+                        <h3 className="text-xl font-bold">{sol.title}</h3>
+                        <p className="text-sm text-muted mt-1 italic">&ldquo;{sol.pain}&rdquo;</p>
                       </div>
                     </div>
-                    <div className="border-t border-border pt-4 space-y-2.5">
-                      {["Section A: 42/42 extracted", "Section B: 28/30 extracted", "Section C: 98/144 extracted"].map((item, i) => (
-                        <div key={item} className="flex items-center justify-between">
-                          <span className="text-xs text-muted">{item}</span>
-                          <div className="w-24 h-2 rounded-full overflow-hidden" style={{ background: "var(--border)" }}>
-                            <div className="h-full rounded-full" style={{ width: `${[100, 93, 68][i]}%`, background: [100, 93, 68][i] >= 90 ? "#059669" : [100, 93, 68][i] >= 70 ? "#E8B931" : "#EA580C" }} />
-                          </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      {/* Steps */}
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted mb-3">How it works</p>
+                        <ol className="space-y-2.5">
+                          {sol.steps.map((step, i) => (
+                            <li key={i} className="flex items-start gap-3">
+                              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5" style={{ background: sol.color }}>{i + 1}</span>
+                              <span className="text-sm leading-relaxed">{step}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+
+                      {/* Metrics */}
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted mb-3">Impact</p>
+                        <div className="space-y-3">
+                          {sol.metrics.map((m, i) => (
+                            <div key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: `${sol.color}06`, border: `1px solid ${sol.color}15` }}>
+                              <div className="text-center shrink-0" style={{ minWidth: 90 }}>
+                                <p className="text-xs line-through text-muted">{m.before}</p>
+                                <p className="text-sm font-bold" style={{ color: sol.color }}>{m.after}</p>
+                              </div>
+                              <p className="text-xs text-muted">{m.label}</p>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* ═══ COMPARISON TABLE ═══ */}
-        <section style={{ padding: "80px 28px" }}>
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#EF4444", marginBottom: 10 }}>
-                STOP WASTING TIME & MONEY
-              </p>
-              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5 }}>
-                Manual filing vs FileBRSR
+        {/* ═══ VALUE COMPARISON TABLE ═══ */}
+        <section style={{ padding: "80px 28px", background: "var(--surface)" }}>
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-10">
+              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 14 }}>
+                Pain → Solution → Value
               </h2>
             </div>
-            <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
-              <table className="w-full">
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr style={{ background: "var(--surface)" }}>
-                    <th className="text-left py-4 px-6 text-sm font-bold text-gray-900">Metric</th>
-                    <th className="text-center py-4 px-6 text-sm font-bold text-gray-500">Manual / Consultants</th>
-                    <th className="text-center py-4 px-6 text-sm font-bold" style={{ color: "var(--primary)" }}>FileBRSR</th>
+                  <tr className="border-b-2 border-border">
+                    <th className="text-left py-3 px-4 font-bold text-xs uppercase tracking-wider text-muted">Pain</th>
+                    <th className="text-left py-3 px-4 font-bold text-xs uppercase tracking-wider text-muted">Who Feels It</th>
+                    <th className="text-left py-3 px-4 font-bold text-xs uppercase tracking-wider text-muted">FileBRSR Solution</th>
+                    <th className="text-left py-3 px-4 font-bold text-xs uppercase tracking-wider text-emerald-600">Value Delivered</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {[
-                    { metric: "Time to extract all 216 datapoints", manual: "2-4 weeks", ai: "~60 seconds", highlight: true },
-                    { metric: "Annual cost", manual: "₹5-15 lakh", ai: "₹25,000/year", highlight: true },
-                    { metric: "Compliance accuracy", manual: "Varies (human error)", ai: "AI + audit trail", highlight: false },
-                    { metric: "Gap analysis", manual: "Manual comparison", ai: "Instant, automated", highlight: false },
-                    { metric: "ESRS/GRI cross-mapping", manual: "Not included", ai: "Built-in", highlight: true },
-                    { metric: "Peer benchmarking", manual: "Separate exercise", ai: "NIFTY 50 included", highlight: false },
-                    { metric: "Scalability", manual: "Linear cost increase", ai: "Unlimited reports", highlight: false },
-                  ].map((row, i) => (
-                    <tr key={i} className={row.highlight ? "bg-emerald-50/30" : ""}>
-                      <td className="py-3.5 px-6 text-sm font-medium text-gray-800">{row.metric}</td>
-                      <td className="py-3.5 px-6 text-center text-sm text-gray-500">{row.manual}</td>
-                      <td className="py-3.5 px-6 text-center text-sm font-semibold" style={{ color: "var(--primary)" }}>{row.ai}</td>
+                <tbody>
+                  {valueTable.map((row, i) => (
+                    <tr key={i} className="border-b border-border hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors">
+                      <td className="py-4 px-4 font-medium">{row.pain}</td>
+                      <td className="py-4 px-4 text-muted">{row.who}</td>
+                      <td className="py-4 px-4">{row.solution}</td>
+                      <td className="py-4 px-4 font-bold text-emerald-600">{row.value}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="text-center mt-8">
-              <Link
-                href="/upload"
-                style={{ fontSize: 14, fontWeight: 700, padding: "13px 32px", borderRadius: 12, background: "var(--primary)", color: "white", display: "inline-flex", alignItems: "center", gap: 8 }}
-              >
-                START SAVING TIME
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              </Link>
-            </div>
           </div>
         </section>
 
-        {/* ═══ SOCIAL PROOF ═══ */}
-        <section style={{ padding: "64px 28px", background: "var(--surface)" }}>
-          <div className="max-w-4xl mx-auto text-center">
-            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
-              BUILT FOR INDIA&apos;S TOP LISTED COMPANIES
-            </p>
-            <h2 style={{ fontSize: "clamp(24px, 3vw, 32px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 16 }}>
-              Who uses FileBRSR?
-            </h2>
-            <p className="text-muted mx-auto" style={{ fontSize: 15, maxWidth: 560, lineHeight: 1.7, marginBottom: 40 }}>
-              SEBI mandates BRSR for the top 1,000 listed companies. BRSR Core with third-party assurance is mandatory for the top 250 from FY 2026-27.
-            </p>
-
-            {/* Urgency Banner */}
-            <div className="mb-8 inline-flex items-center gap-3 px-5 py-3 rounded-xl" style={{ background: "var(--urgency-bg)", border: "1px solid var(--urgency-border)" }}>
-              <span className="flex h-2.5 w-2.5 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
-              </span>
-              <span className="text-sm font-semibold" style={{ color: "var(--urgency-text)" }}>
-                BRSR Core assurance deadline: FY 2026-27 — Top 250 companies must comply
-              </span>
+        {/* ═══ REGULATORY TIMELINE ═══ */}
+        <section style={{ padding: "80px 28px" }}>
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-12">
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#DC2626", marginBottom: 10 }}>
+                WHY NOW
+              </p>
+              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 14 }}>
+                The regulatory clock is ticking
+              </h2>
+              <p className="text-muted text-sm max-w-lg mx-auto">Supply chain disclosure is the newest, hardest requirement. No one has tooling for it in India. That&apos;s the gap.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {[
-                { icon: "🏢", title: "Compliance Officers", desc: "Automate data collection across departments. No more chasing Excel sheets." },
-                { icon: "📊", title: "ESG Consultants", desc: "Serve more clients with instant extraction. Scale without hiring." },
-                { icon: "✅", title: "Assurance Providers", desc: "Verify BRSR filings faster with structured, traceable data." },
-              ].map((t) => (
-                <div key={t.title} className="bg-card rounded-2xl border border-border p-6 text-left hover:shadow-md transition-shadow">
-                  <span className="text-2xl mb-3 block">{t.icon}</span>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>{t.title}</h3>
-                  <p className="text-muted" style={{ fontSize: 13, lineHeight: 1.65 }}>{t.desc}</p>
+            <div className="space-y-6">
+              {timeline.map((t, i) => (
+                <div key={i} className={`flex items-center gap-4 p-5 bg-card rounded-xl border ${t.status === 'current' ? 'border-red-300 shadow-lg shadow-red-50' : 'border-border'}`}>
+                  <div className={`w-4 h-4 rounded-full shrink-0 ${t.status === 'current' ? 'bg-red-500 animate-pulse' : t.status === 'done' ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                  <div className="flex-1">
+                    <p className={`text-xs font-bold uppercase tracking-wider ${t.status === 'current' ? 'text-red-600' : t.status === 'done' ? 'text-emerald-600' : 'text-muted'}`}>
+                      {t.year}
+                    </p>
+                    <p className="text-sm font-semibold mt-0.5">{t.event}</p>
+                  </div>
+                  {t.status === 'current' && (
+                    <span className="text-xs font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full">NOW</span>
+                  )}
+                  {t.status === 'done' && (
+                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">DONE</span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         </section>
+
+        {/* ═══ PLATFORM FEATURES ═══ */}
+        <section style={{ padding: "80px 28px", background: "var(--surface)" }}>
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-14">
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
+                FULL PLATFORM
+              </p>
+              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 14 }}>
+                Everything you need. One connected system.
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {platformFeatures.map((p) => (
+                <div
+                  key={p.title}
+                  className="bg-card border border-border hover:border-transparent hover:shadow-xl transition-all duration-300"
+                  style={{ borderRadius: 20, padding: "28px 24px" }}
+                >
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: p.color, marginBottom: 16 }} />
+                  <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{p.title}</h3>
+                  <p className="text-muted" style={{ fontSize: 13, lineHeight: 1.7 }}>{p.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ═══ PRICING SNAPSHOT ═══ */}
+        <section style={{ padding: "80px 28px" }}>
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
+                PRICING
+              </p>
+              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 14 }}>
+                Simple pricing. Massive ROI.
+              </h2>
+              <p className="text-muted" style={{ fontSize: 15 }}>Suppliers get assessed <strong>free</strong>. Enterprises pay to unlock the full platform.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="bg-card rounded-2xl border border-border p-7">
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">FREE FOREVER</p>
+                <h3 className="text-3xl font-bold mb-1">₹0</h3>
+                <p className="text-sm text-muted mb-6">For suppliers / SMEs</p>
+                <ul className="space-y-2.5 text-sm text-gray-600">
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> ESG self-assessment</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Public scorecard URL</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Shareable badge</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Industry benchmark</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 3 AI BRSR extractions</li>
+                </ul>
+
+              </div>
+              <div className="bg-card rounded-2xl border-2 border-emerald-300 p-7 relative shadow-lg">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full">MOST POPULAR</div>
+                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">PRO</p>
+                <h3 className="text-3xl font-bold mb-1">₹50K<span className="text-base font-normal text-muted">/year</span></h3>
+                <p className="text-sm text-muted mb-6">For mid-size listed companies</p>
+                <ul className="space-y-2.5 text-sm text-gray-600">
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Full BRSR filing (AI)</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Assess up to 50 suppliers</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Gap analysis & scoring</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Multi-framework mapping</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Carbon calculator</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> XBRL export</li>
+                </ul>
+                <p className="mt-5 text-xs font-semibold text-emerald-700">Replaces ₹5–15L/year consulting</p>
+              </div>
+              <div className="bg-card rounded-2xl border border-border p-7">
+                <p className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-2">ENTERPRISE</p>
+                <h3 className="text-3xl font-bold mb-1">₹5–15L<span className="text-base font-normal text-muted">/year</span></h3>
+                <p className="text-sm text-muted mb-6">For top 250 listed companies</p>
+                <ul className="space-y-2.5 text-sm text-gray-600">
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Unlimited supplier assessments</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> API & SAP/ERP integration</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> XBRL filing generation</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Workflow approvals (maker-checker)</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Audit trail & compliance</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Dedicated account manager</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Regulatory compliance tracker</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
 
         {/* ═══ FAQ ═══ */}
         <section style={{ padding: "80px 28px" }}>
@@ -416,23 +612,33 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ═══ CTA ═══ */}
-        <section className="relative overflow-hidden" style={{ background: "linear-gradient(160deg, #0B2B22 0%, #1B4D3E 60%, #2D7A5F 100%)", padding: "80px 28px" }}>
-          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+        {/* ═══ FINAL CTA ═══ */}
+        <section className="relative overflow-hidden" style={{ background: "linear-gradient(160deg, #0A1628 0%, #0F2847 40%, #1B4D3E 100%)", padding: "80px 28px" }}>
+          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
           <div className="relative text-center">
             <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, marginBottom: 16, letterSpacing: -0.5, color: "white" }}>
-              Drive your BRSR compliance toward success
+              BRSR filing. Supply chain ESG. Carbon market.<br />All one platform.
             </h2>
-            <p style={{ fontSize: 16, color: "rgba(255,255,255,0.6)", maxWidth: 480, margin: "0 auto 36px", lineHeight: 1.7 }}>
-              Third-party assurance is mandatory from FY 2026-27. Get your BRSR data extracted and audit-ready today.
+            <p style={{ fontSize: 16, color: "rgba(255,255,255,0.6)", maxWidth: 560, margin: "0 auto 36px", lineHeight: 1.7 }}>
+              Whether you&apos;re a listed company filing BRSR, assessing your supply chain,
+              or monetizing emission reductions through carbon credits — FileBRSR is built for you.
             </p>
-            <Link
-              href="/upload"
-              style={{ fontSize: 15, fontWeight: 700, padding: "16px 40px", borderRadius: 12, background: "#E8B931", color: "#1B4D3E", display: "inline-flex", alignItems: "center", gap: 8 }}
-            >
-              START EXTRACTING — FREE
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href="/signup"
+                style={{ fontSize: 15, fontWeight: 700, padding: "16px 36px", borderRadius: 12, background: "#E8B931", color: "#1B4D3E", display: "inline-flex", alignItems: "center", gap: 8 }}
+              >
+                GET STARTED FREE
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </Link>
+              <Link
+                href="/upload"
+                style={{ fontSize: 15, fontWeight: 600, padding: "16px 36px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.9)", display: "inline-flex", alignItems: "center", gap: 8 }}
+              >
+                TRY AI EXTRACTION
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </Link>
+            </div>
           </div>
         </section>
       </main>
@@ -441,9 +647,6 @@ export default function HomePage() {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════
-// Interactive FAQ Accordion
-// ══════════════════════════════════════════════════════════════════
 function FAQAccordion({ faqs }: { faqs: Array<{ q: string; a: string }> }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
