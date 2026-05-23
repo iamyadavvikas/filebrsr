@@ -82,13 +82,15 @@ const plans = [
       "Unlimited suppliers",
       "Unlimited AI reports",
       "Everything in Pro +",
-      "API & SAP integration",
       "XBRL filing generation",
+      "Audit trail & compliance",
+      "Dedicated account manager",
+    ],
+    roadmap: [
+      "API & SAP integration",
       "Workflow approvals (maker-checker)",
       "Multi-user + SSO",
-      "Audit trail & compliance",
       "White-label option",
-      "Dedicated account manager",
       "SLA guarantee",
     ],
     cta: "Contact Sales",
@@ -106,9 +108,9 @@ const comparisonData = [
   { feature: "NIFTY 50 benchmarks", free: "—", pro: "✓", enterprise: "✓" },
   { feature: "Carbon calculator", free: "—", pro: "✓", enterprise: "✓" },
   { feature: "XBRL filing", free: "—", pro: "—", enterprise: "✓" },
-  { feature: "Workflow approvals", free: "—", pro: "—", enterprise: "✓" },
-  { feature: "API access", free: "—", pro: "—", enterprise: "✓" },
-  { feature: "Users", free: "1", pro: "5", enterprise: "Unlimited + SSO" },
+  { feature: "Workflow approvals", free: "—", pro: "—", enterprise: "Q3 2026" },
+  { feature: "API access", free: "—", pro: "—", enterprise: "Q3 2026" },
+  { feature: "Users", free: "1", pro: "5", enterprise: "Unlimited (SSO Q3 2026)" },
   { feature: "Support", free: "Community", pro: "Email", enterprise: "Dedicated" },
 ];
 
@@ -269,6 +271,17 @@ export default function PricingPage() {
                         {f}
                       </div>
                     ))}
+                    {"roadmap" in p && (p as typeof plans[2]).roadmap && (
+                      <>
+                        <p className="mt-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#D97706" }}>Coming Q3 2026</p>
+                        {(p as typeof plans[2]).roadmap!.map((f) => (
+                          <div key={f} className="flex items-start gap-2" style={{ fontSize: 13, color: "var(--muted)", opacity: 0.6 }}>
+                            <span style={{ color: "#D97706", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>◇</span>
+                            {f}
+                          </div>
+                        ))}
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
