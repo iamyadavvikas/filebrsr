@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAnalytics } from "@/lib/analytics";
 import {
@@ -20,7 +20,7 @@ const PROGRESS_STEPS = [
   { label: "Analyze", desc: "Gap analysis" },
 ];
 
-export default function UploadExtractClient({ userId }: { userId: string }) {
+export default function UploadExtractClient({ userId, initialReports }: { userId: string; initialReports: any[] }) {
   const { track } = useAnalytics();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -319,7 +319,7 @@ export default function UploadExtractClient({ userId }: { userId: string }) {
       )}
 
       {/* Past Extractions */}
-      {!uploading && <PastExtractions userId={userId} />}
+      {!uploading && <PastExtractions userId={userId} initialReports={initialReports} />}
 
       <style jsx>{`
         @keyframes progress {
@@ -331,14 +331,9 @@ export default function UploadExtractClient({ userId }: { userId: string }) {
   );
 }
 
-function PastExtractions({ userId }: { userId: string }) {
-  const [reports, setReports] = useState<any[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    fetchReports();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+function PastExtractions({ userId, initialReports }: { userId: string; initialReports: any[] }) {
+  const [reports, setReports] = useState<any[]>(initialReports);
+  const [loaded, setLoaded] = useState(true);
 
   async function fetchReports() {
     try {

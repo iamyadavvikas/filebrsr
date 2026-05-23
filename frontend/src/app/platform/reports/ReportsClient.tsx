@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -66,18 +66,14 @@ const FORMAT_OPTIONS = [
   { id: "docx", label: "Word", icon: FileType, desc: "Editable document" },
 ];
 
-export default function ReportsClient() {
+export default function ReportsClient({ initialReports }: { initialReports: ExtractionReport[] }) {
   const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedFormat, setSelectedFormat] = useState("pdf");
   const [generating, setGenerating] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<any>(null);
   const [tab, setTab] = useState<"extractions" | "generate">("extractions");
-  const [reports, setReports] = useState<ExtractionReport[]>([]);
-
-  useEffect(() => {
-    fetchExtractions();
-  }, []);
+  const [reports, setReports] = useState<ExtractionReport[]>(initialReports);
 
   async function fetchExtractions() {
     try {

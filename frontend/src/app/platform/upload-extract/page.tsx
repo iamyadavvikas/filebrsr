@@ -10,5 +10,13 @@ export default async function UploadExtractPage() {
 
   if (!user) redirect("/login");
 
-  return <UploadExtractClient userId={user.id} />;
+  // Fetch reports server-side to avoid browser auth/RLS issues
+  const { data: reports } = await supabase
+    .from("reports")
+    .select("id, file_name, status, created_at, company_name, financial_year")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  return <UploadExtractClient userId={user.id} initialReports={reports || []} />;
 }

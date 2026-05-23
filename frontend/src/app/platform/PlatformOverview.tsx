@@ -23,6 +23,7 @@ import { createClient } from "@/lib/supabase/client";
 
 interface OverviewProps {
   userId: string;
+  initialReports: any[];
 }
 
 interface ExtractionReport {
@@ -34,10 +35,10 @@ interface ExtractionReport {
   total_extracted?: number;
 }
 
-export default function PlatformOverview({ userId }: OverviewProps) {
+export default function PlatformOverview({ userId, initialReports }: OverviewProps) {
   const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState<ExtractionReport[]>([]);
+  const [reports, setReports] = useState<ExtractionReport[]>(initialReports as ExtractionReport[]);
   const [stats, setStats] = useState({
     completion: 0,
     coreCompletion: 0,
