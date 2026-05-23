@@ -46,6 +46,7 @@ from app.router_advanced import router as advanced_router
 from app.router_org import router as org_router
 from app.router_moat import router as moat_router
 from app.router_market import router as market_router
+from app.excel_import import router as excel_import_router
 
 app = FastAPI(title="FileBRSR Platform API", version="4.0.0")
 
@@ -59,6 +60,7 @@ app.include_router(advanced_router)
 app.include_router(org_router)
 app.include_router(moat_router)
 app.include_router(market_router)
+app.include_router(excel_import_router)
 
 app.add_middleware(
     CORSMiddleware,
