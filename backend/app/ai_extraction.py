@@ -1,6 +1,7 @@
 from anthropic import Anthropic
 from google import genai
 from groq import Groq
+import boto3
 import json
 import re
 import asyncio
@@ -71,6 +72,63 @@ async def _extract_with_claude(text: str, api_key: str) -> dict[str, Any]:
     return _parse_ai_response(response.content[0].text)
 
 
+async def _extract_with_bedrock(text: str, region: str = "ap-south-1") -> dict[str, Any]:
+    """Extract using Claude 3 Sonnet via AWS Bedrock. Falls back to Llama 3 70B if Claude fails."""
+    client = boto3.client("bedrock-runtime", region_name=region)
+
+    max_chars = 600000
+    if len(text) > max_chars:
+        text = text[:max_chars]
+
+    # Try Claude first (requires valid payment method)
+    try:
+        body = json.dumps({
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 4096,
+            "temperature": 0.1,
+            "messages": [
+                {"role": "user", "content": BRSR_EXTRACTION_PROMPT.format(text=text)},
+            ],
+        })
+        response = await asyncio.wait_for(
+            asyncio.to_thread(
+                client.invoke_model,
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                contentType="application/json",
+                accept="application/json",
+                body=body,
+            ),
+            timeout=60.0,
+        )
+        response_body = json.loads(response["body"].read())
+        result = _parse_ai_response(response_body["content"][0]["text"])
+        if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
+            print("Bedrock: Claude 3 Sonnet succeeded")
+            return result
+    except Exception as e:
+        print(f"Bedrock Claude failed: {e}")
+
+    # Fallback to Llama 3 70B
+    max_chars_llama = 120000
+    text_llama = text[:max_chars_llama] if len(text) > max_chars_llama else text
+    prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\nYou extract structured data from documents. Return ONLY valid JSON, no explanation.<|eot_id|><|start_header_id|>user<|end_header_id|>\n{BRSR_EXTRACTION_PROMPT.format(text=text_llama)}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n"
+    body = json.dumps({"prompt": prompt, "max_gen_len": 4096, "temperature": 0.1})
+
+    response = await asyncio.wait_for(
+        asyncio.to_thread(
+            client.invoke_model,
+            modelId="meta.llama3-70b-instruct-v1:0",
+            contentType="application/json",
+            accept="application/json",
+            body=body,
+        ),
+        timeout=60.0,
+    )
+    response_body = json.loads(response["body"].read())
+    print("Bedrock: Llama 3 70B fallback")
+    return _parse_ai_response(response_body.get("generation", ""))
+
+
 async def _extract_with_gemini(text: str, api_key: str) -> dict[str, Any]:
     """Extract using Google Gemini."""
     client = genai.Client(api_key=api_key)
@@ -120,8 +178,17 @@ async def _extract_with_groq(text: str, api_key: str) -> dict[str, Any]:
 
 
 async def extract_with_ai(text: str, gemini_key: str, groq_key: str = "", anthropic_key: str = "") -> dict[str, Any]:
-    """Extract BRSR metrics using AI. Chain: Claude → Gemini → Groq → regex."""
-    # Try Claude first (best quality)
+    """Extract BRSR metrics using AI. Chain: Bedrock → Claude → Gemini → Groq → regex."""
+    # Try AWS Bedrock first (uses IAM credentials, no API key needed)
+    try:
+        result = await _extract_with_bedrock(text)
+        if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
+            print("AI extraction: Bedrock Claude Sonnet succeeded")
+            return result
+    except Exception as e:
+        print(f"Bedrock failed: {e}")
+
+    # Try Claude direct API
     if anthropic_key:
         try:
             result = await _extract_with_claude(text, anthropic_key)

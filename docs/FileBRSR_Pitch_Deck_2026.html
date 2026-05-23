@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FileBRSR — Pitch Deck 2026</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --green: #10B981;
+  --dark: #0B2B22;
+  --gold: #D97706;
+  --navy: #0F2847;
+  --white: #FFFFFF;
+  --gray: #F9FAFB;
+  --text: #1F2937;
+  --muted: #6B7280;
+}
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text); }
+.slide {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 80px;
+  position: relative;
+  page-break-after: always;
+}
+.slide-number {
+  position: absolute;
+  bottom: 30px;
+  right: 40px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+h1 { font-size: 48px; font-weight: 800; line-height: 1.1; margin-bottom: 16px; }
+h2 { font-size: 36px; font-weight: 700; margin-bottom: 24px; line-height: 1.2; }
+h3 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+p { font-size: 18px; line-height: 1.6; color: var(--muted); }
+.subtitle { font-size: 22px; color: var(--muted); margin-bottom: 32px; }
+.tag { display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-right: 8px; margin-bottom: 8px; }
+.tag-green { background: #D1FAE5; color: #065F46; }
+.tag-gold { background: #FEF3C7; color: #92400E; }
+.tag-blue { background: #DBEAFE; color: #1E40AF; }
+
+/* Title slide */
+.slide-title { background: linear-gradient(160deg, #0A1628 0%, #0F2847 40%, #1B4D3E 100%); color: white; }
+.slide-title h1 { font-size: 56px; color: white; }
+.slide-title .subtitle { color: rgba(255,255,255,0.7); }
+.slide-title p { color: rgba(255,255,255,0.6); }
+.logo-mark { width: 64px; height: 64px; background: var(--green); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 32px; }
+.logo-mark svg { width: 36px; height: 36px; }
+
+/* Dark slides */
+.slide-dark { background: linear-gradient(160deg, #0A1628 0%, #0F2847 40%, #1B4D3E 100%); color: white; }
+.slide-dark h2 { color: white; }
+.slide-dark p { color: rgba(255,255,255,0.7); }
+.slide-dark .slide-number { color: rgba(255,255,255,0.4); }
+
+/* Grid layouts */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 24px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-top: 24px; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 20px; margin-top: 24px; }
+
+/* Cards */
+.card { background: white; border: 1px solid #E5E7EB; border-radius: 16px; padding: 28px; }
+.card-dark { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 28px; }
+.card h3 { font-size: 18px; margin-bottom: 8px; }
+.card p { font-size: 15px; }
+.card-dark h3 { color: white; }
+.card-dark p { color: rgba(255,255,255,0.6); }
+
+/* Stats */
+.stat { text-align: center; }
+.stat-value { font-size: 42px; font-weight: 800; color: var(--green); }
+.stat-label { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.stat-dark .stat-value { color: var(--green); }
+.stat-dark .stat-label { color: rgba(255,255,255,0.6); }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 15px; }
+th { text-align: left; padding: 12px 16px; background: #F3F4F6; font-weight: 600; border-bottom: 2px solid #E5E7EB; }
+td { padding: 12px 16px; border-bottom: 1px solid #F3F4F6; }
+.table-dark th { background: rgba(255,255,255,0.05); color: white; border-bottom-color: rgba(255,255,255,0.1); }
+.table-dark td { color: rgba(255,255,255,0.8); border-bottom-color: rgba(255,255,255,0.05); }
+
+/* Pillar */
+.pillar { border-left: 4px solid var(--green); padding-left: 20px; margin-bottom: 28px; }
+.pillar h3 { color: var(--dark); }
+.pillar p { font-size: 16px; }
+.pillar-gold { border-left-color: var(--gold); }
+.pillar-blue { border-left-color: #3B82F6; }
+
+/* Flow */
+.flow { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 32px; }
+.flow-step { background: white; border: 1px solid #E5E7EB; border-radius: 12px; padding: 16px 20px; font-size: 14px; font-weight: 600; text-align: center; min-width: 140px; }
+.flow-arrow { font-size: 20px; color: var(--green); font-weight: bold; }
+
+/* List */
+.check-list { list-style: none; margin-top: 16px; }
+.check-list li { font-size: 17px; padding: 8px 0; padding-left: 28px; position: relative; color: var(--text); }
+.check-list li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: bold; }
+.check-list-dark li { color: rgba(255,255,255,0.85); }
+.check-list-dark li::before { color: var(--green); }
+
+/* Founder */
+.founder-row { display: flex; gap: 40px; align-items: center; margin-top: 32px; }
+.founder-avatar { width: 120px; height: 120px; background: linear-gradient(135deg, var(--green), var(--dark)); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; font-weight: 800; flex-shrink: 0; }
+.founder-info h3 { font-size: 24px; margin-bottom: 8px; }
+.founder-info p { font-size: 16px; margin-bottom: 6px; }
+
+/* CTA */
+.cta-box { background: linear-gradient(135deg, var(--green), #047857); border-radius: 16px; padding: 40px; color: white; margin-top: 32px; }
+.cta-box h3 { color: white; font-size: 28px; margin-bottom: 16px; }
+.cta-box p { color: rgba(255,255,255,0.85); font-size: 16px; }
+
+/* Timeline */
+.timeline { margin-top: 24px; }
+.timeline-item { display: flex; gap: 20px; margin-bottom: 24px; }
+.timeline-dot { width: 12px; height: 12px; background: var(--green); border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+.timeline-content h4 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.timeline-content p { font-size: 14px; color: var(--muted); }
+
+@media print {
+  .slide { min-height: auto; height: 100vh; }
+}
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: Title -->
+<section class="slide slide-title">
+  <div class="logo-mark">
+    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M24 8 C17 16, 17 32, 24 40 C31 32, 31 16, 24 8z" fill="white"/>
+      <line x1="24" y1="12" x2="24" y2="36" stroke="#10B981" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <h1>file<span style="color: #D97706">BRSR</span></h1>
+  <p class="subtitle">EcoVadis for India — Supply Chain ESG + BRSR Automation + Carbon Market</p>
+  <div style="margin-top: 48px;">
+    <p style="font-size: 16px;">Vikas Yadav &nbsp;|&nbsp; MTech (Safety, Health & Environment) &nbsp;|&nbsp; SRE/DevOps Engineer</p>
+    <p style="font-size: 14px; margin-top: 8px;">filebrsr.com &nbsp;•&nbsp; May 2026</p>
+  </div>
+  <span class="slide-number">1 / 15</span>
+</section>
+
+<!-- SLIDE 2: Problem -->
+<section class="slide">
+  <span class="tag tag-gold">THE PROBLEM</span>
+  <h2 style="margin-top: 16px;">India's ESG Compliance is Broken</h2>
+  <div class="grid-2" style="margin-top: 32px;">
+    <div>
+      <ul class="check-list" style="list-style: none;">
+        <li style="padding-left: 0;">❌ &nbsp;SEBI mandated BRSR for 10,000+ companies — most aren't ready</li>
+        <li style="padding-left: 0;">❌ &nbsp;337 datapoints across 9 principles — filled manually in Excel</li>
+        <li style="padding-left: 0;">❌ &nbsp;₹15-25L spent on consultants per filing cycle</li>
+        <li style="padding-left: 0;">❌ &nbsp;Supply chain ESG assessment required but no tool exists</li>
+        <li style="padding-left: 0;">❌ &nbsp;78% of Indian companies score below 40% on BRSR disclosure</li>
+      </ul>
+    </div>
+    <div style="background: #FEF2F2; border-radius: 16px; padding: 32px;">
+      <h3 style="color: #991B1B;">The Cost of Inaction</h3>
+      <p style="font-size: 15px; color: #7F1D1D; margin-top: 12px;">• SEBI penalties for non-compliance<br>• ESG rating downgrades by CRISIL/MSCI<br>• Loss of institutional investor interest<br>• EU CBAM border tax on exports (2026)<br>• Reputational damage from greenwashing claims</p>
+    </div>
+  </div>
+  <span class="slide-number">2 / 15</span>
+</section>
+
+<!-- SLIDE 3: Market -->
+<section class="slide slide-dark">
+  <span class="tag tag-green">MARKET OPPORTUNITY</span>
+  <h2 style="margin-top: 16px;">$1.5B+ Addressable Market</h2>
+  <div class="grid-3" style="margin-top: 40px;">
+    <div class="stat stat-dark">
+      <div class="stat-value">₹5,000 Cr</div>
+      <div class="stat-label">BRSR Compliance SaaS<br><small>10,000 companies × ₹5L/year</small></div>
+    </div>
+    <div class="stat stat-dark">
+      <div class="stat-value">₹2,500 Cr</div>
+      <div class="stat-label">Supply Chain ESG<br><small>50,000 suppliers × ₹50K/year</small></div>
+    </div>
+    <div class="stat stat-dark">
+      <div class="stat-value">$35B</div>
+      <div class="stat-label">India Carbon Market by 2030<br><small>McKinsey estimate</small></div>
+    </div>
+  </div>
+  <div style="margin-top: 48px;">
+    <h3 style="color: rgba(255,255,255,0.9); font-size: 18px; margin-bottom: 16px;">Regulatory Tailwinds</h3>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+      <span class="tag tag-green">SEBI BRSR Core (FY2026)</span>
+      <span class="tag tag-gold">India CCTS (2023)</span>
+      <span class="tag tag-blue">EU CBAM (2026)</span>
+      <span class="tag tag-green">SEBI Value Chain Assessment</span>
+    </div>
+  </div>
+  <span class="slide-number">3 / 15</span>
+</section>
+
+<!-- SLIDE 4: Solution -->
+<section class="slide">
+  <span class="tag tag-green">SOLUTION</span>
+  <h2 style="margin-top: 16px;">Three Pillars — Land, Expand, Monetize</h2>
+  <div style="margin-top: 32px;">
+    <div class="pillar">
+      <h3>Pillar 1: BRSR Automation <span style="color: var(--muted); font-weight: 400; font-size: 14px;">— THE HOOK</span></h3>
+      <p>Upload annual report PDF → AI extracts 337 datapoints in 60 sec → Gap analysis → Collaborative data entry → XBRL filing for BSE/NSE</p>
+    </div>
+    <div class="pillar pillar-gold">
+      <h3>Pillar 2: Supply Chain ESG Ratings <span style="color: var(--muted); font-weight: 400; font-size: 14px;">— NETWORK EFFECT</span></h3>
+      <p>Enterprise invites suppliers → Suppliers complete ESG questionnaire (no signup) → Auto-scored E(40%)+S(35%)+G(25%) → Risk heat map → Each buyer onboards 100-500 suppliers</p>
+    </div>
+    <div class="pillar pillar-blue">
+      <h3>Pillar 3: Carbon Market <span style="color: var(--muted); font-weight: 400; font-size: 14px;">— MONETIZE DATA</span></h3>
+      <p>Verified Scope 1/2/3 data feeds carbon accounting → Connect reductions to India's CCTS registry → Facilitate carbon credit generation for SME suppliers → Transaction fee revenue</p>
+    </div>
+  </div>
+  <span class="slide-number">4 / 15</span>
+</section>
+
+<!-- SLIDE 5: How It Works -->
+<section class="slide" style="background: var(--gray);">
+  <span class="tag tag-green">HOW IT WORKS</span>
+  <h2 style="margin-top: 16px;">End-to-End ESG Workflow</h2>
+  <div class="flow">
+    <div class="flow-step">📄 Upload<br>Annual Report</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">🤖 AI Extracts<br>337 Datapoints</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">📊 Gap Analysis<br>Dashboard</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">✏️ Fill Gaps<br>Data Entry</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color: var(--green); border-width: 2px;">📋 XBRL Filing<br>BSE/NSE</div>
+  </div>
+  <div class="flow" style="margin-top: 24px;">
+    <div class="flow-step">🏭 Add<br>Suppliers</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">📧 Send Invite<br>Link</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">📝 Supplier<br>Questionnaire</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">⚡ Auto-Score<br>ESG Rating</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color: var(--gold); border-width: 2px;">🌱 Carbon<br>Credits</div>
+  </div>
+  <span class="slide-number">5 / 15</span>
+</section>
+
+<!-- SLIDE 6: Product -->
+<section class="slide">
+  <span class="tag tag-green">PRODUCT</span>
+  <h2 style="margin-top: 16px;">Built & Live at filebrsr.com</h2>
+  <div class="grid-3" style="margin-top: 24px;">
+    <div class="card">
+      <h3>🤖 AI Extraction</h3>
+      <p>Upload PDF, get 337 BRSR datapoints extracted with >85% accuracy in 60 seconds</p>
+    </div>
+    <div class="card">
+      <h3>📝 Data Entry</h3>
+      <p>337 structured fields across Section A/B/C with auto-fill from extraction</p>
+    </div>
+    <div class="card">
+      <h3>📊 Gap Analysis</h3>
+      <p>Section-wise coverage charts, found vs missing, compliance percentage</p>
+    </div>
+    <div class="card">
+      <h3>🏭 Supply Chain</h3>
+      <p>Add suppliers, send assessments, auto-score, risk heat maps</p>
+    </div>
+    <div class="card">
+      <h3>🔄 Multi-Framework</h3>
+      <p>One data entry → maps to GRI, CDP, TCFD, SASB, UNGC, SDG automatically</p>
+    </div>
+    <div class="card">
+      <h3>📋 XBRL Filing</h3>
+      <p>Generate exchange-ready XBRL for BSE/NSE submission, validated output</p>
+    </div>
+    <div class="card">
+      <h3>🛡️ Compliance Tracker</h3>
+      <p>9 overlapping regulations: PAT, EPR, POSH, LODR, Companies Act, Water/Air Act</p>
+    </div>
+    <div class="card">
+      <h3>⭐ ESG Ratings</h3>
+      <p>Readiness scoring for CRISIL, MSCI, Sustainalytics, CDP assessments</p>
+    </div>
+    <div class="card">
+      <h3>🌱 Carbon Calculator</h3>
+      <p>Scope 1/2/3 emissions, intensity metrics, reduction tracking</p>
+    </div>
+  </div>
+  <span class="slide-number">6 / 15</span>
+</section>
+
+<!-- SLIDE 7: Business Model -->
+<section class="slide">
+  <span class="tag tag-gold">BUSINESS MODEL</span>
+  <h2 style="margin-top: 16px;">SaaS + Network Fees + Carbon Transaction</h2>
+  <table>
+    <tr><th>Tier</th><th>Price</th><th>Target</th><th>Key Features</th></tr>
+    <tr><td><strong>Starter</strong></td><td>₹4,999/mo</td><td>SMEs, unlisted companies</td><td>5 extractions, data entry, Excel export</td></tr>
+    <tr><td><strong>Pro</strong></td><td>₹14,999/mo</td><td>Listed companies (top 1000)</td><td>Unlimited extractions, XBRL, 50 suppliers, multi-framework</td></tr>
+    <tr><td><strong>Enterprise</strong></td><td>₹49,999/mo</td><td>NIFTY 500, conglomerates</td><td>Unlimited suppliers, API, workflows, SSO, white-label</td></tr>
+    <tr><td><strong>Carbon</strong></td><td>2% of trade</td><td>All participants</td><td>Transaction fee on carbon credits facilitated via platform</td></tr>
+  </table>
+  <div class="grid-3" style="margin-top: 32px;">
+    <div class="stat">
+      <div class="stat-value">40%</div>
+      <div class="stat-label">SaaS Subscriptions</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">35%</div>
+      <div class="stat-label">Supplier Network Fees</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">25%</div>
+      <div class="stat-label">Carbon Facilitation</div>
+    </div>
+  </div>
+  <p style="font-size: 14px; margin-top: 16px; text-align: center;">Revenue mix target — Year 3</p>
+  <span class="slide-number">7 / 15</span>
+</section>
+
+<!-- SLIDE 8: Traction -->
+<section class="slide slide-dark">
+  <span class="tag tag-green">TRACTION</span>
+  <h2 style="margin-top: 16px;">Built & Deployed — Solo Founder, 8 Weeks</h2>
+  <div class="grid-4" style="margin-top: 40px;">
+    <div class="stat stat-dark">
+      <div class="stat-value">337</div>
+      <div class="stat-label">BRSR datapoints mapped</div>
+    </div>
+    <div class="stat stat-dark">
+      <div class="stat-value">6</div>
+      <div class="stat-label">Frameworks integrated</div>
+    </div>
+    <div class="stat stat-dark">
+      <div class="stat-value">85%+</div>
+      <div class="stat-label">Extraction accuracy</div>
+    </div>
+    <div class="stat stat-dark">
+      <div class="stat-value">₹2</div>
+      <div class="stat-label">Cost per extraction</div>
+    </div>
+  </div>
+  <ul class="check-list check-list-dark" style="margin-top: 40px; columns: 2;">
+    <li>Live product at filebrsr.com</li>
+    <li>Full-stack platform deployed on AWS EC2</li>
+    <li>AI extraction pipeline operational (Groq/Llama 3.3)</li>
+    <li>Supply chain assessment module built</li>
+    <li>XBRL generation engine ready</li>
+    <li>Multi-framework mapping (GRI, CDP, TCFD, SASB, UNGC, SDG)</li>
+    <li>9-regulation compliance tracker</li>
+    <li>Workflow approvals (maker-checker)</li>
+  </ul>
+  <span class="slide-number">8 / 15</span>
+</section>
+
+<!-- SLIDE 9: Competition -->
+<section class="slide">
+  <span class="tag tag-blue">COMPETITIVE LANDSCAPE</span>
+  <h2 style="margin-top: 16px;">White Space in India ESG Tech</h2>
+  <table>
+    <tr><th>Player</th><th>What They Do</th><th>What They Miss</th></tr>
+    <tr><td><strong>EcoVadis</strong></td><td>Global supply chain ESG ratings</td><td>No BRSR, no India focus, €5K+ pricing</td></tr>
+    <tr><td><strong>Greenstone</strong></td><td>UK ESG reporting software</td><td>No SEBI/BRSR, no supply chain assessment</td></tr>
+    <tr><td><strong>ESGpedia (SGX)</strong></td><td>Singapore ESG registry</td><td>No Indian regulatory mapping</td></tr>
+    <tr><td><strong>EY / KPMG / PwC</strong></td><td>Manual BRSR consulting</td><td>No tech platform, ₹15-50L per engagement</td></tr>
+    <tr><td><strong>BRSRReport.com</strong></td><td>BRSR Excel templates</td><td>No AI, no supply chain, no carbon</td></tr>
+  </table>
+  <div style="margin-top: 32px; background: #ECFDF5; border-radius: 12px; padding: 24px;">
+    <h3 style="color: #065F46;">Our Moat</h3>
+    <p style="font-size: 15px; color: #065F46;">Only platform combining: AI extraction + Supply chain ESG network + Carbon market + India regulatory depth (9 regulations) + Multi-framework mapping (6 standards) — at 10x lower cost than consultants.</p>
+  </div>
+  <span class="slide-number">9 / 15</span>
+</section>
+
+<!-- SLIDE 10: GTM -->
+<section class="slide">
+  <span class="tag tag-green">GO-TO-MARKET</span>
+  <h2 style="margin-top: 16px;">Land → Expand → Monetize</h2>
+  <div class="grid-3" style="margin-top: 32px;">
+    <div class="card" style="border-top: 4px solid var(--green);">
+      <h3>Phase 1: Land (M1-3)</h3>
+      <p style="font-size: 14px;">
+        • Target 50 companies via CS/CFO communities<br>
+        • LinkedIn content on BRSR deadline urgency<br>
+        • Free tier drives sign-ups (1 extraction/mo)<br>
+        • Partner with CA/CS firms (20% rev share)<br>
+        • Direct outreach to NIFTY 500 Company Secretaries
+      </p>
+    </div>
+    <div class="card" style="border-top: 4px solid var(--gold);">
+      <h3>Phase 2: Expand (M3-9)</h3>
+      <p style="font-size: 14px;">
+        • Each customer invites 100-500 suppliers<br>
+        • Supplier questionnaire is free → builds network<br>
+        • Viral loop: more suppliers = more data = more value<br>
+        • Launch enterprise tier (SSO, workflows)<br>
+        • ICSI/NASSCOM event presence
+      </p>
+    </div>
+    <div class="card" style="border-top: 4px solid #3B82F6;">
+      <h3>Phase 3: Monetize (M9-18)</h3>
+      <p style="font-size: 14px;">
+        • Carbon credit facilitation via CCTS<br>
+        • ESG rating readiness consulting upsell<br>
+        • API licensing to rating agencies<br>
+        • Cross-sell to supplier network (paid tiers)<br>
+        • International expansion (GCC, SEA)
+      </p>
+    </div>
+  </div>
+  <span class="slide-number">10 / 15</span>
+</section>
+
+<!-- SLIDE 11: Technology -->
+<section class="slide slide-dark">
+  <span class="tag tag-green">TECHNOLOGY</span>
+  <h2 style="margin-top: 16px;">AI-Native, Model-Agnostic, India-First</h2>
+  <div class="grid-2" style="margin-top: 32px;">
+    <div>
+      <h3 style="color: white; margin-bottom: 16px;">Stack</h3>
+      <table class="table-dark">
+        <tr><td>Frontend</td><td>Next.js 16, TypeScript, Tailwind</td></tr>
+        <tr><td>Backend</td><td>FastAPI (Python 3.12), async</td></tr>
+        <tr><td>Database</td><td>Supabase PostgreSQL + RLS</td></tr>
+        <tr><td>Infra</td><td>Docker, AWS EC2, Nginx, SSL</td></tr>
+        <tr><td>AI</td><td>Groq/Llama 3.3 70B (swappable)</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3 style="color: white; margin-bottom: 16px;">AI Pipeline (Proprietary)</h3>
+      <ul class="check-list check-list-dark">
+        <li>Layout-aware PDF chunking</li>
+        <li>Schema-guided extraction (337 datapoints)</li>
+        <li>Multi-pass confidence scoring</li>
+        <li>NIFTY-50 benchmark validation</li>
+        <li>Model-agnostic (swap Groq→Vertex→OpenAI)</li>
+        <li>~₹2 per extraction cost</li>
+      </ul>
+    </div>
+  </div>
+  <div style="margin-top: 32px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+    <p style="font-size: 14px; color: rgba(255,255,255,0.7);"><strong style="color: white;">Google Cloud Migration Path:</strong> Vertex AI for Document AI extraction • BigQuery for cross-company benchmarking • Cloud Run for serverless autoscaling during filing season</p>
+  </div>
+  <span class="slide-number">11 / 15</span>
+</section>
+
+<!-- SLIDE 12: Founder -->
+<section class="slide">
+  <span class="tag tag-green">FOUNDER</span>
+  <h2 style="margin-top: 16px;">Rare Intersection: Domain + Engineering</h2>
+  <div class="founder-row">
+    <div class="founder-avatar">VY</div>
+    <div class="founder-info">
+      <h3>Vikas Yadav</h3>
+      <p><strong>MTech, Safety Health & Environment</strong> — Domain expertise in ESG, environmental compliance, industrial safety, occupational health regulations</p>
+      <p><strong>Software Engineer (SRE/DevOps)</strong> — Enterprise-scale reliability engineering, distributed systems, infrastructure automation</p>
+      <p style="margin-top: 12px; color: var(--text);"><em>"I understand what Scope 1 emissions mean AND how to build scalable data pipelines. That's why I built this — India's ESG gap isn't a knowledge problem, it's an infrastructure problem."</em></p>
+    </div>
+  </div>
+  <div class="grid-3" style="margin-top: 40px;">
+    <div class="card" style="text-align: center;">
+      <h3>8 weeks</h3>
+      <p>Solo-built entire platform</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <h3>Full-stack</h3>
+      <p>Backend + Frontend + AI + DevOps</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <h3>Enterprise SRE</h3>
+      <p>Production reliability at scale</p>
+    </div>
+  </div>
+  <span class="slide-number">12 / 15</span>
+</section>
+
+<!-- SLIDE 13: Financials -->
+<section class="slide">
+  <span class="tag tag-gold">PROJECTIONS</span>
+  <h2 style="margin-top: 16px;">Path to ₹30L ARR in 12 Months</h2>
+  <table>
+    <tr><th>Metric</th><th>Month 6</th><th>Month 12</th><th>Month 24</th></tr>
+    <tr><td>Paying Companies</td><td>20</td><td>100</td><td>500</td></tr>
+    <tr><td>Suppliers Assessed</td><td>500</td><td>5,000</td><td>25,000</td></tr>
+    <tr><td>MRR</td><td>₹1.5L</td><td>₹2.5L</td><td>₹15L</td></tr>
+    <tr><td>ARR</td><td>₹18L</td><td>₹30L</td><td>₹1.8Cr</td></tr>
+    <tr><td>Carbon Credits Facilitated</td><td>—</td><td>First txn</td><td>₹50L volume</td></tr>
+  </table>
+  <div style="margin-top: 32px; background: #F3F4F6; border-radius: 12px; padding: 24px;">
+    <h3>Unit Economics</h3>
+    <div class="grid-4" style="margin-top: 12px;">
+      <div class="stat"><div class="stat-value" style="font-size: 28px;">₹2</div><div class="stat-label">Cost per extraction</div></div>
+      <div class="stat"><div class="stat-value" style="font-size: 28px;">90%+</div><div class="stat-label">Gross margin</div></div>
+      <div class="stat"><div class="stat-value" style="font-size: 28px;">5:1</div><div class="stat-label">LTV:CAC target</div></div>
+      <div class="stat"><div class="stat-value" style="font-size: 28px;">&lt;2%</div><div class="stat-label">Monthly churn (regulatory mandate)</div></div>
+    </div>
+  </div>
+  <span class="slide-number">13 / 15</span>
+</section>
+
+<!-- SLIDE 14: The Ask -->
+<section class="slide slide-dark">
+  <span class="tag tag-gold">THE ASK</span>
+  <h2 style="margin-top: 16px;">Raising ₹75L Pre-Seed</h2>
+  <div class="grid-2" style="margin-top: 32px;">
+    <div>
+      <h3 style="color: white; margin-bottom: 20px;">Use of Funds</h3>
+      <div style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; color: rgba(255,255,255,0.9); font-size: 15px; margin-bottom: 6px;"><span>Engineering (1 full-stack + 1 AI/ML)</span><span>40%</span></div>
+        <div style="background: rgba(255,255,255,0.1); border-radius: 4px; height: 8px;"><div style="background: var(--green); width: 40%; height: 100%; border-radius: 4px;"></div></div>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; color: rgba(255,255,255,0.9); font-size: 15px; margin-bottom: 6px;"><span>GTM (ads, events, content)</span><span>25%</span></div>
+        <div style="background: rgba(255,255,255,0.1); border-radius: 4px; height: 8px;"><div style="background: var(--gold); width: 25%; height: 100%; border-radius: 4px;"></div></div>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; color: rgba(255,255,255,0.9); font-size: 15px; margin-bottom: 6px;"><span>Infrastructure (Cloud, AI inference)</span><span>20%</span></div>
+        <div style="background: rgba(255,255,255,0.1); border-radius: 4px; height: 8px;"><div style="background: #3B82F6; width: 20%; height: 100%; border-radius: 4px;"></div></div>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; color: rgba(255,255,255,0.9); font-size: 15px; margin-bottom: 6px;"><span>Compliance & Legal (SOC2, privacy)</span><span>15%</span></div>
+        <div style="background: rgba(255,255,255,0.1); border-radius: 4px; height: 8px;"><div style="background: #8B5CF6; width: 15%; height: 100%; border-radius: 4px;"></div></div>
+      </div>
+    </div>
+    <div>
+      <h3 style="color: white; margin-bottom: 20px;">12-Month Milestones</h3>
+      <ul class="check-list check-list-dark">
+        <li>100 paying companies</li>
+        <li>5,000 suppliers assessed on platform</li>
+        <li>₹30L ARR</li>
+        <li>First carbon credit facilitation transaction</li>
+        <li>SOC2 Type 1 certification</li>
+        <li>3-person engineering team</li>
+      </ul>
+    </div>
+  </div>
+  <span class="slide-number">14 / 15</span>
+</section>
+
+<!-- SLIDE 15: Vision / Why Now -->
+<section class="slide" style="background: linear-gradient(160deg, #0B2B22 0%, #0F3D2E 50%, #1B4D3E 100%); color: white;">
+  <h2 style="color: white;">Why Now. Why Us. Why This Wins.</h2>
+  <div class="grid-2" style="margin-top: 40px;">
+    <div>
+      <h3 style="color: var(--green); margin-bottom: 16px;">Why Now</h3>
+      <ul class="check-list check-list-dark">
+        <li>BRSR Core mandatory for 10,000+ companies (FY2026)</li>
+        <li>India CCTS launched — carbon market infrastructure ready</li>
+        <li>EU CBAM hitting Indian exporters this year</li>
+        <li>LLMs finally viable for structured document extraction</li>
+        <li>EcoVadis ($1B+ valuation) completely ignores India</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="color: var(--green); margin-bottom: 16px;">Vision</h3>
+      <div class="timeline">
+        <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-content"><h4 style="color: white;">Year 1</h4><p style="color: rgba(255,255,255,0.6);">India's #1 BRSR platform (100 companies, 5K suppliers)</p></div></div>
+        <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-content"><h4 style="color: white;">Year 3</h4><p style="color: rgba(255,255,255,0.6);">Supply chain ESG network — 50K+ Indian suppliers</p></div></div>
+        <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-content"><h4 style="color: white;">Year 5</h4><p style="color: rgba(255,255,255,0.6);">India's ESG data infrastructure — the API layer for rating agencies, investors & carbon markets</p></div></div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top: 48px; text-align: center; padding: 24px; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);">
+    <p style="font-size: 20px; color: white; font-weight: 600;">filebrsr.com &nbsp;&nbsp;•&nbsp;&nbsp; vikas@filebrsr.com &nbsp;&nbsp;•&nbsp;&nbsp; Let's build India's ESG infrastructure together.</p>
+  </div>
+  <span class="slide-number">15 / 15</span>
+</section>
+
+</body>
+</html>
