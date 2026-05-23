@@ -206,8 +206,11 @@ export default function AuditClient({ userId }: { userId: string }) {
             onChange={(e) => setFilters({ ...filters, financial_year: e.target.value })}
           >
             <option value="">All Years</option>
+            <option value="FY2022-23">FY 2022-23</option>
+            <option value="FY2023-24">FY 2023-24</option>
             <option value="FY2024-25">FY 2024-25</option>
             <option value="FY2025-26">FY 2025-26</option>
+            <option value="FY2026-27">FY 2026-27</option>
           </select>
           <div className="flex-1 min-w-[200px]">
             <div className="relative">

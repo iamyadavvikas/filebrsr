@@ -41,7 +41,7 @@ interface ActionItem {
 }
 
 export default function ActionPlanClient() {
-  const [financialYear, setFinancialYear] = useState("FY2024-25");
+  const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [sector, setSector] = useState("general");
   const [loading, setLoading] = useState(false);
   const [actionPlan, setActionPlan] = useState<{

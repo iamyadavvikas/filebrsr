@@ -35,7 +35,7 @@ interface ExtractionReport {
 }
 
 export default function PlatformOverview({ userId }: OverviewProps) {
-  const [financialYear, setFinancialYear] = useState("FY2024-25");
+  const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<ExtractionReport[]>([]);
   const [stats, setStats] = useState({
@@ -122,10 +122,11 @@ export default function PlatformOverview({ userId }: OverviewProps) {
           onChange={(e) => setFinancialYear(e.target.value)}
           className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium bg-white self-start"
         >
-          <option value="FY2025-26">FY 2025-26</option>
-          <option value="FY2024-25">FY 2024-25</option>
-          <option value="FY2023-24">FY 2023-24</option>
           <option value="FY2022-23">FY 2022-23</option>
+          <option value="FY2023-24">FY 2023-24</option>
+          <option value="FY2024-25">FY 2024-25</option>
+          <option value="FY2025-26">FY 2025-26</option>
+          <option value="FY2026-27">FY 2026-27</option>
         </select>
       </div>
 

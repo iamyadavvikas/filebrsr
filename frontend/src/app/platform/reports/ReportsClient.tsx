@@ -67,7 +67,7 @@ const FORMAT_OPTIONS = [
 ];
 
 export default function ReportsClient() {
-  const [financialYear, setFinancialYear] = useState("FY2024-25");
+  const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedFormat, setSelectedFormat] = useState("pdf");
   const [generating, setGenerating] = useState(false);
@@ -137,9 +137,11 @@ export default function ReportsClient() {
           onChange={(e) => setFinancialYear(e.target.value)}
           className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
         >
-          <option value="FY2024-25">FY 2024-25</option>
+          <option value="FY2022-23">FY 2022-23</option>
           <option value="FY2023-24">FY 2023-24</option>
+          <option value="FY2024-25">FY 2024-25</option>
           <option value="FY2025-26">FY 2025-26</option>
+          <option value="FY2026-27">FY 2026-27</option>
         </select>
       </div>
 

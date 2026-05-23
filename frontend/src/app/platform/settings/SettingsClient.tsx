@@ -20,7 +20,7 @@ export default function SettingsClient({ userId, userEmail }: Props) {
   const [sector, setSector] = useState("IT / Software Services");
   const [listedOn, setListedOn] = useState("BSE + NSE");
   const [reportingCategory, setReportingCategory] = useState("Top 1000 (BRSR Full)");
-  const [financialYear, setFinancialYear] = useState("FY2024-25");
+  const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [assuranceProvider, setAssuranceProvider] = useState("");
 
   // Team state
@@ -322,6 +322,8 @@ export default function SettingsClient({ userId, userEmail }: Props) {
               </div>
               <select value={financialYear} onChange={e => setFinancialYear(e.target.value)}
                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500">
+                <option>FY2022-23</option>
+                <option>FY2023-24</option>
                 <option>FY2024-25</option>
                 <option>FY2025-26</option>
                 <option>FY2026-27</option>

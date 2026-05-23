@@ -31,7 +31,7 @@ interface ReportOption {
 export default function DataEntryClient({ userId }: DataEntryClientProps) {
   const { track } = useAnalytics();
   const searchParams = useSearchParams();
-  const [financialYear, setFinancialYear] = useState("FY2024-25");
+  const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [activeSection, setActiveSection] = useState("section_a");
   const [activeSubsection, setActiveSubsection] = useState(0);
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -294,9 +294,11 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
             onChange={(e) => setFinancialYear(e.target.value)}
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
           >
-            <option value="FY2024-25">FY 2024-25</option>
+            <option value="FY2022-23">FY 2022-23</option>
             <option value="FY2023-24">FY 2023-24</option>
+            <option value="FY2024-25">FY 2024-25</option>
             <option value="FY2025-26">FY 2025-26</option>
+            <option value="FY2026-27">FY 2026-27</option>
           </select>
           <div className="flex items-center gap-2">
             <div className="px-2 md:px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-xs md:text-sm font-medium">

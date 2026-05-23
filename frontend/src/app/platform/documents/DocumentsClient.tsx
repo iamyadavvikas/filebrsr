@@ -59,7 +59,7 @@ export default function DocumentsClient() {
   const [uploadCategory, setUploadCategory] = useState("data_source");
   const [uploadDescription, setUploadDescription] = useState("");
   const [uploadPrinciples, setUploadPrinciples] = useState<string[]>([]);
-  const [uploadFY, setUploadFY] = useState("FY2024-25");
+  const [uploadFY, setUploadFY] = useState("FY2025-26");
 
   useEffect(() => {
     fetchDocuments();
@@ -301,9 +301,11 @@ export default function DocumentsClient() {
                   <label className="text-sm font-medium text-gray-700 mb-1 block">Financial Year</label>
                   <select value={uploadFY} onChange={e => setUploadFY(e.target.value)}
                     className="w-full px-3 py-2 border rounded-lg text-sm">
+                    <option>FY2022-23</option>
+                    <option>FY2023-24</option>
                     <option>FY2024-25</option>
                     <option>FY2025-26</option>
-                    <option>FY2023-24</option>
+                    <option>FY2026-27</option>
                   </select>
                 </div>
               </div>

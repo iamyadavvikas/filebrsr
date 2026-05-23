@@ -44,7 +44,7 @@ interface DashboardData {
 export default function BoardClient({ userId }: { userId: string }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [fy, setFy] = useState("FY2024-25");
+  const [fy, setFy] = useState("FY2025-26");
 
   useEffect(() => {
     loadDashboard();
@@ -108,9 +108,11 @@ export default function BoardClient({ userId }: { userId: string }) {
             onChange={(e) => setFy(e.target.value)}
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
           >
+            <option value="FY2022-23">FY 2022-23</option>
+            <option value="FY2023-24">FY 2023-24</option>
             <option value="FY2024-25">FY 2024-25</option>
             <option value="FY2025-26">FY 2025-26</option>
-            <option value="FY2023-24">FY 2023-24</option>
+            <option value="FY2026-27">FY 2026-27</option>
           </select>
           <button
             onClick={downloadReport}
