@@ -42,9 +42,9 @@ export const SECTIONS: Record<string, BRSRSection> = {
           { id: "A.I.10", label: "Name of Stock Exchange(s) where shares are listed", type: "textarea", required: true },
           { id: "A.I.11", label: "Paid-up Capital (INR)", type: "number", required: true },
           { id: "A.I.12", label: "Name and contact details of person for BRSR queries", type: "textarea", required: true },
-          { id: "A.I.13", label: "Reporting boundary - Standalone or Consolidated", type: "select", required: true, core: true },
+          { id: "A.I.13", label: "Reporting boundary - Standalone or Consolidated", type: "select", required: true, core: true, options: ["Standalone", "Consolidated"] },
           { id: "A.I.14", label: "Name of assurance provider", type: "textarea", required: false, core: true },
-          { id: "A.I.15", label: "Type of assurance obtained (limited/reasonable)", type: "select", required: false, core: true },
+          { id: "A.I.15", label: "Type of assurance obtained (limited/reasonable)", type: "select", required: false, core: true, options: ["Limited Assurance", "Reasonable Assurance", "Not Applicable"] },
         ],
       },
       {
