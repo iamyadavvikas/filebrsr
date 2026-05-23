@@ -84,6 +84,21 @@ export default function LoginPage() {
             Sign up free
           </Link>
         </p>
+
+        {/* Demo CTA for first-time visitors */}
+        <div className="mt-8 pt-6 border-t border-gray-100">
+          <p className="text-center text-xs text-gray-400 mb-3">Just exploring?</p>
+          <Link
+            href="/demo"
+            className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-emerald-200 rounded-xl text-sm font-semibold text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition-all"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Try With Sample Report — No Signup
+          </Link>
+          <p className="text-center text-xs text-gray-400 mt-2">
+            See a full BRSR extraction from a real annual report
+          </p>
+        </div>
       </div>
     </div>
   );

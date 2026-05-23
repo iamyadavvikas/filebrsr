@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { Loader2, FileText, Upload, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -242,17 +243,14 @@ export default function UploadPage() {
                   <span className="w-8 h-px bg-gray-200" />
                 </div>
                 <br />
-                <button
-                  onClick={() => {
-                    // Use a sample PDF URL to demonstrate
-                    window.open("https://www.filebrsr.com/upload?sample=true", "_self");
-                  }}
+                <Link
+                  href="/demo"
                   className="inline-flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors"
                   style={{ color: "var(--primary)", padding: "8px 16px", borderRadius: 10, border: "1px dashed var(--illustration-border)", background: "var(--icon-soft)" }}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   Try with sample sustainability report
-                </button>
+                </Link>
               </div>
             )}
 
