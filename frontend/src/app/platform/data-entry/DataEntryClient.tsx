@@ -272,22 +272,22 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
     : currentSubsection.fields;
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">BRSR Data Entry</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">BRSR Data Entry</h1>
+          <p className="text-gray-500 mt-1 text-sm">
             Enter manually or auto-fill from AI extraction
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           <button
             onClick={fetchReportsForImport}
-            className="px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-sm font-medium hover:bg-indigo-100 flex items-center gap-2"
+            className="px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs md:text-sm font-medium hover:bg-indigo-100 flex items-center gap-1.5"
           >
-            <Sparkles className="w-4 h-4" />
-            Import from Extraction
+            <Sparkles className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Import from</span> Extraction
           </button>
           <select
             value={financialYear}
@@ -299,10 +299,10 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
             <option value="FY2025-26">FY 2025-26</option>
           </select>
           <div className="flex items-center gap-2">
-            <div className="px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium">
+            <div className="px-2 md:px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-xs md:text-sm font-medium">
               {filledCount}/{totalFields} filled
             </div>
-            <div className="px-2 py-2 text-xs text-gray-500">
+            <div className="hidden md:block px-2 py-2 text-xs text-gray-500">
               {MANDATORY_DATAPOINTS} mandatory · {CORE_DATAPOINTS} core
             </div>
           </div>
@@ -394,9 +394,37 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
         </div>
       )}
 
+      {/* Mobile Section Selector */}
+      <div className="md:hidden mb-4">
+        <select
+          value={activeSection}
+          onChange={(e) => { setActiveSection(e.target.value); setActiveSubsection(0); }}
+          className="w-full px-3 py-3 border border-gray-200 rounded-lg text-sm font-semibold bg-white mb-2"
+        >
+          {Object.entries(SECTIONS).map(([key, section]) => (
+            <option key={key} value={key}>{section.name}</option>
+          ))}
+        </select>
+        <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+          {currentSection.subsections.map((sub, idx) => (
+            <button
+              key={sub.id}
+              onClick={() => setActiveSubsection(idx)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                activeSubsection === idx
+                  ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                  : "bg-gray-100 text-gray-600 border border-transparent"
+              }`}
+            >
+              {sub.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex gap-6">
-        {/* Left: Section Navigation */}
-        <div className="w-72 flex-shrink-0">
+        {/* Left: Section Navigation (desktop only) */}
+        <div className="w-72 flex-shrink-0 hidden md:block">
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden sticky top-6">
             {Object.entries(SECTIONS).map(([key, section]) => (
               <div key={key}>

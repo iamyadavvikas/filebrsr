@@ -205,7 +205,7 @@ export default function HomePage() {
             ))}
           </div>
 
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-8 pt-24 pb-16 lg:pt-32 lg:pb-24">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-8 pt-16 pb-12 md:pt-24 md:pb-16 lg:pt-32 lg:pb-24">
             <div className="text-center max-w-4xl mx-auto">
               <div
                 className="inline-flex items-center gap-2 mb-6"
@@ -245,30 +245,30 @@ export default function HomePage() {
                 </Link>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-8 mt-16">
+              <div className="grid grid-cols-3 md:flex md:flex-wrap md:items-center md:justify-center gap-4 md:gap-8 mt-12 md:mt-16">
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-white">1,000+</p>
-                  <p className="text-xs text-white/50 mt-1">Listed companies mandated</p>
+                  <p className="text-xl md:text-3xl font-bold text-white">1,000+</p>
+                  <p className="text-[10px] md:text-xs text-white/50 mt-1">Listed companies mandated</p>
                 </div>
-                <div className="w-px h-10 bg-white/10" />
+                <div className="hidden md:block w-px h-10 bg-white/10" />
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-white">100K+</p>
-                  <p className="text-xs text-white/50 mt-1">Suppliers need assessment</p>
+                  <p className="text-xl md:text-3xl font-bold text-white">100K+</p>
+                  <p className="text-[10px] md:text-xs text-white/50 mt-1">Suppliers need assessment</p>
                 </div>
-                <div className="w-px h-10 bg-white/10" />
+                <div className="hidden md:block w-px h-10 bg-white/10" />
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-white">337</p>
-                  <p className="text-xs text-white/50 mt-1">BRSR data points mapped</p>
+                  <p className="text-xl md:text-3xl font-bold text-white">337</p>
+                  <p className="text-[10px] md:text-xs text-white/50 mt-1">BRSR data points mapped</p>
                 </div>
-                <div className="w-px h-10 bg-white/10" />
+                <div className="hidden md:block w-px h-10 bg-white/10" />
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-white">60s</p>
-                  <p className="text-xs text-white/50 mt-1">AI extraction time</p>
+                  <p className="text-xl md:text-3xl font-bold text-white">60s</p>
+                  <p className="text-[10px] md:text-xs text-white/50 mt-1">AI extraction time</p>
                 </div>
-                <div className="w-px h-10 bg-white/10" />
+                <div className="hidden md:block w-px h-10 bg-white/10" />
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-white">$35B</p>
-                  <p className="text-xs text-white/50 mt-1">India carbon market by 2030</p>
+                  <p className="text-xl md:text-3xl font-bold text-white">$35B</p>
+                  <p className="text-[10px] md:text-xs text-white/50 mt-1">India carbon market by 2030</p>
                 </div>
               </div>
             </div>
@@ -330,14 +330,14 @@ export default function HomePage() {
 
             {/* Tab toggle */}
             <div className="flex justify-center mb-8">
-              <div className="inline-flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1 gap-1">
+              <div className="inline-flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1 gap-1 flex-wrap justify-center">
                 {(["enterprise", "supplier", "filing"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setPainTab(tab)}
-                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${painTab === tab ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white" : "text-gray-500"}`}
+                    className={`px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-all ${painTab === tab ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white" : "text-gray-500"}`}
                   >
-                    {painPoints[tab].icon} {painPoints[tab].label}
+                    {painPoints[tab].icon} <span className="hidden sm:inline">{painPoints[tab].label}</span><span className="sm:hidden">{painPoints[tab].label.split(" ")[0]}</span>
                   </button>
                 ))}
               </div>
