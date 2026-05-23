@@ -96,7 +96,7 @@ export default function PlatformOverview({ userId }: OverviewProps) {
         .select("id, file_name, status, created_at")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(20);
       if (data) {
         setReports(data);
         const completedReports = data.filter((r) => r.status === "completed");
@@ -122,9 +122,10 @@ export default function PlatformOverview({ userId }: OverviewProps) {
           onChange={(e) => setFinancialYear(e.target.value)}
           className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium bg-white self-start"
         >
+          <option value="FY2025-26">FY 2025-26</option>
           <option value="FY2024-25">FY 2024-25</option>
           <option value="FY2023-24">FY 2023-24</option>
-          <option value="FY2025-26">FY 2025-26</option>
+          <option value="FY2022-23">FY 2022-23</option>
         </select>
       </div>
 
