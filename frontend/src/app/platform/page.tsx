@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import PlatformOverview from "./PlatformOverview";
 
 export default async function PlatformPage() {
@@ -10,8 +10,9 @@ export default async function PlatformPage() {
 
   if (!user) redirect("/login");
 
-  // Fetch reports server-side to avoid browser auth/RLS issues
-  const { data: reports } = await supabase
+  // Fetch reports server-side using admin client (bypasses RLS)
+  const admin = createAdminClient();
+  const { data: reports } = await admin
     .from("reports")
     .select("id, file_name, status, created_at, company_name, financial_year")
     .eq("user_id", user.id)
