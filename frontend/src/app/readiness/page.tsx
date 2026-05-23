@@ -232,9 +232,9 @@ export default function ReadinessPage() {
           {/* Trust */}
           <section className="py-12 px-6 bg-white border-b">
             <div className="max-w-4xl mx-auto text-center">
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">TRUSTED BY COMPLIANCE TEAMS AT</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">BUILT FOR</p>
               <div className="flex flex-wrap justify-center gap-8 opacity-50">
-                {["NIFTY 500 Companies", "BSE Listed", "NSE Listed", "SEBI Regulated"].map(t => (
+                {["NIFTY 500 Companies", "BSE Listed Firms", "NSE Listed Firms", "SEBI-Regulated Entities"].map(t => (
                   <span key={t} className="text-sm font-bold text-gray-700">{t}</span>
                 ))}
               </div>
