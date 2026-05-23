@@ -108,19 +108,19 @@ export default function PlatformOverview({ userId }: OverviewProps) {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">ESG Compliance & Supply Chain Intelligence</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">ESG Compliance & Supply Chain Intelligence</h1>
+          <p className="text-gray-500 mt-1 text-sm">
             Automate BRSR filing, assess supplier ESG risk, and stay ahead of SEBI deadlines
           </p>
         </div>
         <select
           value={financialYear}
           onChange={(e) => setFinancialYear(e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium bg-white"
+          className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium bg-white self-start"
         >
           <option value="FY2024-25">FY 2024-25</option>
           <option value="FY2023-24">FY 2023-24</option>
