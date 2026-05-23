@@ -44,6 +44,7 @@ interface DashboardData {
 export default function BoardClient({ userId }: { userId: string }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [fy, setFy] = useState("FY2025-26");
 
   useEffect(() => {
@@ -52,15 +53,19 @@ export default function BoardClient({ userId }: { userId: string }) {
 
   async function loadDashboard() {
     setLoading(true);
+    setError("");
     try {
       const res = await fetch(`/backend/api/platform/board/dashboard?financial_year=${fy}`, {
         headers: { Authorization: `Bearer ${userId}` },
       });
       if (res.ok) {
         setData(await res.json());
+      } else {
+        const text = await res.text();
+        setError(`Failed to load (${res.status}): ${text.slice(0, 200)}`);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setError(`Network error: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -89,7 +94,12 @@ export default function BoardClient({ userId }: { userId: string }) {
   }
 
   if (!data) {
-    return <div className="p-8 text-center text-gray-500">Unable to load dashboard data.</div>;
+    return (
+      <div className="p-8 text-center">
+        <p className="text-gray-500 mb-2">Unable to load dashboard data.</p>
+        {error && <p className="text-sm text-red-500">{error}</p>}
+      </div>
+    );
   }
 
   const riskScore = data.risks.high_risk_suppliers + data.risks.non_compliant_regulations + data.risks.overdue_filings;

@@ -112,6 +112,7 @@ export default function CarbonClient() {
   const [revenueCrores, setRevenueCrores] = useState<number>(0);
   const [results, setResults] = useState<any>(null);
   const [calculating, setCalculating] = useState(false);
+  const [calcError, setCalcError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -183,6 +184,7 @@ export default function CarbonClient() {
 
   async function calculateAll() {
     setCalculating(true);
+    setCalcError("");
     try {
       const res = await fetch("/backend/api/platform/carbon/summary", {
         method: "POST",
@@ -203,9 +205,12 @@ export default function CarbonClient() {
       });
       if (res.ok) {
         setResults(await res.json());
+      } else {
+        const text = await res.text();
+        setCalcError(`Calculation failed (${res.status}): ${text.slice(0, 200)}`);
       }
-    } catch (err) {
-      console.error("Calculation failed:", err);
+    } catch (err: any) {
+      setCalcError(`Network error: ${err.message}`);
     }
     setCalculating(false);
   }
@@ -484,6 +489,13 @@ export default function CarbonClient() {
             {saving ? "Saving..." : saved ? "Saved!" : "Save"}
           </button>
         </div>
+
+        {/* Error Display */}
+        {calcError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+            <strong>Error:</strong> {calcError}
+          </div>
+        )}
 
         {/* Results */}
         {results && (
