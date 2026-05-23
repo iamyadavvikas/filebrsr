@@ -57,8 +57,8 @@ export default function Footer() {
             <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Legal</h4>
             <ul className="space-y-2.5">
               {[
-                { label: "Terms of Use", href: "#" },
-                { label: "Privacy Policy", href: "#" },
+                { label: "Terms of Use", href: "/terms" },
+                { label: "Privacy Policy", href: "/privacy" },
                 { label: "Contact", href: "mailto:support@filebrsr.com" },
               ].map((l) => (
                 <li key={l.label}>

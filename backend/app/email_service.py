@@ -210,7 +210,30 @@ TEMPLATES = {
         </div>
         """,
     },
+    "admin_pilot_notification": {
+        "subject": "🚀 New Pilot Application: {company_name}",
+        "html": """
+        <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+            <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 24px;">
+                <h2 style="color: #166534; margin: 0 0 16px;">New Pilot Application Received</h2>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr><td style="padding: 6px 0; color: #6B7280; width: 140px;">Company</td><td style="padding: 6px 0; font-weight: 600; color: #111827;">{company_name}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #6B7280;">Contact</td><td style="padding: 6px 0; color: #111827;">{contact_name}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #6B7280;">Email</td><td style="padding: 6px 0; color: #111827;">{email}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #6B7280;">Designation</td><td style="padding: 6px 0; color: #111827;">{designation}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #6B7280;">CIN</td><td style="padding: 6px 0; color: #111827;">{cin}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #6B7280;">Market Cap</td><td style="padding: 6px 0; color: #111827;">{market_cap_range}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #6B7280;">Current Method</td><td style="padding: 6px 0; color: #111827;">{current_method}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #6B7280;">Pain Points</td><td style="padding: 6px 0; color: #111827;">{pain_points}</td></tr>
+                </table>
+                <p style="color: #6B7280; font-size: 12px; margin-top: 16px;">Submitted at {submitted_at}</p>
+            </div>
+        </div>
+        """,
+    },
 }
+
+ADMIN_EMAIL = "support@filebrsr.com"
 
 
 async def send_email(

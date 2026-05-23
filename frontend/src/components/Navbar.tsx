@@ -192,6 +192,14 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                 )}
               </div>
             ) : authLoaded ? (
+              <>
+              <Link
+                href="/demo"
+                className="text-sm font-semibold transition-colors hover:text-emerald-700"
+                style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #1B4D3E", color: "#1B4D3E" }}
+              >
+                See Demo
+              </Link>
               <Link
                 href="/login"
                 className="text-white text-sm font-semibold"
@@ -199,6 +207,7 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
               >
                 Log In
               </Link>
+              </>
             ) : null}
           </div>
 
@@ -264,14 +273,24 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                 </button>
               </>
             ) : authLoaded ? (
-              <Link
-                href="/login"
-                className="block mt-2 px-4 py-2 bg-primary text-white text-sm font-semibold text-center"
-                style={{ borderRadius: 10, background: "#1B4D3E" }}
-                onClick={() => setMobileOpen(false)}
-              >
-                Log In
-              </Link>
+              <div className="mt-2 space-y-2">
+                <Link
+                  href="/demo"
+                  className="block px-4 py-2 text-sm font-semibold text-center border border-emerald-700 text-emerald-700"
+                  style={{ borderRadius: 10 }}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  See Demo
+                </Link>
+                <Link
+                  href="/login"
+                  className="block px-4 py-2 bg-primary text-white text-sm font-semibold text-center"
+                  style={{ borderRadius: 10, background: "#1B4D3E" }}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Log In
+                </Link>
+              </div>
             ) : null}
           </div>
         )}

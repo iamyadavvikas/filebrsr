@@ -588,13 +588,81 @@ export default function HomePage() {
                 <p className="text-sm text-muted mb-6">For top 250 listed companies</p>
                 <ul className="space-y-2.5 text-sm text-gray-600">
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Unlimited supplier assessments</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> API & SAP/ERP integration</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> XBRL filing generation</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Workflow approvals (maker-checker)</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Audit trail & compliance</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Dedicated account manager</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Regulatory compliance tracker</li>
                 </ul>
+                <p className="mt-4 text-[10px] font-bold text-amber-600 uppercase tracking-wider">ROADMAP (Q3 2026)</p>
+                <ul className="mt-1.5 space-y-1.5 text-sm text-gray-400">
+                  <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">◇</span> API & SAP/ERP integration</li>
+                  <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">◇</span> Workflow approvals (maker-checker)</li>
+                  <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">◇</span> Multi-user + SSO</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+
+        {/* ═══ WHY INDIA NEEDS ITS OWN PLATFORM ═══ */}
+        <section style={{ padding: "80px 28px", background: "var(--highlight-bg)" }}>
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#DC2626", marginBottom: 10 }}>
+                THE HARD QUESTION
+              </p>
+              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 14 }}>
+                &ldquo;Why not just use EcoVadis?&rdquo;
+              </h2>
+              <p className="text-muted" style={{ fontSize: 15, maxWidth: 640, margin: "0 auto" }}>
+                Global ESG platforms serve Fortune 500 companies filing CDP and CSRD.
+                They don&apos;t solve India&apos;s problem. Here&apos;s why.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
+              <div className="bg-card rounded-2xl border border-border p-7">
+                <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-4">GLOBAL PLATFORMS (EcoVadis, Sphera, Sedex)</p>
+                <ul className="space-y-3 text-sm text-gray-600">
+                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> No BRSR schema — built for GRI/CDP/CSRD, not SEBI&apos;s 337-datapoint format</li>
+                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> Pricing starts at $5K-$15K/year — unaffordable for Indian MSMEs</li>
+                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> No India carbon market (CCTS) integration</li>
+                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> Questionnaires in English only — 60% of Indian suppliers need Hindi/regional</li>
+                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> No XBRL generation for BSE/NSE filing</li>
+                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> Not aligned to NGRBC Principles or PAT scheme</li>
+                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> Assessment designed for Fortune 500 vendors, not Indian SME suppliers</li>
+                </ul>
+              </div>
+              <div className="bg-card rounded-2xl border-2 border-emerald-200 p-7">
+                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-4">FileBRSR (Built for India)</p>
+                <ul className="space-y-3 text-sm text-gray-600">
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Native BRSR schema — all 337 SEBI datapoints mapped and extracted by AI</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Starts free for suppliers, ₹50K/year for enterprises (10x cheaper)</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> India Carbon Credit Trading Scheme (CCTS) integration from day one</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Hindi and regional language support (roadmap Q4 2026)</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> XBRL-JSON generation for direct BSE/NSE filing</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 9 NGRBC Principles + PAT + EPR compliance built in</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 5-minute WhatsApp-friendly assessment for MSME suppliers</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="bg-card rounded-2xl border border-border p-6 md:p-8">
+              <h3 className="text-base font-bold mb-4">Why global platforms can&apos;t retrofit for India</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-600">
+                <div>
+                  <p className="font-bold text-gray-900 mb-1">Regulatory depth</p>
+                  <p>SEBI BRSR is the world&apos;s most prescriptive ESG framework — 337 mandatory datapoints vs. GRI&apos;s flexible &ldquo;report what&apos;s material.&rdquo; Global tools can&apos;t handle this specificity without a full rebuild.</p>
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900 mb-1">Market structure</p>
+                  <p>India has 63M MSMEs in supply chains vs. Fortune 500 vendors. Global platforms are designed for 50 large suppliers, not 2,000 SMEs across Tier 2/3 cities. Different UX, different pricing, different language.</p>
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900 mb-1">Carbon market alignment</p>
+                  <p>India&apos;s CCTS is separate from EU ETS or voluntary markets. Emission factors, baseline methodologies, and credit generation rules are India-specific. No global tool supports this natively.</p>
+                </div>
               </div>
             </div>
           </div>

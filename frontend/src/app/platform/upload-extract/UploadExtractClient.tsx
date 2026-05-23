@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Sparkles,
   ArrowRight,
+  Trash2,
 } from "lucide-react";
 
 const PROGRESS_STEPS = [
@@ -334,6 +335,7 @@ export default function UploadExtractClient({ userId, initialReports }: { userId
 function PastExtractions({ userId, initialReports }: { userId: string; initialReports: any[] }) {
   const [reports, setReports] = useState<any[]>(initialReports);
   const [loaded, setLoaded] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   async function fetchReports() {
     try {
@@ -348,6 +350,21 @@ function PastExtractions({ userId, initialReports }: { userId: string; initialRe
       if (data) setReports(data);
     } catch {}
     setLoaded(true);
+  }
+
+  async function deleteReport(id: string) {
+    if (!confirm("Delete this extraction? This cannot be undone.")) return;
+    setDeleting(id);
+    try {
+      const res = await fetch(`/backend/api/platform/reports/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${userId}` },
+      });
+      if (res.ok) {
+        setReports((prev) => prev.filter((r) => r.id !== id));
+      }
+    } catch {}
+    setDeleting(null);
   }
 
   if (!loaded) return null;
@@ -367,16 +384,15 @@ function PastExtractions({ userId, initialReports }: { userId: string; initialRe
           const timeAgo = getTimeAgo(extractedAt);
 
           return (
-            <a
+            <div
               key={r.id}
-              href={`/platform/reports/${r.id}`}
               className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg hover:border-emerald-200 hover:bg-emerald-50/30 transition-colors group"
             >
-              <div className="flex items-center gap-3">
-                <FileText className="w-4 h-4 text-gray-400 group-hover:text-emerald-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-800">{reportName}</p>
-                  <p className="text-xs text-gray-400">
+              <a href={`/platform/reports/${r.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                <FileText className="w-4 h-4 text-gray-400 group-hover:text-emerald-600 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{reportName}</p>
+                  <p className="text-xs text-gray-400 truncate">
                     {r.file_name && r.company_name ? <span className="text-gray-500">{r.file_name} · </span> : null}
                     {extractedAt.toLocaleDateString("en-IN", {
                       day: "numeric",
@@ -389,8 +405,8 @@ function PastExtractions({ userId, initialReports }: { userId: string; initialRe
                     {timeAgo}
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
+              </a>
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                     r.status === "completed"
@@ -403,10 +419,18 @@ function PastExtractions({ userId, initialReports }: { userId: string; initialRe
                 {r.status}
               </span>
               {r.status === "completed" && (
-                <span className="text-xs text-emerald-600 font-medium group-hover:underline">View →</span>
+                <a href={`/platform/reports/${r.id}`} className="text-xs text-emerald-600 font-medium hover:underline">View →</a>
               )}
+              <button
+                onClick={() => deleteReport(r.id)}
+                disabled={deleting === r.id}
+                className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                title="Delete extraction"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
               </div>
-            </a>
+            </div>
           );
         })}
       </div>

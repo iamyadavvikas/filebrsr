@@ -166,7 +166,7 @@ export default function ReadinessPage() {
     if (step < questions.length) {
       setStep(step + 1);
     } else {
-      setStep(11); // email gate
+      setStep(12); // show results immediately (ungated)
     }
   }
 
@@ -232,9 +232,9 @@ export default function ReadinessPage() {
           {/* Trust */}
           <section className="py-12 px-6 bg-white border-b">
             <div className="max-w-4xl mx-auto text-center">
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">TRUSTED BY COMPLIANCE TEAMS AT</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">BUILT FOR</p>
               <div className="flex flex-wrap justify-center gap-8 opacity-50">
-                {["NIFTY 500 Companies", "BSE Listed", "NSE Listed", "SEBI Regulated"].map(t => (
+                {["NIFTY 500 Companies", "BSE Listed Firms", "NSE Listed Firms", "SEBI-Regulated Entities"].map(t => (
                   <span key={t} className="text-sm font-bold text-gray-700">{t}</span>
                 ))}
               </div>
@@ -481,6 +481,44 @@ export default function ReadinessPage() {
               )}
             </div>
           </div>
+
+          {/* Email capture (soft gate — optional) */}
+          {!submitted && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-6 text-center">
+              <h3 className="font-bold text-lg mb-2">📧 Get your full report via email</h3>
+              <p className="text-sm text-gray-500 mb-4">We&apos;ll send a detailed PDF with benchmarks, peer comparison, and personalized recommendations.</p>
+              <div className="flex flex-col sm:flex-row gap-2 max-w-lg mx-auto">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <input
+                  type="text"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="Company name"
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <button
+                  onClick={handleSubmitLead}
+                  disabled={!email || submitting}
+                  className="px-6 py-3 rounded-lg font-bold text-sm text-white disabled:opacity-50 whitespace-nowrap"
+                  style={{ background: "#1B4D3E" }}
+                >
+                  {submitting ? "Sending..." : "Send Report"}
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] text-gray-400">No spam. One email with your report.</p>
+            </div>
+          )}
+          {submitted && (
+            <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-6 mb-6 text-center">
+              <p className="text-sm font-medium text-emerald-700">✓ Report sent to {email}. Check your inbox!</p>
+            </div>
+          )}
 
           {/* CTA */}
           <div className="bg-gradient-to-r from-emerald-900 to-emerald-700 rounded-2xl p-8 text-center text-white">

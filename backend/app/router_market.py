@@ -14,7 +14,7 @@ import json
 from app.config import get_settings
 from app.email_service import (
     send_team_invite, send_filing_reminder, send_extraction_complete,
-    send_workflow_notification, send_deadline_alert, send_email,
+    send_workflow_notification, send_deadline_alert, send_email, ADMIN_EMAIL,
 )
 
 router = APIRouter(prefix="/api/platform", tags=["Market Readiness"])
@@ -600,6 +600,7 @@ class LeadCapture(BaseModel):
     tags: Optional[List[str]] = None
     answers: Optional[dict] = None
     phase_scores: Optional[dict] = None
+    metadata: Optional[dict] = None
 
 
 @router.post("/leads/capture")
@@ -615,7 +616,7 @@ async def capture_lead(lead: LeadCapture):
         "score": lead.score,
         "readiness_level": lead.readiness_level,
         "tags": lead.tags,
-        "metadata": {
+        "metadata": lead.metadata or {
             "answers": lead.answers,
             "phase_scores": lead.phase_scores,
         },
@@ -633,14 +634,31 @@ async def capture_lead(lead: LeadCapture):
     try:
         if lead.source == "readiness_assessment" and lead.score is not None:
             await send_email(
-                to_email=lead.email,
-                template="readiness_report",
+                to=lead.email,
+                template_name="readiness_report",
                 variables={
                     "name": lead.contact_name or "there",
                     "company": lead.company_name or "your company",
                     "score": lead.score,
                     "readiness_level": lead.readiness_level or "Unknown",
                     "phase_scores": lead.phase_scores or {},
+                },
+            )
+        elif lead.source == "pilot_application":
+            metadata = lead.metadata or {}
+            await send_email(
+                to=ADMIN_EMAIL,
+                template_name="admin_pilot_notification",
+                variables={
+                    "company_name": lead.company_name or "Unknown",
+                    "contact_name": lead.contact_name or "Unknown",
+                    "email": lead.email,
+                    "designation": metadata.get("designation", "N/A") if isinstance(metadata, dict) else "N/A",
+                    "cin": metadata.get("cin", "N/A") if isinstance(metadata, dict) else "N/A",
+                    "market_cap_range": metadata.get("market_cap_range", "N/A") if isinstance(metadata, dict) else "N/A",
+                    "current_method": metadata.get("current_method", "N/A") if isinstance(metadata, dict) else "N/A",
+                    "pain_points": metadata.get("pain_points", "N/A") if isinstance(metadata, dict) else "N/A",
+                    "submitted_at": datetime.utcnow().strftime("%d %b %Y, %H:%M UTC"),
                 },
             )
     except Exception:
