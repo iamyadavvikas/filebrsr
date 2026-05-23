@@ -148,7 +148,7 @@ const timeline = [
 const valueTable = [
   { pain: "How to assess 500 suppliers?", who: "Enterprise compliance", solution: "One-click invite → auto-scored questionnaire", value: "Months → minutes" },
   { pain: "I fill 10 different ESG forms", who: "Supplier / SME", solution: "Fill once → shareable badge", value: "One assessment, prove to all" },
-  { pain: "BRSR filing costs ₹15L", who: "Listed company", solution: "AI extracts 337 datapoints from PDF", value: "₹15L → ₹50K" },
+  { pain: "BRSR filing costs ₹15L", who: "Listed company", solution: "AI extracts 337 datapoints from PDF", value: "₹15L → ₹49,999/yr" },
   { pain: "We reduce emissions but can't monetize", who: "Net Zero teams", solution: "Carbon credit generation via India CCTS", value: "Reductions → revenue" },
   { pain: "Are we compliant?", who: "Board / CFO", solution: "Instant gap analysis + scoring", value: "Real-time visibility" },
   { pain: "Show your process to auditors", who: "Assurance team", solution: "Structured audit trail", value: "Audit-ready from day 1" },
@@ -169,12 +169,12 @@ const platformFeatures = [
 const faqs = [
   { q: "What is FileBRSR?", a: "FileBRSR is India's ESG infrastructure platform built on three pillars: AI-powered BRSR filing, supply chain ESG ratings, and carbon market facilitation. We help listed companies automate compliance, assess suppliers, and monetize emission reductions." },
   { q: "Who needs this?", a: "SEBI mandates the top 1,000 listed companies to disclose value chain ESG data (BRSR Section A.V). This means 50,000–100,000 suppliers need to prove ESG readiness. FileBRSR serves both sides — enterprises assessing suppliers, and SMEs proving compliance." },
-  { q: "How is this different from consultants?", a: "Consultants charge ₹5–15L/year, take months, use Excel, and provide no standardized scoring. FileBRSR automates the entire process — assessment, scoring, gap analysis, and filing — for a fraction of the cost with instant results." },
+  { q: "How is this different from consultants?", a: "Consultants charge ₹5–15L/year, take months, use Excel, and provide no standardized scoring. FileBRSR automates the entire process — assessment, scoring, gap analysis, and filing — starting at ₹9,999/year with instant results." },
   { q: "How do supplier assessments work?", a: "Enterprise users add suppliers and send invite links. Suppliers complete a 20-question ESG questionnaire (no signup needed). Scores are auto-calculated across Environment (40%), Social (35%) & Governance (25%) dimensions." },
   { q: "What are FileBRSR badges?", a: "Based on assessment scores and industry percentile ranking, suppliers earn Platinum (top 1%), Gold (top 5%), Silver (top 15%), or Bronze (top 35%) badges. These are publicly shareable to attract new business." },
   { q: "How does the carbon market work?", a: "FileBRSR calculates Scope 1/2/3 emissions from your BRSR data, tracks year-over-year reductions, and connects verified reductions to India's Carbon Credit Trading Scheme (CCTS). Suppliers can generate carbon credits from proven reductions — we facilitate the trade at 2% transaction fee." },
   { q: "Does it support BRSR filing?", a: "Yes. Upload any sustainability PDF and AI extracts all 337 BRSR datapoints in 60 seconds. Includes gap analysis, scoring, XBRL generation, and multi-framework mapping (GRI, CDP, TCFD, SASB)." },
-  { q: "What's the pricing model?", a: "Suppliers get assessed FREE. Enterprises pay ₹50K/year (Pro) or ₹5–15L/year (Enterprise) based on supplier count and features needed. Carbon market transactions: 2% fee." },
+  { q: "What's the pricing model?", a: "Suppliers get assessed FREE. Plans start at ₹9,999/year (Starter), ₹49,999/year (Pro with 25 suppliers), or custom pricing for Enterprise. Single reports available at ₹2,500 each — no subscription needed." },
 ];
 
 /* ═══════════════════════════════════════════════════════════════
@@ -548,46 +548,64 @@ export default function HomePage() {
                 PRICING
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 14 }}>
-                Simple pricing. Massive ROI.
+                Replace ₹15L consultants with one tool
               </h2>
-              <p className="text-muted" style={{ fontSize: 15 }}>Suppliers get assessed <strong>free</strong>. Enterprises pay to unlock the full platform.</p>
+              <p className="text-muted" style={{ fontSize: 15 }}>Companies pay ₹5–15 lakhs annually for manual BRSR compilation. FileBRSR does it in seconds.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Pay-per-report highlight */}
+            <div className="mb-8 flex flex-col md:flex-row items-center justify-between gap-4 rounded-2xl border-2 border-emerald-200 p-6" style={{ background: "linear-gradient(135deg, rgba(27,77,62,0.03), rgba(232,185,49,0.05))" }}>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-amber-600 bg-amber-50 px-2 py-0.5 rounded">MOST FLEXIBLE</span>
+                <h3 className="text-xl font-bold mt-1">Pay Per Report — <span className="text-emerald-600">₹2,500</span></h3>
+                <p className="text-sm text-muted">Full BRSR analysis + NIFTY 50 benchmarks + PDF. No subscription.</p>
+              </div>
+              <a href="/pricing" className="whitespace-nowrap px-6 py-3 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">See All Plans →</a>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
               <div className="bg-card rounded-2xl border border-border p-7">
                 <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">FREE FOREVER</p>
                 <h3 className="text-3xl font-bold mb-1">₹0</h3>
                 <p className="text-sm text-muted mb-6">For suppliers / SMEs</p>
                 <ul className="space-y-2.5 text-sm text-gray-600">
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> ESG self-assessment</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Public scorecard URL</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Shareable badge</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Scorecard & badge</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Industry benchmark</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 3 AI BRSR extractions</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 3 AI extractions (one-time)</li>
                 </ul>
-
+              </div>
+              <div className="bg-card rounded-2xl border border-border p-7">
+                <p className="text-xs font-bold text-sky-600 uppercase tracking-wider mb-2">STARTER</p>
+                <h3 className="text-3xl font-bold mb-1">₹9,999<span className="text-base font-normal text-muted">/yr</span></h3>
+                <p className="text-sm text-muted mb-6">For companies exploring BRSR</p>
+                <ul className="space-y-2.5 text-sm text-gray-600">
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 5 AI extractions/month</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Full BRSR filing</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Gap analysis & scoring</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> PDF export</li>
+                </ul>
               </div>
               <div className="bg-card rounded-2xl border-2 border-emerald-300 p-7 relative shadow-lg">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full">MOST POPULAR</div>
                 <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">PRO</p>
-                <h3 className="text-3xl font-bold mb-1">₹50K<span className="text-base font-normal text-muted">/year</span></h3>
-                <p className="text-sm text-muted mb-6">For mid-size listed companies</p>
+                <h3 className="text-3xl font-bold mb-1">₹49,999<span className="text-base font-normal text-muted">/yr</span></h3>
+                <p className="text-sm text-muted mb-6">For listed companies</p>
                 <ul className="space-y-2.5 text-sm text-gray-600">
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Full BRSR filing (AI)</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Assess up to 50 suppliers</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Gap analysis & scoring</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Multi-framework mapping</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Unlimited AI extractions</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 25 supplier assessments</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Multi-framework (GRI, CDP, TCFD)</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> NIFTY 50 benchmarks</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Carbon calculator</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> XBRL export</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> PDF + XBRL-JSON export</li>
                 </ul>
-                <p className="mt-5 text-xs font-semibold text-emerald-700">Replaces ₹5–15L/year consulting</p>
               </div>
               <div className="bg-card rounded-2xl border border-border p-7">
                 <p className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-2">ENTERPRISE</p>
-                <h3 className="text-3xl font-bold mb-1">₹5–15L<span className="text-base font-normal text-muted">/year</span></h3>
-                <p className="text-sm text-muted mb-6">For top 250 listed companies</p>
+                <h3 className="text-3xl font-bold mb-1">Custom</h3>
+                <p className="text-sm text-muted mb-6">For large listed companies</p>
                 <ul className="space-y-2.5 text-sm text-gray-600">
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Unlimited supplier assessments</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Unlimited suppliers</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> XBRL filing generation</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Audit trail & compliance</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Dedicated account manager</li>
@@ -595,11 +613,18 @@ export default function HomePage() {
                 <p className="mt-4 text-[10px] font-bold text-amber-600 uppercase tracking-wider">ROADMAP (Q3 2026)</p>
                 <ul className="mt-1.5 space-y-1.5 text-sm text-gray-400">
                   <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">◇</span> API & SAP/ERP integration</li>
-                  <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">◇</span> Workflow approvals (maker-checker)</li>
+                  <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">◇</span> Workflow approvals</li>
                   <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">◇</span> Multi-user + SSO</li>
                 </ul>
               </div>
             </div>
+
+            <div className="flex justify-center gap-6 mt-6 text-xs text-muted">
+              <span>✓ No credit card for free tier</span>
+              <span>✓ Cancel anytime</span>
+              <span>✓ GST invoice included</span>
+            </div>
+            <p className="mt-3 text-center text-xs text-muted opacity-70">Used by compliance teams preparing FY2025-26 and FY2026-27 BRSR filings</p>
           </div>
         </section>
 
