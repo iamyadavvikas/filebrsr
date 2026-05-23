@@ -43,29 +43,48 @@ const plans = [
     period: "forever",
     desc: "For suppliers / SMEs getting assessed",
     reports: "Unlimited self-assessments",
-    features: ["ESG self-assessment", "Basic scorecard", "1 shareable badge", "Industry benchmark", "3 AI extractions"],
+    features: ["ESG self-assessment", "Basic scorecard", "1 shareable badge", "Industry benchmark", "3 AI extractions (one-time)"],
     cta: "Start Free",
+    popular: false,
+    ctaBg: "white", ctaColor: "#1B4D3E", ctaBorder: "1px solid #E5E7DF",
+  },
+  {
+    key: "starter",
+    name: "Starter",
+    price: "₹9,999",
+    period: "/year",
+    monthlyEquiv: "₹833/month",
+    desc: "For companies exploring AI-powered BRSR filing",
+    reports: "5 AI extractions/month",
+    features: [
+      "Full BRSR filing (AI extraction)",
+      "5 AI reports per month",
+      "Gap analysis & scoring",
+      "PDF export",
+      "Email support",
+    ],
+    cta: "Subscribe",
     popular: false,
     ctaBg: "white", ctaColor: "#1B4D3E", ctaBorder: "1px solid #E5E7DF",
   },
   {
     key: "pro",
     name: "Pro",
-    price: "₹50,000",
+    price: "₹49,999",
     period: "/year",
     monthlyEquiv: "₹4,167/month",
-    desc: "For mid-size companies assessing suppliers",
-    reports: "25 suppliers + 10 AI reports/month",
+    desc: "For listed companies with full BRSR + supplier needs",
+    reports: "Unlimited AI reports + 25 suppliers",
     features: [
-      "Assess 25 suppliers",
-      "Full BRSR filing (AI extraction)",
-      "10 AI reports per month",
-      "Gap analysis & scoring",
+      "Unlimited AI extractions",
+      "Full BRSR filing + gap analysis",
+      "Assess up to 25 suppliers",
       "Multi-framework mapping (GRI, CDP, TCFD)",
       "NIFTY 50 sector benchmarks",
       "Carbon calculator",
       "PDF + XBRL-JSON export",
-      "Email support",
+      "5 users",
+      "Priority email support",
     ],
     cta: "Subscribe",
     popular: true,
@@ -74,14 +93,13 @@ const plans = [
   {
     key: "enterprise",
     name: "Enterprise",
-    price: "₹5-15L",
-    period: "/year",
-    desc: "For listed companies with large supply chains",
-    reports: "Unlimited suppliers + reports",
+    price: "Custom",
+    period: "",
+    desc: "For large listed companies with 100+ suppliers",
+    reports: "Unlimited everything",
     features: [
-      "Unlimited suppliers",
-      "Unlimited AI reports",
       "Everything in Pro +",
+      "Unlimited suppliers",
       "XBRL filing generation",
       "Audit trail & compliance",
       "Dedicated account manager",
@@ -100,18 +118,18 @@ const plans = [
 ];
 
 const comparisonData = [
-  { feature: "Supplier assessments", free: "Self only", pro: "25 suppliers", enterprise: "Unlimited" },
-  { feature: "AI report extractions", free: "3 total", pro: "10/month", enterprise: "Unlimited" },
-  { feature: "ESG scorecard & badge", free: "✓", pro: "✓", enterprise: "✓" },
-  { feature: "Gap analysis", free: "Basic", pro: "Full", enterprise: "Full" },
-  { feature: "Multi-framework mapping", free: "—", pro: "✓", enterprise: "✓" },
-  { feature: "NIFTY 50 benchmarks", free: "—", pro: "✓", enterprise: "✓" },
-  { feature: "Carbon calculator", free: "—", pro: "✓", enterprise: "✓" },
-  { feature: "XBRL filing", free: "—", pro: "—", enterprise: "✓" },
-  { feature: "Workflow approvals", free: "—", pro: "—", enterprise: "Q3 2026" },
-  { feature: "API access", free: "—", pro: "—", enterprise: "Q3 2026" },
-  { feature: "Users", free: "1", pro: "5", enterprise: "Unlimited (SSO Q3 2026)" },
-  { feature: "Support", free: "Community", pro: "Email", enterprise: "Dedicated" },
+  { feature: "AI report extractions", free: "3 (one-time)", starter: "5/month", pro: "Unlimited", enterprise: "Unlimited" },
+  { feature: "Supplier assessments", free: "Self only", starter: "—", pro: "25 suppliers", enterprise: "Unlimited" },
+  { feature: "ESG scorecard & badge", free: "✓", starter: "✓", pro: "✓", enterprise: "✓" },
+  { feature: "Gap analysis", free: "Basic", starter: "Full", pro: "Full", enterprise: "Full" },
+  { feature: "Multi-framework mapping", free: "—", starter: "—", pro: "✓", enterprise: "✓" },
+  { feature: "NIFTY 50 benchmarks", free: "—", starter: "—", pro: "✓", enterprise: "✓" },
+  { feature: "Carbon calculator", free: "—", starter: "—", pro: "✓", enterprise: "✓" },
+  { feature: "XBRL filing", free: "—", starter: "—", pro: "Export only", enterprise: "Full generation" },
+  { feature: "Workflow approvals", free: "—", starter: "—", pro: "—", enterprise: "Q3 2026" },
+  { feature: "API access", free: "—", starter: "—", pro: "—", enterprise: "Q3 2026" },
+  { feature: "Users", free: "1", starter: "1", pro: "5", enterprise: "Unlimited (SSO Q3 2026)" },
+  { feature: "Support", free: "Community", starter: "Email", pro: "Priority email", enterprise: "Dedicated" },
 ];
 
 export default function PricingPage() {
@@ -129,7 +147,7 @@ export default function PricingPage() {
 
     setLoadingPlan(planKey);
     try {
-      const isSubscription = planKey === "pro";
+      const isSubscription = planKey === "pro" || planKey === "starter";
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const endpoint = isSubscription
         ? `${backendUrl}/api/billing/create-subscription`
@@ -207,13 +225,46 @@ export default function PricingPage() {
               <span>✓ Cancel anytime</span>
               <span>✓ GST invoice included</span>
             </div>
+            <p className="mt-4 text-center" style={{ fontSize: 12, color: "var(--muted)", opacity: 0.7 }}>
+              Used by compliance teams preparing FY2025-26 and FY2026-27 BRSR filings
+            </p>
           </div>
         </section>
 
         {/* Plans Grid */}
         <section style={{ padding: "0 28px 64px" }}>
           <div className="max-w-[1100px] mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5" style={{ alignItems: "start" }}>
+            {/* Pay-per-report — prominent option */}
+            <div
+              className="mb-8 flex flex-col md:flex-row items-center justify-between gap-6"
+              style={{ borderRadius: 20, padding: "24px 32px", background: "linear-gradient(135deg, rgba(27,77,62,0.04), rgba(232,185,49,0.06))", border: "2px solid var(--primary-light)" }}
+            >
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#D97706", background: "rgba(217,119,6,0.1)", padding: "3px 8px", borderRadius: 6 }}>MOST FLEXIBLE</span>
+                </div>
+                <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4, color: "var(--foreground)" }}>
+                  Pay Per Report — <span style={{ color: "var(--primary-light)" }}>₹2,500</span>
+                </h3>
+                <p style={{ fontSize: 14, color: "var(--muted)" }}>
+                  Full BRSR analysis with NIFTY 50 benchmarks, gap analysis, and branded PDF. No subscription, no commitment.
+                </p>
+              </div>
+              <button
+                onClick={() => handlePurchase("pay_per_report")}
+                disabled={loadingPlan === "pay_per_report"}
+                className="flex items-center gap-2 whitespace-nowrap"
+                style={{
+                  padding: "14px 32px", borderRadius: 12, fontSize: 15, fontWeight: 700,
+                  background: "var(--primary-light)", color: "white", cursor: "pointer", border: "none",
+                }}
+              >
+                {loadingPlan === "pay_per_report" && <Loader2 className="w-4 h-4 animate-spin" />}
+                Buy Single Report →
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5" style={{ alignItems: "start" }}>
               {plans.map((p) => (
                 <div
                   key={p.key}
@@ -287,32 +338,6 @@ export default function PricingPage() {
               ))}
             </div>
 
-            {/* Pay-per-report callout */}
-            <div
-              className="mt-8 flex flex-col md:flex-row items-center justify-between gap-6"
-              style={{ border: "1px solid var(--border)", borderRadius: 20, padding: "28px 32px", background: "var(--card)" }}
-            >
-              <div>
-                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4, color: "var(--foreground)" }}>
-                  Just need one report? <span style={{ color: "var(--primary-light)" }}>₹2,500 per report</span>
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--muted)" }}>
-                  Full analysis with NIFTY 50 benchmarks, ESRS mapping, and branded PDF — no subscription needed.
-                </p>
-              </div>
-              <button
-                onClick={() => handlePurchase("pay_per_report")}
-                disabled={loadingPlan === "pay_per_report"}
-                className="flex items-center gap-2 whitespace-nowrap"
-                style={{
-                  padding: "12px 28px", borderRadius: 12, fontSize: 14, fontWeight: 700,
-                  border: "2px solid var(--primary-light)", background: "var(--card)", color: "var(--primary-light)", cursor: "pointer",
-                }}
-              >
-                {loadingPlan === "pay_per_report" && <Loader2 className="w-4 h-4 animate-spin" />}
-                Buy Single Report
-              </button>
-            </div>
           </div>
         </section>
 
@@ -328,6 +353,7 @@ export default function PricingPage() {
                   <tr style={{ background: "var(--surface)" }}>
                     <th style={{ padding: "14px 16px", textAlign: "left", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Feature</th>
                     <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Free</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Starter</th>
                     <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>Pro</th>
                     <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Enterprise</th>
                   </tr>
@@ -337,6 +363,7 @@ export default function PricingPage() {
                     <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
                       <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500, color: "var(--foreground)" }}>{row.feature}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.free}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.starter}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", fontWeight: 600, color: "var(--primary)" }}>{row.pro}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.enterprise}</td>
                     </tr>
