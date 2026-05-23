@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  frontend:
+  frontend-lint-build:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -20,12 +20,14 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-key-for-build
 
-  backend:
+  backend-lint-test:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -36,8 +38,31 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt
-      - run: python -m py_compile app/main.py
-      - run: python -m py_compile app/config.py
-      - run: python -m py_compile app/extraction_enhanced.py
-      - run: python -m py_compile app/pdf_generator.py
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check app/
+      - run: ruff format --check app/
+      - run: pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
+        env:
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_SERVICE_KEY: test-key
+          ALLOWED_ORIGINS: http://localhost:3000
+
+  deploy:
+    needs: [frontend-lint-build, backend-lint-test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/filebrsr
+            git pull origin main
+            docker-compose -f docker-compose.prod.yml build --no-cache
+            docker-compose -f docker-compose.prod.yml up -d
+            docker-compose -f docker-compose.prod.yml restart nginx
+            docker image prune -f

@@ -1,11 +1,33 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pdfplumber
 import io
+import time
+import logging
+import sentry_sdk
 from supabase import create_client
 
 from app.config import get_settings
+
+# ─── Structured Logging ───────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
+logger = logging.getLogger("filebrsr")
+
+# ─── Sentry Error Tracking ────────────────────────────────────
+_settings = get_settings()
+if _settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=_settings.SENTRY_DSN,
+        traces_sample_rate=0.2,
+        profiles_sample_rate=0.1,
+        environment=_settings.ENVIRONMENT,
+    )
+    logger.info("Sentry initialized for %s", _settings.ENVIRONMENT)
 from app.extraction import extract_with_regex, calculate_confidence
 from app.extraction_enhanced import extract_enhanced
 from app.ai_extraction import extract_with_ai
@@ -45,6 +67,20 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
+
+
+# ─── Request Logging Middleware ────────────────────────────────
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration = time.time() - start
+    if duration > 2.0 or response.status_code >= 400:
+        logger.warning(
+            "%s %s → %d (%.2fs)",
+            request.method, request.url.path, response.status_code, duration,
+        )
+    return response
 
 
 def get_supabase_admin():
@@ -385,7 +421,16 @@ async def extract_brsr_async(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "2.0.0"}
+    """Health check with dependency verification."""
+    checks = {"api": "ok", "version": "4.0.0", "environment": settings.ENVIRONMENT}
+    try:
+        supabase = get_supabase_admin()
+        supabase.table("reports").select("id").limit(1).execute()
+        checks["database"] = "ok"
+    except Exception as e:
+        checks["database"] = f"degraded: {type(e).__name__}"
+        logger.error("Health check DB failure: %s", e)
+    return checks
 
 
 class PDFReportRequest(BaseModel):
