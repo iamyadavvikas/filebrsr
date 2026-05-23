@@ -14,6 +14,7 @@ import {
   Sparkles,
   X,
   Download,
+  RotateCcw,
 } from "lucide-react";
 import { SECTIONS, TOTAL_DATAPOINTS, MANDATORY_DATAPOINTS, CORE_DATAPOINTS, LEADERSHIP_DATAPOINTS } from "./brsr-fields";
 
@@ -224,6 +225,15 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
       console.error("Save all failed:", err);
     }
     setSaving(false);
+  }
+
+  function handleResetSection() {
+    const fieldIds = currentSubsection.fields.map((f) => f.id);
+    setFormData((prev) => {
+      const updated = { ...prev };
+      fieldIds.forEach((id) => { updated[id] = ""; });
+      return updated;
+    });
   }
 
   async function handleDownloadExcel() {
@@ -438,6 +448,13 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
               />
             </div>
             <button
+              onClick={handleResetSection}
+              className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset
+            </button>
+            <button
               onClick={handleSave}
               disabled={saving}
               className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
@@ -506,18 +523,36 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                     />
                   ) : field.type === "select" ? (
-                    <select
-                      value={formData[field.id] || ""}
-                      onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    >
-                      <option value="">Select...</option>
-                      {field.options?.map((opt: string) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <select
+                        value={field.options?.includes(formData[field.id] || "") ? formData[field.id] : (formData[field.id] ? "__other__" : "")}
+                        onChange={(e) => {
+                          if (e.target.value === "__other__") {
+                            handleFieldChange(field.id, "");
+                          } else {
+                            handleFieldChange(field.id, e.target.value);
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      >
+                        <option value="">Select...</option>
+                        {field.options?.map((opt: string) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                        <option value="__other__">Other (type below)</option>
+                      </select>
+                      {(!field.options?.includes(formData[field.id] || "") && formData[field.id] !== "") || (field.options && !field.options.includes(formData[field.id] || "") && formData[field.id]) ? (
+                        <input
+                          type="text"
+                          value={formData[field.id] || ""}
+                          onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                          placeholder="Type custom value..."
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      ) : null}
+                    </div>
                   ) : (
                     <input
                       type={field.type === "number" ? "number" : "text"}
