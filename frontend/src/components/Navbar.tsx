@@ -48,8 +48,9 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
     { href: "/", label: "Home" },
     { href: "/products", label: "Products & Services" },
     { href: "/about", label: "About Us" },
-    { href: "/contact", label: "Contact" },
     { href: "/pricing", label: "Pricing" },
+    { href: "/pilot", label: "Pilot Program" },
+    { href: "/contact", label: "Contact" },
   ];
 
   const handleSignOut = async () => {

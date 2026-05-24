@@ -28,6 +28,7 @@ export default function Footer() {
                 { label: "Carbon Calculator", href: "/platform/carbon" },
                 { label: "Assess Suppliers", href: "/platform/supply-chain" },
                 { label: "BRSR Platform", href: "/platform" },
+                { label: "Pilot Program", href: "/pilot" },
                 { label: "Pricing", href: "/pricing" },
               ].map((l) => (
                 <li key={l.label}>

@@ -19,7 +19,7 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-lg font-bold mt-6 mb-2">1. Introduction</h2>
               <p className="text-sm text-gray-600 leading-relaxed">
-                FileBRSR Technologies Pvt. Ltd. (&quot;FileBRSR&quot;, &quot;we&quot;, &quot;us&quot;) is committed to protecting the privacy and security of your personal information. This policy explains how we collect, use, store, and protect data when you use our platform at filebrsr.com.
+                FileBRSR (&quot;we&quot;, &quot;us&quot;) is committed to protecting the privacy and security of your personal information. This policy explains how we collect, use, store, and protect data when you use our platform at filebrsr.com.
               </p>
             </section>
 
@@ -124,7 +124,7 @@ export default function PrivacyPage() {
                 For privacy-related questions or to exercise your data rights:<br />
                 <strong>Email:</strong> support@filebrsr.com<br />
                 <strong>Data Protection Officer:</strong> dpo@filebrsr.com<br />
-                <strong>Address:</strong> FileBRSR Technologies Pvt. Ltd., Bengaluru, Karnataka, India
+                <strong>Website:</strong> filebrsr.com
               </p>
             </section>
           </div>

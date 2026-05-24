@@ -73,7 +73,7 @@ const products = [
       "Multi-framework mapping (GRI, CDP, TCFD, SASB)",
       "Board-ready ESG dashboards",
     ],
-    cta: "Try BRSR Platform",
+    cta: "Try BRSR Platform (5-min free trial)",
   },
 ];
 
