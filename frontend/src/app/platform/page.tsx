@@ -21,15 +21,13 @@ export default async function PlatformPage() {
 
   // Fetch user profile for usage counter (gracefully handle missing columns)
   let profile = null;
-  let onboardingCompleted = false;
   try {
     const { data } = await admin
       .from("profiles")
-      .select("plan, credits_remaining, extractions_this_month, month_reset_at, onboarding_completed, company_name")
+      .select("plan, credits_remaining, extractions_this_month, month_reset_at, company_name")
       .eq("id", user.id)
       .single();
     profile = data;
-    onboardingCompleted = !!(data?.onboarding_completed || data?.company_name);
   } catch {
     // If columns don't exist yet, try minimal query
     try {
@@ -44,5 +42,5 @@ export default async function PlatformPage() {
     }
   }
 
-  return <PlatformOverview userId={user.id} initialReports={reports || []} userProfile={profile} onboardingCompleted={onboardingCompleted} />;
+  return <PlatformOverview userId={user.id} initialReports={reports || []} userProfile={profile} />;
 }
