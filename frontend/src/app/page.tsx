@@ -790,7 +790,7 @@ export default function HomePage() {
                 <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-4">FileBRSR (Built for India)</p>
                 <ul className="space-y-3 text-sm text-gray-600">
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Native BRSR schema — all 140 SEBI BRSR indicators (Essential + Leadership) mapped and extracted by AI</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Starts free for suppliers, ₹9,999/year for Starter, ₹49,999/year for Pro</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Starts free for 5 suppliers, ₹49,999/year for Growth, ₹1,99,999/year for Scale</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Carbon calculator with India-specific factors (CCTS marketplace on roadmap)</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Hindi and regional language support (roadmap Q4 2026)</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> XBRL-JSON generation for direct BSE/NSE filing</li>
