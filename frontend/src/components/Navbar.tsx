@@ -46,10 +46,10 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
 
   const navLinks = [
     { href: "/", label: "Home" },
-    { href: "/platform/supply-chain", label: "Supply Chain" },
-    { href: "/platform/carbon", label: "Carbon" },
+    { href: "/products", label: "Products & Services" },
+    { href: "/about", label: "About Us" },
     { href: "/pricing", label: "Pricing" },
-    { href: "/about", label: "About" },
+    { href: "/pilot", label: "Pilot Program" },
     { href: "/contact", label: "Contact" },
   ];
 
