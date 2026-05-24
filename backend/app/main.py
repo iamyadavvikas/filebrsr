@@ -49,6 +49,8 @@ from app.router_market import router as market_router
 from app.excel_import import router as excel_import_router
 from app.router_cron import router as cron_router
 from app.xbrl_export import router as xbrl_router
+from app.xbrl_filing import router as xbrl_filing_router
+from app.sebi_pdf_filing import router as sebi_pdf_router
 from app.router_trends import router as trends_router
 
 app = FastAPI(title="FileBRSR Platform API", version="4.0.0")
@@ -66,6 +68,8 @@ app.include_router(market_router)
 app.include_router(excel_import_router)
 app.include_router(cron_router)
 app.include_router(xbrl_router)
+app.include_router(xbrl_filing_router)
+app.include_router(sebi_pdf_router)
 app.include_router(trends_router)
 
 app.add_middleware(

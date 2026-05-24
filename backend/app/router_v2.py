@@ -34,7 +34,6 @@ from typing import Optional
 
 import pdfplumber
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.config import get_settings
@@ -52,7 +51,6 @@ from app.cross_framework_mapping import (
 )
 from app.validation_engine import validate_brsr_data, validate_year_over_year
 from app.scoring import calculate_brsr_score
-from app.template_generator import generate_brsr_excel, generate_brsr_core_excel
 from app.nifty50_benchmarks import SECTOR_BENCHMARKS, get_benchmark_comparison
 from app.api_keys import validate_api_key, check_feature_access
 
@@ -78,11 +76,6 @@ class YoYCompareRequest(BaseModel):
     current_data: dict
     previous_data: dict
     threshold_pct: float = 50.0
-
-
-class GenerateTemplateRequest(BaseModel):
-    extracted_data: dict
-    company_name: str = "Company"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -359,54 +352,6 @@ async def get_framework_coverage(
     """Check how well your extracted data covers each international framework."""
     await check_feature_access(api_key_data, "mapping")
     return generate_cross_framework_report(req.extracted_data)
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# TEMPLATE GENERATION
-# ═══════════════════════════════════════════════════════════════════════
-
-
-@router.post("/generate/brsr-template")
-async def generate_template(
-    req: GenerateTemplateRequest,
-    api_key_data: dict = Depends(validate_api_key),
-):
-    """Generate a SEBI BRSR format Excel workbook from extracted data."""
-    await check_feature_access(api_key_data, "template")
-
-    try:
-        excel_bytes = generate_brsr_excel(req.extracted_data, req.company_name)
-    except ImportError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    filename = f"BRSR_{req.company_name.replace(' ', '_')}.xlsx"
-    return StreamingResponse(
-        io.BytesIO(excel_bytes),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
-
-
-@router.post("/generate/brsr-core")
-async def generate_core_template(
-    req: ExtractedDataRequest,
-    api_key_data: dict = Depends(validate_api_key),
-):
-    """Generate BRSR Core assurance-ready Excel (subset for auditors)."""
-    await check_feature_access(api_key_data, "template")
-
-    try:
-        excel_bytes = generate_brsr_core_excel(req.extracted_data)
-    except ImportError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    company = req.extracted_data.get("section_a", {}).get("company_name", "Company")
-    filename = f"BRSR_Core_{company.replace(' ', '_')}.xlsx"
-    return StreamingResponse(
-        io.BytesIO(excel_bytes),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
 
 
 # ═══════════════════════════════════════════════════════════════════════
