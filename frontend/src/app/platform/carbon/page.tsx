@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import CarbonClient from "./CarbonClient";
 
@@ -8,7 +7,6 @@ export default async function CarbonPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
-
+  // Allow guest access (no redirect)
   return <CarbonClient />;
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AnalyticsProvider } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -34,7 +34,19 @@ import {
   PieChart,
   Menu,
   X,
+  LogIn,
 } from "lucide-react";
+
+const FOUNDER_EMAILS = [
+  "ydvikasiitkgp@gmail.com",
+  "ydvikas.iitkgp@gmail.com",
+  "vkyadav.iitkgp@gmail.com",
+  "vikaskashi896@gmail.com",
+  "yvikas.free@gmail.com",
+];
+
+// Pages accessible without login (guest trial)
+const GUEST_ALLOWED_PATHS = ["/platform/data-entry", "/platform/carbon"];
 
 // Grouped by ESG compliance workflow priority
 const navGroups = [
@@ -98,26 +110,56 @@ export default function PlatformLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isFounder, setIsFounder] = useState(false);
+  const [isGuest, setIsGuest] = useState(true); // default guest until auth resolves
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [guestExpired, setGuestExpired] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
         setUserId(data.user.id);
+        setUserEmail(data.user.email || null);
+        setIsGuest(false);
+        const founder = FOUNDER_EMAILS.includes(data.user.email || "");
+        setIsFounder(founder);
         // Check admin status
         supabase.from("profiles").select("is_admin").eq("id", data.user.id).single().then(({ data: profile }) => {
           if (profile?.is_admin) setIsAdmin(true);
         });
+      } else {
+        setIsGuest(true);
       }
     });
   }, []);
 
-  // 15-minute inactivity timeout
+  // 5-minute guest trial timer
+  useEffect(() => {
+    if (!isGuest) return;
+    const GUEST_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+    const timer = setTimeout(() => {
+      setGuestExpired(true);
+    }, GUEST_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [isGuest]);
+
+  // Route guard: non-founder logged-in users can only access data-entry & carbon
+  useEffect(() => {
+    if (isGuest || isFounder || !pathname) return;
+    const isAllowed = GUEST_ALLOWED_PATHS.some((p) => pathname.startsWith(p)) || pathname === "/platform";
+    if (!isAllowed) {
+      router.replace("/platform/data-entry");
+    }
+  }, [pathname, isGuest, isFounder, router]);
+
+  // 15-minute inactivity timeout (only for logged-in users)
   useEffect(() => {
     let timeout: NodeJS.Timeout;
     const TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
@@ -155,11 +197,15 @@ export default function PlatformLayout({
     .flatMap((g) => g.items)
     .find((item) => pathname === item.href || (item.href !== "/platform" && pathname?.startsWith(item.href)));
 
-  // Filter nav items: hide Analytics for non-admins
+  // Filter nav items: restrict access based on role
   const filteredNavGroups = navGroups.map(group => ({
     ...group,
     items: group.items.filter(item => {
       if (item.href === "/platform/analytics" && !isAdmin) return false;
+      // Guests and non-founder users only see data-entry & carbon
+      if (!isFounder && !isAdmin) {
+        return GUEST_ALLOWED_PATHS.some((p) => item.href.startsWith(p));
+      }
       return true;
     }),
   })).filter(group => group.items.length > 0);
@@ -185,6 +231,33 @@ export default function PlatformLayout({
             >
               Log In Again
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Guest Trial Expired Modal */}
+      {guestExpired && isGuest && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center">
+            <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <LogIn className="w-7 h-7 text-emerald-600" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Free Trial Ended</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Your 5-minute free trial has ended. Sign up to continue using Data Entry and Carbon Calculator — it&apos;s free!
+            </p>
+            <Link
+              href="/signup"
+              className="block w-full px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 transition-colors mb-3"
+            >
+              Sign Up Free
+            </Link>
+            <Link
+              href="/login"
+              className="block w-full px-5 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors"
+            >
+              Already have an account? Log In
+            </Link>
           </div>
         </div>
       )}

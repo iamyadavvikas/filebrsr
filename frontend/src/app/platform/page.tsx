@@ -8,7 +8,7 @@ export default async function PlatformPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) redirect("/platform/data-entry");
 
   // Fetch reports server-side using admin client (bypasses RLS)
   const admin = createAdminClient();
