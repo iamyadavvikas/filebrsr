@@ -36,6 +36,9 @@ export default function SupplyChainClient() {
   const [showCsvUpload, setShowCsvUpload] = useState(false);
   const [inviteUrl, setInviteUrl] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [showUpgradeGate, setShowUpgradeGate] = useState(false);
+
+  const FREE_SUPPLIER_LIMIT = 5;
 
   const fetchSuppliers = useCallback(async () => {
     try {
@@ -102,7 +105,10 @@ export default function SupplyChainClient() {
           <button onClick={() => setShowCsvUpload(true)} className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50">
             <Upload className="w-4 h-4" /> CSV Upload
           </button>
-          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">
+          <button onClick={() => {
+            if (suppliers.length >= FREE_SUPPLIER_LIMIT) { setShowUpgradeGate(true); return; }
+            setShowAddModal(true);
+          }} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">
             <Plus className="w-4 h-4" /> Add Supplier
           </button>
         </div>
@@ -127,6 +133,22 @@ export default function SupplyChainClient() {
           <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
         </div>
       </div>
+
+      {/* Free plan usage bar */}
+      {suppliers.length > 0 && (
+        <div className="bg-white rounded-xl border p-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-gray-700">Free Plan Usage</span>
+            <span className="text-xs text-gray-500">{suppliers.length}/{FREE_SUPPLIER_LIMIT} suppliers</span>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-2">
+            <div className={`h-2 rounded-full transition-all ${suppliers.length >= FREE_SUPPLIER_LIMIT ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${Math.min((suppliers.length / FREE_SUPPLIER_LIMIT) * 100, 100)}%` }}></div>
+          </div>
+          {suppliers.length >= FREE_SUPPLIER_LIMIT && (
+            <p className="text-xs text-amber-600 mt-2">Limit reached — <a href="/pricing" className="underline font-medium">upgrade to add more</a></p>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-3 items-center flex-wrap">
@@ -309,6 +331,39 @@ export default function SupplyChainClient() {
 
       {/* CSV Upload Modal */}
       {showCsvUpload && <CsvUploadModal onClose={() => setShowCsvUpload(false)} onUploaded={fetchSuppliers} />}
+
+      {/* Upgrade Gate Modal */}
+      {showUpgradeGate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-xl text-center">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-amber-600" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Free Plan Limit Reached</h3>
+            <p className="text-gray-600 text-sm mb-4">
+              You&apos;ve used all <strong>{FREE_SUPPLIER_LIMIT}</strong> free supplier slots.
+              Upgrade to Growth to assess up to 25 suppliers, or Scale for unlimited.
+            </p>
+            <div className="bg-gray-50 rounded-lg p-3 mb-6">
+              <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <span>Suppliers used</span>
+                <span>{suppliers.length}/{FREE_SUPPLIER_LIMIT}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="bg-amber-500 h-2 rounded-full" style={{ width: "100%" }}></div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowUpgradeGate(false)} className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Maybe Later
+              </button>
+              <a href="/pricing" className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 inline-flex items-center justify-center">
+                View Plans →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Invite Modal */}
       {showInviteModal && (

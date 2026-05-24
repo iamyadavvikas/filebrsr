@@ -21,14 +21,12 @@ export default function Footer() {
 
           {/* Platform */}
           <div>
-            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Products</h4>
+            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Platform</h4>
             <ul className="space-y-2.5">
               {[
-                { label: "Free Assessment", href: "/readiness" },
+                { label: "Supply Chain ESG", href: "/platform/supply-chain" },
+                { label: "BRSR Automation", href: "/platform" },
                 { label: "Carbon Calculator", href: "/platform/carbon" },
-                { label: "Assess Suppliers", href: "/platform/supply-chain" },
-                { label: "BRSR Platform", href: "/platform" },
-                { label: "Pilot Program", href: "/pilot" },
                 { label: "Pricing", href: "/pricing" },
               ].map((l) => (
                 <li key={l.label}>
