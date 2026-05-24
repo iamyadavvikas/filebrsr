@@ -102,6 +102,7 @@ export default function PlatformLayout({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -115,6 +116,34 @@ export default function PlatformLayout({
       }
     });
   }, []);
+
+  // 15-minute inactivity timeout
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+    const TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+    function resetTimer() {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        setSessionExpired(true);
+      }, TIMEOUT_MS);
+    }
+
+    const events = ["mousedown", "keydown", "scroll", "touchstart", "mousemove"];
+    events.forEach((evt) => window.addEventListener(evt, resetTimer));
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeout);
+      events.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
+  }, []);
+
+  async function handleRelogin() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  }
 
   // Close mobile sidebar on route change
   useEffect(() => {
@@ -138,6 +167,27 @@ export default function PlatformLayout({
   return (
     <AnalyticsProvider userId={userId}>
     <div className="flex h-screen bg-gray-50">
+
+      {/* Session Timeout Modal */}
+      {sessionExpired && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center">
+            <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Settings className="w-7 h-7 text-amber-600" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Session Expired</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Your session has been inactive for 15 minutes. Please log in again to continue.
+            </p>
+            <button
+              onClick={handleRelogin}
+              className="w-full px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 transition-colors"
+            >
+              Log In Again
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Header Bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center h-14 px-3 border-b border-border" style={{ background: "var(--nav-bg)", backdropFilter: "blur(16px)" }}>
