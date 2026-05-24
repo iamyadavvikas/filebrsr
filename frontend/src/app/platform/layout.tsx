@@ -45,8 +45,20 @@ const FOUNDER_EMAILS = [
   "yvikas.free@gmail.com",
 ];
 
-// Pages accessible without login (guest trial)
-const GUEST_ALLOWED_PATHS = ["/platform/data-entry", "/platform/carbon", "/platform/supply-chain"];
+// Guest mode determines what a non-logged-in user can access
+type GuestMode = "carbon" | "supply-chain" | "trial";
+
+function getGuestMode(path: string): GuestMode {
+  if (path.startsWith("/platform/carbon")) return "carbon";
+  if (path.startsWith("/platform/supply-chain")) return "supply-chain";
+  return "trial";
+}
+
+const GUEST_MODE_PATHS: Record<GuestMode, string[]> = {
+  carbon: ["/platform/carbon"],
+  "supply-chain": ["/platform/supply-chain"],
+  trial: [], // trial mode allows all paths (for 5 min)
+};
 
 // Grouped by ESG compliance workflow priority
 const navGroups = [
@@ -119,6 +131,7 @@ export default function PlatformLayout({
   const [isFounder, setIsFounder] = useState(false);
   const [isGuest, setIsGuest] = useState(true); // default guest until auth resolves
   const [guestExpired, setGuestExpired] = useState(false);
+  const [guestMode, setGuestMode] = useState<GuestMode>("trial");
 
   useEffect(() => {
     const supabase = createClient();
@@ -135,28 +148,34 @@ export default function PlatformLayout({
         });
       } else {
         setIsGuest(true);
+        // Determine guest mode from initial pathname
+        setGuestMode(getGuestMode(pathname || "/platform"));
       }
     });
   }, []);
 
-  // 5-minute guest trial timer
+  // 5-minute guest trial timer (only for BRSR Platform trial mode)
   useEffect(() => {
-    if (!isGuest) return;
+    if (!isGuest || guestMode !== "trial") return;
     const GUEST_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
     const timer = setTimeout(() => {
       setGuestExpired(true);
     }, GUEST_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [isGuest]);
+  }, [isGuest, guestMode]);
 
-  // Route guard: guests can only access data-entry & carbon
+  // Route guard: restrict guests based on mode
   useEffect(() => {
     if (!isGuest || !pathname) return;
-    const isAllowed = GUEST_ALLOWED_PATHS.some((p) => pathname.startsWith(p)) || pathname === "/platform";
+    const allowedPaths = GUEST_MODE_PATHS[guestMode];
+    // Trial mode allows all paths (no restriction until timer expires)
+    if (guestMode === "trial") return;
+    // Carbon/supply-chain mode: restrict to only their section
+    const isAllowed = allowedPaths.some((p) => pathname.startsWith(p));
     if (!isAllowed) {
-      router.replace("/platform/data-entry");
+      router.replace(allowedPaths[0]);
     }
-  }, [pathname, isGuest, router]);
+  }, [pathname, isGuest, guestMode, router]);
 
   // Close mobile sidebar on route change
   useEffect(() => {
@@ -168,14 +187,17 @@ export default function PlatformLayout({
     .flatMap((g) => g.items)
     .find((item) => pathname === item.href || (item.href !== "/platform" && pathname?.startsWith(item.href)));
 
-  // Filter nav items: guests only see data-entry & carbon; logged-in users see all
+  // Filter nav items: guests in carbon/supply-chain mode see only their section; trial guests see all
   const filteredNavGroups = navGroups.map(group => ({
     ...group,
     items: group.items.filter(item => {
       if (item.href === "/platform/analytics" && !isAdmin) return false;
-      // Guests only see data-entry & carbon
       if (isGuest) {
-        return GUEST_ALLOWED_PATHS.some((p) => item.href.startsWith(p));
+        // Trial mode: show all sections
+        if (guestMode === "trial") return true;
+        // Carbon/supply-chain mode: show only their section
+        const allowedPaths = GUEST_MODE_PATHS[guestMode];
+        return allowedPaths.some((p) => item.href.startsWith(p));
       }
       return true;
     }),
