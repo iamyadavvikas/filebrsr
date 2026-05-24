@@ -129,7 +129,8 @@ export default function PlatformLayout({
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isFounder, setIsFounder] = useState(false);
-  const [isGuest, setIsGuest] = useState(true); // default guest until auth resolves
+  const [isGuest, setIsGuest] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [guestExpired, setGuestExpired] = useState(false);
   const [guestMode, setGuestMode] = useState<GuestMode>("trial");
 
@@ -151,18 +152,19 @@ export default function PlatformLayout({
         // Determine guest mode from initial pathname
         setGuestMode(getGuestMode(pathname || "/platform"));
       }
+      setAuthChecked(true);
     });
   }, []);
 
-  // 5-minute guest trial timer (only for BRSR Platform trial mode)
+  // 5-minute guest trial timer (only for BRSR Platform trial mode, after auth confirmed)
   useEffect(() => {
-    if (!isGuest || guestMode !== "trial") return;
+    if (!authChecked || !isGuest || guestMode !== "trial") return;
     const GUEST_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
     const timer = setTimeout(() => {
       setGuestExpired(true);
     }, GUEST_TIMEOUT_MS);
     return () => clearTimeout(timer);
-  }, [isGuest, guestMode]);
+  }, [authChecked, isGuest, guestMode]);
 
   // Route guard: restrict guests based on mode
   useEffect(() => {

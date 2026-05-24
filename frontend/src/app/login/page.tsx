@@ -30,7 +30,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5">
-            <div className="flex items-center justify-center text-white font-extrabold" style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg, #1B4D3E, #2D7A5F)", fontSize: 15 }}>F</div>
+            <img src="/logo-icon.svg" alt="FileBRSR" width={36} height={36} />
             <span className="font-extrabold" style={{ fontSize: 20, color: "#1B4D3E", letterSpacing: -0.5 }}>
               File<span style={{ color: "#E8B931" }}>BRSR</span>
             </span>

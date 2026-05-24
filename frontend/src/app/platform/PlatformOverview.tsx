@@ -62,15 +62,16 @@ export default function PlatformOverview({ userId, initialReports, userProfile }
 
   useEffect(() => {
     fetchOverview();
-    fetchReports();
+    if (!initialReports || initialReports.length === 0) {
+      fetchReports();
+    }
   }, [financialYear]);
 
   async function fetchOverview() {
     setLoading(true);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
       const res = await fetch(
-        `${backendUrl}/api/platform/data-entry/${financialYear}/progress`,
+        `/backend/api/platform/data-entry/${financialYear}/progress`,
         {
           headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""}` },
         }
