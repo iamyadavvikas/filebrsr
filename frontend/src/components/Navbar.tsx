@@ -45,10 +45,10 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
   }, [userProp]);
 
   const navLinks = [
-    { href: "/platform", label: "Platform" },
-    { href: "/readiness", label: "Free Assessment" },
-    { href: "/pilot", label: "Pilot Program" },
-    { href: "/resources", label: "Resources" },
+    { href: "/", label: "Home" },
+    { href: "/products", label: "Products & Services" },
+    { href: "/about", label: "About Us" },
+    { href: "/contact", label: "Contact" },
     { href: "/pricing", label: "Pricing" },
   ];
 

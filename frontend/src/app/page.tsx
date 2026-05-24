@@ -230,17 +230,17 @@ export default function HomePage() {
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
-                  href="/platform/supply-chain"
+                  href="/products"
                   style={{ fontSize: 15, fontWeight: 700, padding: "16px 36px", borderRadius: 12, background: "#E8B931", color: "#1B4D3E", display: "inline-flex", alignItems: "center", gap: 8 }}
                 >
-                  ASSESS MY SUPPLIERS
+                  VIEW PRODUCTS & SERVICES
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </Link>
                 <Link
-                  href="/platform/upload-extract"
+                  href="/platform/carbon"
                   style={{ fontSize: 15, fontWeight: 600, padding: "16px 36px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.9)", display: "inline-flex", alignItems: "center", gap: 8 }}
                 >
-                  TRY AI BRSR EXTRACTION
+                  TRY CARBON CALCULATOR FREE
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </Link>
               </div>
@@ -714,21 +714,21 @@ export default function HomePage() {
             </h2>
             <p style={{ fontSize: 16, color: "rgba(255,255,255,0.6)", maxWidth: 560, margin: "0 auto 36px", lineHeight: 1.7 }}>
               Whether you&apos;re a listed company filing BRSR, assessing your supply chain,
-              or monetizing emission reductions through carbon credits — FileBRSR is built for you.
+              or tracking emissions — FileBRSR is built for you.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/signup"
+                href="/products"
                 style={{ fontSize: 15, fontWeight: 700, padding: "16px 36px", borderRadius: 12, background: "#E8B931", color: "#1B4D3E", display: "inline-flex", alignItems: "center", gap: 8 }}
               >
-                GET STARTED FREE
+                EXPLORE PRODUCTS
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </Link>
               <Link
-                href="/platform/upload-extract"
+                href="/contact"
                 style={{ fontSize: 15, fontWeight: 600, padding: "16px 36px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.9)", display: "inline-flex", alignItems: "center", gap: 8 }}
               >
-                TRY AI EXTRACTION
+                CONTACT US
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </Link>
             </div>

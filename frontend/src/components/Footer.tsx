@@ -21,12 +21,13 @@ export default function Footer() {
 
           {/* Platform */}
           <div>
-            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Platform</h4>
+            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Products</h4>
             <ul className="space-y-2.5">
               {[
-                { label: "Supply Chain Assessment", href: "/signup" },
-                { label: "AI BRSR Filing", href: "/upload" },
-                { label: "Dashboard", href: "/dashboard" },
+                { label: "Free Assessment", href: "/readiness" },
+                { label: "Carbon Calculator", href: "/platform/carbon" },
+                { label: "Assess Suppliers", href: "/platform/supply-chain" },
+                { label: "BRSR Platform", href: "/platform" },
                 { label: "Pricing", href: "/pricing" },
               ].map((l) => (
                 <li key={l.label}>
@@ -36,31 +37,15 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Resources */}
+          {/* Company */}
           <div>
-            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Resources</h4>
+            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Company</h4>
             <ul className="space-y-2.5">
               {[
-                { label: "BRSR Framework Guide", href: "https://www.sebi.gov.in/legal/regulations/may-2021/business-responsibility-and-sustainability-reporting-by-listed-entities_50096.html" },
-                { label: "NGRBC Principles", href: "https://www.mca.gov.in/Ministry/pdf/NationalGuildeline_15032019.pdf" },
-                { label: "SEBI Circulars", href: "https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&ssid=2&smid=0" },
-              ].map((l) => (
-                <li key={l.label}>
-                  <Link href={l.href} target="_blank" rel="noopener noreferrer" className="text-sm text-muted hover:text-foreground transition-colors">{l.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div>
-            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Legal</h4>
-            <ul className="space-y-2.5">
-              {[
+                { label: "About Us", href: "/about" },
+                { label: "Contact", href: "/contact" },
                 { label: "Terms of Use", href: "/terms" },
                 { label: "Privacy Policy", href: "/privacy" },
-                { label: "Data Retention (DPDPA)", href: "/data-retention" },
-                { label: "Contact", href: "mailto:support@filebrsr.com" },
               ].map((l) => (
                 <li key={l.label}>
                   <Link href={l.href} className="text-sm text-muted hover:text-foreground transition-colors">{l.label}</Link>
