@@ -35,8 +35,7 @@ export default function UpgradeNudge({ plan, extractionsUsed, limit }: Props) {
             You&apos;ve used all {limit} free extractions
           </h3>
           <p className="text-xs text-gray-600 mb-3">
-            Upgrade to Starter (₹9,999/yr) for 5 extractions/month, or go Pro (₹49,999/yr) for unlimited.
-            Pay-per-report at ₹2,500 also available — no subscription needed.
+            Upgrade to Growth (₹49,999/yr) for unlimited extractions and 25 suppliers, or Scale (₹1,99,999/yr) for unlimited everything.
           </p>
           <div className="flex gap-2">
             <Link
@@ -44,12 +43,6 @@ export default function UpgradeNudge({ plan, extractionsUsed, limit }: Props) {
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700 transition-colors"
             >
               View Plans <ArrowRight className="w-3 h-3" />
-            </Link>
-            <Link
-              href="/pricing#pay-per-report"
-              className="inline-flex items-center gap-1.5 px-4 py-2 border border-amber-300 text-amber-800 rounded-lg text-xs font-medium hover:bg-amber-100 transition-colors"
-            >
-              ₹2,500 per report
             </Link>
           </div>
         </div>

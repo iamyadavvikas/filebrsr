@@ -238,36 +238,6 @@ export default function PricingPage() {
         {/* Plans Grid */}
         <section style={{ padding: "0 28px 64px" }}>
           <div className="max-w-[1100px] mx-auto">
-            {/* Pay-per-report — prominent option */}
-            <div
-              className="mb-8 flex flex-col md:flex-row items-center justify-between gap-6"
-              style={{ borderRadius: 20, padding: "24px 32px", background: "linear-gradient(135deg, rgba(27,77,62,0.04), rgba(232,185,49,0.06))", border: "2px solid var(--primary-light)" }}
-            >
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "#D97706", background: "rgba(217,119,6,0.1)", padding: "3px 8px", borderRadius: 6 }}>MOST FLEXIBLE</span>
-                </div>
-                <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4, color: "var(--foreground)" }}>
-                  Pay Per Report — <span style={{ color: "var(--primary-light)" }}>₹2,500</span>
-                </h3>
-                <p style={{ fontSize: 14, color: "var(--muted)" }}>
-                  Full BRSR analysis with NIFTY 50 benchmarks, gap analysis, and branded PDF. No subscription, no commitment.
-                </p>
-              </div>
-              <button
-                onClick={() => handlePurchase("pay_per_report")}
-                disabled={loadingPlan === "pay_per_report"}
-                className="flex items-center gap-2 whitespace-nowrap"
-                style={{
-                  padding: "14px 32px", borderRadius: 12, fontSize: 15, fontWeight: 700,
-                  background: "var(--primary-light)", color: "white", cursor: "pointer", border: "none",
-                }}
-              >
-                {loadingPlan === "pay_per_report" && <Loader2 className="w-4 h-4 animate-spin" />}
-                Buy Single Report →
-              </button>
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5" style={{ alignItems: "start" }}>
               {plans.map((p) => (
                 <div
