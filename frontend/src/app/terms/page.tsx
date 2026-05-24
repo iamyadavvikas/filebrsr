@@ -19,7 +19,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-lg font-bold mt-6 mb-2">1. Acceptance of Terms</h2>
               <p className="text-sm text-gray-600 leading-relaxed">
-                By accessing or using FileBRSR (&quot;Platform&quot;), operated by FileBRSR Technologies Pvt. Ltd. (&quot;Company&quot;, &quot;we&quot;, &quot;us&quot;), you agree to be bound by these Terms of Use. If you do not agree, please do not use the Platform.
+                By accessing or using FileBRSR (&quot;Platform&quot;, &quot;we&quot;, &quot;us&quot;), you agree to be bound by these Terms of Use. If you do not agree, please do not use the Platform.
               </p>
             </section>
 
@@ -53,7 +53,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-lg font-bold mt-6 mb-2">5. Intellectual Property</h2>
               <p className="text-sm text-gray-600 leading-relaxed">
-                The Platform, including its AI models, algorithms, UI design, branding, and documentation, is the intellectual property of FileBRSR Technologies Pvt. Ltd. You retain ownership of data you upload. By uploading content, you grant us a limited license to process it solely for providing our services to you.
+                The Platform, including its AI models, algorithms, UI design, branding, and documentation, is the intellectual property of FileBRSR. You retain ownership of data you upload. By uploading content, you grant us a limited license to process it solely for providing our services to you.
               </p>
             </section>
 
@@ -95,7 +95,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-lg font-bold mt-6 mb-2">11. Governing Law</h2>
               <p className="text-sm text-gray-600 leading-relaxed">
-                These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of courts in Bengaluru, Karnataka.
+                These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of courts in India.
               </p>
             </section>
 
@@ -111,7 +111,7 @@ export default function TermsPage() {
               <p className="text-sm text-gray-600 leading-relaxed">
                 For questions about these Terms, contact us at:<br />
                 <strong>Email:</strong> support@filebrsr.com<br />
-                <strong>Address:</strong> FileBRSR Technologies Pvt. Ltd., Bengaluru, Karnataka, India
+                <strong>Website:</strong> filebrsr.com
               </p>
             </section>
           </div>
