@@ -35,7 +35,7 @@ SECTOR_BENCHMARKS = {
     },
     "Banking_Financial": {
         "name": "Banking & Financial Services",
-        "companies": ["HDFC Bank", "ICICI Bank", "SBI", "Kotak Mahindra", "Axis Bank"],
+        "companies": ["HDFC Bank", "ICICI Bank", "SBI", "Kotak Mahindra", "Axis Bank", "IndusInd Bank"],
         "benchmarks": {
             "women_board_pct": {"median": 20.0, "top_quartile": 30.0, "unit": "%"},
             "women_employees_pct": {"median": 22.0, "top_quartile": 28.0, "unit": "%"},
@@ -56,8 +56,8 @@ SECTOR_BENCHMARKS = {
         "typical_disclosure_rate": 82,
     },
     "Energy_Power": {
-        "name": "Energy & Power",
-        "companies": ["Reliance", "NTPC", "Power Grid", "Adani Green", "Tata Power"],
+        "name": "Energy, Oil & Gas",
+        "companies": ["Reliance Industries", "NTPC", "Power Grid", "ONGC", "BPCL"],
         "benchmarks": {
             "women_board_pct": {"median": 18.0, "top_quartile": 25.0, "unit": "%"},
             "women_employees_pct": {"median": 8.0, "top_quartile": 12.0, "unit": "%"},
@@ -78,8 +78,8 @@ SECTOR_BENCHMARKS = {
         "typical_disclosure_rate": 85,
     },
     "Manufacturing": {
-        "name": "Manufacturing & Industrial",
-        "companies": ["L&T", "M&M", "Tata Motors", "Maruti Suzuki", "Asian Paints"],
+        "name": "Automobile & Manufacturing",
+        "companies": ["L&T", "M&M", "Tata Motors", "Maruti Suzuki", "Bajaj Auto", "Hero MotoCorp", "Eicher Motors", "Asian Paints"],
         "benchmarks": {
             "women_board_pct": {"median": 16.0, "top_quartile": 25.0, "unit": "%"},
             "women_employees_pct": {"median": 10.0, "top_quartile": 15.0, "unit": "%"},
@@ -101,7 +101,7 @@ SECTOR_BENCHMARKS = {
     },
     "FMCG_Consumer": {
         "name": "FMCG & Consumer Goods",
-        "companies": ["ITC", "HUL", "Nestle India", "Britannia", "Dabur"],
+        "companies": ["ITC", "HUL", "Nestle India", "Britannia", "Tata Consumer", "Titan"],
         "benchmarks": {
             "women_board_pct": {"median": 25.0, "top_quartile": 33.0, "unit": "%"},
             "women_employees_pct": {"median": 18.0, "top_quartile": 25.0, "unit": "%"},
@@ -144,8 +144,8 @@ SECTOR_BENCHMARKS = {
         "typical_disclosure_rate": 78,
     },
     "Metals_Mining": {
-        "name": "Metals & Mining",
-        "companies": ["Tata Steel", "JSW Steel", "Hindalco", "Vedanta", "Coal India"],
+        "name": "Metals, Mining & Chemicals",
+        "companies": ["Tata Steel", "JSW Steel", "Hindalco", "Coal India", "UPL"],
         "benchmarks": {
             "women_board_pct": {"median": 15.0, "top_quartile": 22.0, "unit": "%"},
             "women_employees_pct": {"median": 6.0, "top_quartile": 10.0, "unit": "%"},
@@ -164,6 +164,72 @@ SECTOR_BENCHMARKS = {
             "esrs_alignment_score": {"median": 72, "top_quartile": 85, "unit": "%"},
         },
         "typical_disclosure_rate": 83,
+    },
+    "Insurance_NBFC": {
+        "name": "Insurance & NBFC",
+        "companies": ["Bajaj Finance", "Bajaj Finserv", "HDFC Life", "SBI Life", "Shriram Finance"],
+        "benchmarks": {
+            "women_board_pct": {"median": 18.0, "top_quartile": 25.0, "unit": "%"},
+            "women_employees_pct": {"median": 20.0, "top_quartile": 26.0, "unit": "%"},
+            "employee_turnover_rate": {"median": 28.0, "top_quartile": 20.0, "unit": "%"},
+            "training_hours_per_employee": {"median": 50.0, "top_quartile": 80.0, "unit": "hours"},
+            "renewable_energy_pct": {"median": 18.0, "top_quartile": 35.0, "unit": "%"},
+            "energy_intensity": {"median": 0.006, "top_quartile": 0.004, "unit": "GJ/INR Lakh"},
+            "water_intensity": {"median": 0.4, "top_quartile": 0.2, "unit": "KL/INR Cr"},
+            "ghg_scope1": {"median": 5000, "top_quartile": 2500, "unit": "tCO2e"},
+            "ghg_scope2": {"median": 80000, "top_quartile": 45000, "unit": "tCO2e"},
+            "ghg_intensity": {"median": 0.8, "top_quartile": 0.5, "unit": "tCO2e/INR Cr"},
+            "waste_recycled_pct": {"median": 60.0, "top_quartile": 80.0, "unit": "%"},
+            "csr_spend_pct": {"median": 2.0, "top_quartile": 2.5, "unit": "% of PAT"},
+            "data_privacy_complaints": {"median": 15, "top_quartile": 3, "unit": "count"},
+            "ltifr": {"median": 0.01, "top_quartile": 0.0, "unit": "per million hours"},
+            "esrs_alignment_score": {"median": 60, "top_quartile": 72, "unit": "%"},
+        },
+        "typical_disclosure_rate": 78,
+    },
+    "Infrastructure_Cement": {
+        "name": "Infrastructure & Cement",
+        "companies": ["Adani Enterprises", "Adani Ports", "Grasim Industries", "UltraTech Cement"],
+        "benchmarks": {
+            "women_board_pct": {"median": 15.0, "top_quartile": 22.0, "unit": "%"},
+            "women_employees_pct": {"median": 7.0, "top_quartile": 12.0, "unit": "%"},
+            "employee_turnover_rate": {"median": 10.0, "top_quartile": 6.0, "unit": "%"},
+            "training_hours_per_employee": {"median": 38.0, "top_quartile": 55.0, "unit": "hours"},
+            "renewable_energy_pct": {"median": 12.0, "top_quartile": 30.0, "unit": "%"},
+            "energy_intensity": {"median": 5.5, "top_quartile": 3.5, "unit": "GJ/INR Lakh"},
+            "water_intensity": {"median": 30.0, "top_quartile": 18.0, "unit": "KL/INR Cr"},
+            "ghg_scope1": {"median": 3500000, "top_quartile": 2000000, "unit": "tCO2e"},
+            "ghg_scope2": {"median": 600000, "top_quartile": 350000, "unit": "tCO2e"},
+            "ghg_intensity": {"median": 45.0, "top_quartile": 28.0, "unit": "tCO2e/INR Cr"},
+            "waste_recycled_pct": {"median": 75.0, "top_quartile": 90.0, "unit": "%"},
+            "csr_spend_pct": {"median": 2.2, "top_quartile": 3.0, "unit": "% of PAT"},
+            "data_privacy_complaints": {"median": 0, "top_quartile": 0, "unit": "count"},
+            "ltifr": {"median": 0.42, "top_quartile": 0.15, "unit": "per million hours"},
+            "esrs_alignment_score": {"median": 68, "top_quartile": 80, "unit": "%"},
+        },
+        "typical_disclosure_rate": 80,
+    },
+    "Telecom": {
+        "name": "Telecom & Media",
+        "companies": ["Bharti Airtel"],
+        "benchmarks": {
+            "women_board_pct": {"median": 22.0, "top_quartile": 30.0, "unit": "%"},
+            "women_employees_pct": {"median": 12.0, "top_quartile": 18.0, "unit": "%"},
+            "employee_turnover_rate": {"median": 18.0, "top_quartile": 12.0, "unit": "%"},
+            "training_hours_per_employee": {"median": 42.0, "top_quartile": 60.0, "unit": "hours"},
+            "renewable_energy_pct": {"median": 30.0, "top_quartile": 50.0, "unit": "%"},
+            "energy_intensity": {"median": 0.35, "top_quartile": 0.22, "unit": "GJ/INR Lakh"},
+            "water_intensity": {"median": 2.0, "top_quartile": 1.2, "unit": "KL/INR Cr"},
+            "ghg_scope1": {"median": 180000, "top_quartile": 100000, "unit": "tCO2e"},
+            "ghg_scope2": {"median": 1500000, "top_quartile": 900000, "unit": "tCO2e"},
+            "ghg_intensity": {"median": 12.0, "top_quartile": 7.5, "unit": "tCO2e/INR Cr"},
+            "waste_recycled_pct": {"median": 70.0, "top_quartile": 85.0, "unit": "%"},
+            "csr_spend_pct": {"median": 2.0, "top_quartile": 2.5, "unit": "% of PAT"},
+            "data_privacy_complaints": {"median": 50, "top_quartile": 10, "unit": "count"},
+            "ltifr": {"median": 0.08, "top_quartile": 0.02, "unit": "per million hours"},
+            "esrs_alignment_score": {"median": 70, "top_quartile": 82, "unit": "%"},
+        },
+        "typical_disclosure_rate": 85,
     },
 }
 
@@ -295,12 +361,15 @@ def detect_sector(extracted_data: dict) -> str:
     
     sector_keywords = {
         "IT_Services": ["information technology", "software", "consulting", "digital", "it services", "technology"],
-        "Banking_Financial": ["banking", "financial", "nbfc", "insurance", "credit", "lending", "bank"],
+        "Banking_Financial": ["banking", "financial", "credit", "lending", "bank"],
+        "Insurance_NBFC": ["insurance", "nbfc", "life insurance", "general insurance", "finance company", "housing finance"],
         "Energy_Power": ["energy", "power", "electricity", "oil", "gas", "petroleum", "refining", "renewable"],
-        "Manufacturing": ["automobile", "manufacturing", "engineering", "machinery", "cement", "construction"],
-        "FMCG_Consumer": ["fmcg", "consumer", "food", "beverage", "personal care", "tobacco", "packaged"],
+        "Manufacturing": ["automobile", "manufacturing", "engineering", "machinery", "vehicle", "two-wheeler", "paint"],
+        "FMCG_Consumer": ["fmcg", "consumer", "food", "beverage", "personal care", "tobacco", "packaged", "jewellery", "watch"],
         "Pharma_Healthcare": ["pharma", "pharmaceutical", "healthcare", "hospital", "drug", "medicine"],
-        "Metals_Mining": ["mining", "metal", "steel", "iron", "aluminium", "coal", "ore", "smelting"],
+        "Metals_Mining": ["mining", "metal", "steel", "iron", "aluminium", "coal", "ore", "smelting", "chemical", "agrochemical"],
+        "Infrastructure_Cement": ["infrastructure", "cement", "port", "logistics", "construction material", "building material"],
+        "Telecom": ["telecom", "telecommunication", "mobile", "wireless", "broadband", "media"],
     }
     
     for sector, keywords in sector_keywords.items():
