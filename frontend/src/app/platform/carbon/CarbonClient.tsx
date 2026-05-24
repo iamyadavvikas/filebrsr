@@ -20,12 +20,9 @@ import { createClient } from "@/lib/supabase/client";
 // Emission Factor Organizations
 const EMISSION_FACTOR_ORGS = [
   { value: "cea_2024", label: "CEA India 2024", desc: "Central Electricity Authority — India grid factor", region: "India" },
-  { value: "cea_2023", label: "CEA India 2023", desc: "Central Electricity Authority — Previous year", region: "India" },
   { value: "ipcc_ar6", label: "IPCC AR6 (2021)", desc: "Intergovernmental Panel on Climate Change — 6th Assessment", region: "Global" },
-  { value: "ipcc_ar5", label: "IPCC AR5 (2014)", desc: "IPCC 5th Assessment Report defaults", region: "Global" },
   { value: "epa_2024", label: "US EPA (2024)", desc: "US Environmental Protection Agency — GHG Emission Factors Hub", region: "USA" },
   { value: "defra_2024", label: "UK DEFRA (2024)", desc: "UK Dept for Environment, Food & Rural Affairs — Conversion Factors", region: "UK" },
-  { value: "defra_2023", label: "UK DEFRA (2023)", desc: "DEFRA/BEIS previous year conversion factors", region: "UK" },
   { value: "ghg_protocol", label: "GHG Protocol", desc: "WRI/WBCSD GHG Protocol — Cross-sector tools", region: "Global" },
   { value: "isro_india", label: "ISRO / BEE India", desc: "Bureau of Energy Efficiency — India-specific factors", region: "India" },
 ];
