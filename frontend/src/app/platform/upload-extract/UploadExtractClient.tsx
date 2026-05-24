@@ -336,6 +336,8 @@ function PastExtractions({ userId, initialReports }: { userId: string; initialRe
   const [reports, setReports] = useState<any[]>(initialReports);
   const [loaded, setLoaded] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   async function fetchReports() {
     try {
@@ -362,9 +364,36 @@ function PastExtractions({ userId, initialReports }: { userId: string; initialRe
       });
       if (res.ok) {
         setReports((prev) => prev.filter((r) => r.id !== id));
+        setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
       }
     } catch {}
     setDeleting(null);
+  }
+
+  async function bulkDelete() {
+    if (selected.size === 0) return;
+    if (!confirm(`Delete ${selected.size} selected extraction(s)? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    try {
+      for (const id of selected) {
+        await fetch(`/backend/api/platform/reports/${id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${userId}` },
+        });
+      }
+      setReports((prev) => prev.filter((r) => !selected.has(r.id)));
+      setSelected(new Set());
+    } catch {}
+    setBulkDeleting(false);
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === reports.length) setSelected(new Set());
+    else setSelected(new Set(reports.map((r) => r.id)));
   }
 
   if (!loaded) return null;
@@ -376,6 +405,28 @@ function PastExtractions({ userId, initialReports }: { userId: string; initialRe
         <p className="text-sm text-gray-400 py-4 text-center">No extractions yet. Upload a report above to get started.</p>
       ) : (
       <div className="space-y-2">
+        {/* Bulk actions bar */}
+        <div className="flex items-center gap-3 px-1 py-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selected.size === reports.length && reports.length > 0}
+              onChange={toggleSelectAll}
+              className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+            />
+            <span className="text-xs text-gray-500 font-medium">Select All</span>
+          </label>
+          {selected.size > 0 && (
+            <button
+              onClick={bulkDelete}
+              disabled={bulkDeleting}
+              className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete {selected.size} selected
+            </button>
+          )}
+        </div>
         {reports.map((r) => {
           const reportName = r.company_name
             ? `${r.company_name} ${r.financial_year ? `(${r.financial_year})` : ""}`
@@ -388,47 +439,55 @@ function PastExtractions({ userId, initialReports }: { userId: string; initialRe
               key={r.id}
               className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg hover:border-emerald-200 hover:bg-emerald-50/30 transition-colors group"
             >
-              <a href={`/platform/reports/${r.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                <FileText className="w-4 h-4 text-gray-400 group-hover:text-emerald-600 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">{reportName}</p>
-                  <p className="text-xs text-gray-400 truncate">
-                    {r.file_name && r.company_name ? <span className="text-gray-500">{r.file_name} · </span> : null}
-                    {extractedAt.toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                    {" · "}
-                    {timeAgo}
-                  </p>
-                </div>
-              </a>
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <input
+                  type="checkbox"
+                  checked={selected.has(r.id)}
+                  onChange={() => toggleSelect(r.id)}
+                  className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 flex-shrink-0"
+                />
+                <a href={`/platform/reports/${r.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                  <FileText className="w-4 h-4 text-gray-400 group-hover:text-emerald-600 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{reportName}</p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {r.file_name && r.company_name ? <span className="text-gray-500">{r.file_name} · </span> : null}
+                      {extractedAt.toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                      {" · "}
+                      {timeAgo}
+                    </p>
+                  </div>
+                </a>
+              </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                     r.status === "completed"
                       ? "bg-emerald-100 text-emerald-700"
-                    : r.status === "failed"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-amber-100 text-amber-700"
-                }`}
-              >
-                {r.status}
-              </span>
-              {r.status === "completed" && (
-                <a href={`/platform/reports/${r.id}`} className="text-xs text-emerald-600 font-medium hover:underline">View →</a>
-              )}
-              <button
-                onClick={() => deleteReport(r.id)}
-                disabled={deleting === r.id}
-                className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                title="Delete extraction"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+                      : r.status === "failed"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {r.status}
+                </span>
+                {r.status === "completed" && (
+                  <a href={`/platform/reports/${r.id}`} className="text-xs text-emerald-600 font-medium hover:underline">View →</a>
+                )}
+                <button
+                  onClick={() => deleteReport(r.id)}
+                  disabled={deleting === r.id}
+                  className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                  title="Delete extraction"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           );

@@ -46,7 +46,7 @@ const FOUNDER_EMAILS = [
 ];
 
 // Pages accessible without login (guest trial)
-const GUEST_ALLOWED_PATHS = ["/platform/data-entry", "/platform/carbon"];
+const GUEST_ALLOWED_PATHS = ["/platform/data-entry", "/platform/carbon", "/platform/supply-chain"];
 
 // Grouped by ESG compliance workflow priority
 const navGroups = [
