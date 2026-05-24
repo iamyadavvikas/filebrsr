@@ -149,14 +149,14 @@ export default function PlatformLayout({
     return () => clearTimeout(timer);
   }, [isGuest]);
 
-  // Route guard: non-founder logged-in users can only access data-entry & carbon
+  // Route guard: guests can only access data-entry & carbon
   useEffect(() => {
-    if (isGuest || isFounder || !pathname) return;
+    if (!isGuest || !pathname) return;
     const isAllowed = GUEST_ALLOWED_PATHS.some((p) => pathname.startsWith(p)) || pathname === "/platform";
     if (!isAllowed) {
       router.replace("/platform/data-entry");
     }
-  }, [pathname, isGuest, isFounder, router]);
+  }, [pathname, isGuest, router]);
 
   // Close mobile sidebar on route change
   useEffect(() => {
@@ -168,13 +168,13 @@ export default function PlatformLayout({
     .flatMap((g) => g.items)
     .find((item) => pathname === item.href || (item.href !== "/platform" && pathname?.startsWith(item.href)));
 
-  // Filter nav items: restrict access based on role
+  // Filter nav items: guests only see data-entry & carbon; logged-in users see all
   const filteredNavGroups = navGroups.map(group => ({
     ...group,
     items: group.items.filter(item => {
       if (item.href === "/platform/analytics" && !isAdmin) return false;
-      // Guests and non-founder users only see data-entry & carbon
-      if (!isFounder && !isAdmin) {
+      // Guests only see data-entry & carbon
+      if (isGuest) {
         return GUEST_ALLOWED_PATHS.some((p) => item.href.startsWith(p));
       }
       return true;
