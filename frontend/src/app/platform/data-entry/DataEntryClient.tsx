@@ -507,15 +507,6 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
               <Download className="w-4 h-4" />
               Excel
             </button>
-            <a
-              href="https://www.bseindia.com/downloads1/BSE_Listing_Obligations/BRSR_Format_2024.xlsx"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 bg-white border border-blue-200 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-50 flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              SEBI BRSR Template
-            </a>
           </div>
 
           {/* Save All Success Toast */}
