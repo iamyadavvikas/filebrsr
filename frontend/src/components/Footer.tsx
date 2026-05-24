@@ -59,6 +59,7 @@ export default function Footer() {
               {[
                 { label: "Terms of Use", href: "/terms" },
                 { label: "Privacy Policy", href: "/privacy" },
+                { label: "Data Retention (DPDPA)", href: "/data-retention" },
                 { label: "Contact", href: "mailto:support@filebrsr.com" },
               ].map((l) => (
                 <li key={l.label}>

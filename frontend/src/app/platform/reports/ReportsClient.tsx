@@ -11,6 +11,7 @@ import {
   Upload,
   ChevronDown,
   Trash2,
+  TrendingUp,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -24,7 +25,7 @@ interface ExtractionReport {
 }
 
 const REPORT_TYPES = [
-  { id: "brsr_full", label: "BRSR Full", desc: "216 datapoints", color: "bg-emerald-600" },
+  { id: "brsr_full", label: "BRSR Full", desc: "140 indicators", color: "bg-emerald-600" },
   { id: "brsr_core", label: "BRSR Core", desc: "Core indicators", color: "bg-blue-600" },
   { id: "brsr_lite", label: "BRSR Lite", desc: "Value chain", color: "bg-purple-600" },
   { id: "gap_analysis", label: "Gap Analysis", desc: "Readiness check", color: "bg-amber-600" },
@@ -36,6 +37,16 @@ export default function ReportsClient({ initialReports }: { initialReports: Extr
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Year-over-year: group reports by FY
+  const reportsByFY = reports.reduce<Record<string, ExtractionReport[]>>((acc, r) => {
+    const fy = r.financial_year || "Unknown";
+    if (!acc[fy]) acc[fy] = [];
+    acc[fy].push(r);
+    return acc;
+  }, {});
+  const fyKeys = Object.keys(reportsByFY).sort();
+  const showYoY = fyKeys.length >= 2;
 
   async function handleGenerateReport(reportId: string, reportType: string) {
     setGenerating(`${reportId}-${reportType}`);
@@ -99,6 +110,25 @@ export default function ReportsClient({ initialReports }: { initialReports: Extr
           <option value="FY2026-27">FY 2026-27</option>
         </select>
       </div>
+
+      {/* Year-over-Year Comparison */}
+      {showYoY && (
+        <div className="mb-6 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+          <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-blue-600" /> Year-over-Year Comparison
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {fyKeys.map((fy) => (
+              <div key={fy} className="bg-white rounded-lg p-3 border border-blue-100">
+                <p className="text-[11px] font-medium text-gray-500">{fy}</p>
+                <p className="text-lg font-bold text-gray-900">{reportsByFY[fy].length}</p>
+                <p className="text-[10px] text-gray-400">{reportsByFY[fy].filter(r => r.status === "completed").length} completed</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-gray-500 mt-2">Upload reports for multiple financial years to track ESG progress over time.</p>
+        </div>
+      )}
 
       {reports.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
