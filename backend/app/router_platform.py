@@ -703,7 +703,8 @@ async def get_sebi_deadlines(financial_year: str = "FY2024-25"):
     """Get standard SEBI compliance deadlines for a financial year."""
     # Parse FY to get dates
     # FY2024-25 → April 2024 to March 2025, deadlines in Q2/Q3 FY next year
-    fy_start_year = int(financial_year.replace("FY", "").split("-")[0]) + 2000
+    fy_part = financial_year.replace("FY", "").split("-")[0]
+    fy_start_year = int(fy_part) if len(fy_part) == 4 else int(fy_part) + 2000
     
     deadlines = []
     for event in SEBI_COMPLIANCE_CALENDAR:
