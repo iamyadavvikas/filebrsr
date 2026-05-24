@@ -47,9 +47,8 @@ export default function CalendarClient() {
   async function fetchDeadlines() {
     setLoading(true);
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
       const res = await fetch(
-        `${backendUrl}/api/platform/calendar/sebi-deadlines?financial_year=${financialYear}`
+        `/backend/api/platform/calendar/sebi-deadlines?financial_year=${financialYear}`
       );
       if (res.ok) {
         const data = await res.json();
