@@ -9,11 +9,24 @@ from typing import Optional, List
 from datetime import date, datetime
 import json
 import uuid
+import logging
 
 from app.config import get_settings
 
 router = APIRouter(prefix="/api/platform", tags=["Advanced Platform"])
 settings = get_settings()
+logger = logging.getLogger("filebrsr.advanced")
+
+# Plan-based limits
+PLAN_SUPPLIER_LIMITS = {
+    "free": 5,
+    "growth": 25,
+    "scale": 999999,
+    "enterprise": 999999,
+    # Legacy plan names (in case DB hasn't migrated)
+    "starter": 5,
+    "pro": 25,
+}
 
 
 def get_supabase_admin():
@@ -22,17 +35,50 @@ def get_supabase_admin():
 
 
 async def get_user_id(authorization: str) -> str:
-    """Extract user_id from JWT. Simplified for now."""
+    """Extract and verify user_id from Supabase JWT."""
     token = authorization.replace("Bearer ", "")
     if not token:
         raise HTTPException(status_code=401, detail="Missing auth token")
-    # Decode Supabase JWT to get user_id
+
+    import jwt as pyjwt
+
+    # If JWT secret is configured, verify the signature
+    jwt_secret = settings.SUPABASE_JWT_SECRET
+    if jwt_secret:
+        try:
+            payload = pyjwt.decode(
+                token,
+                jwt_secret,
+                algorithms=["HS256"],
+                audience="authenticated",
+            )
+            user_id = payload.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="Invalid token: no sub claim")
+            return user_id
+        except pyjwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Token expired")
+        except pyjwt.InvalidTokenError as e:
+            raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+    else:
+        # Fallback: decode without verification (dev only)
+        try:
+            payload = pyjwt.decode(token, options={"verify_signature": False})
+            return payload.get("sub", token)
+        except Exception:
+            return token
+
+
+async def get_user_plan(user_id: str) -> str:
+    """Get user's current plan from profiles table."""
+    supabase = get_supabase_admin()
     try:
-        import jwt as pyjwt
-        payload = pyjwt.decode(token, options={"verify_signature": False})
-        return payload.get("sub", token)
+        result = supabase.table("profiles").select("plan").eq("id", user_id).single().execute()
+        if result.data:
+            return result.data.get("plan", "free")
     except Exception:
-        return token
+        pass
+    return "free"
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -99,9 +145,22 @@ async def list_suppliers(
 
 @router.post("/suppliers")
 async def create_supplier(req: SupplierCreate, authorization: str = Header(...)):
-    """Add a new supplier."""
+    """Add a new supplier — enforces plan-based limit."""
     user_id = await get_user_id(authorization)
     supabase = get_supabase_admin()
+
+    # Enforce supplier limit based on user plan
+    plan = await get_user_plan(user_id)
+    limit = PLAN_SUPPLIER_LIMITS.get(plan, 5)
+
+    count_result = supabase.table("suppliers").select("id", count="exact").eq("user_id", user_id).execute()
+    current_count = count_result.count or 0
+
+    if current_count >= limit:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Supplier limit reached ({limit} on {plan} plan). Upgrade to add more suppliers."
+        )
 
     data = req.model_dump(exclude_none=True)
     data["user_id"] = user_id

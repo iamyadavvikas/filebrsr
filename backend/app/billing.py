@@ -18,31 +18,46 @@ def _settings():
 # Razorpay Plan IDs - create these once via Razorpay Dashboard or API
 # These map to our internal plan names
 PLANS = {
-    "starter": {
-        "name": "Starter",
-        "monthly_amount": 83300,  # ₹833/mo (₹9,999/yr)
-        "yearly_amount": 999900,   # ₹9,999/yr
-        "reports_per_month": 5,
-        "features": ["5 reports/month", "Full gap analysis", "PDF export", "Email support"],
-    },
-    "professional": {
-        "name": "Professional",
+    "growth": {
+        "name": "Growth",
         "monthly_amount": 416700,  # ₹4,167/mo (₹49,999/yr)
         "yearly_amount": 4999900,  # ₹49,999/yr
         "reports_per_month": -1,  # unlimited
-        "features": ["Unlimited reports", "25 suppliers", "NIFTY 50 benchmarks", "Multi-framework mapping", "Carbon calculator", "PDF + XBRL-JSON export", "5 users", "Priority support"],
+        "supplier_limit": 25,
+        "features": ["Unlimited AI extractions", "25 suppliers", "Full Scope 1, 2 & 3 carbon", "Multi-framework mapping", "NIFTY 50 benchmarks", "PDF + XBRL-JSON export", "5 users", "Priority support"],
+    },
+    "scale": {
+        "name": "Scale",
+        "monthly_amount": 1666700,  # ₹16,667/mo (₹1,99,999/yr)
+        "yearly_amount": 19999900,  # ₹1,99,999/yr
+        "reports_per_month": -1,  # unlimited
+        "supplier_limit": -1,  # unlimited
+        "features": ["Unlimited AI extractions", "Unlimited suppliers", "XBRL filing generation", "Audit trail & compliance", "Supplier-side dashboard", "10 users", "Dedicated AM"],
     },
     "enterprise": {
         "name": "Enterprise",
         "monthly_amount": 0,  # Custom pricing
         "yearly_amount": 0,   # Custom pricing — handled via sales
         "reports_per_month": -1,  # unlimited
-        "features": ["Unlimited reports", "Unlimited suppliers", "XBRL filing", "Audit trail", "Dedicated support", "API access"],
+        "supplier_limit": -1,  # unlimited
+        "features": ["Unlimited everything", "API & ERP integration", "SSO / SAML", "Workflow approvals", "White-label option", "SLA guarantee", "Unlimited users"],
     },
-    "pay_per_report": {
-        "name": "Pay Per Report",
-        "amount": 250000,  # ₹2,500 per report
-        "features": ["Single report analysis", "Full gap analysis", "NIFTY 50 benchmarks", "PDF export"],
+    # Legacy — kept for backwards compat with existing subscribers
+    "starter": {
+        "name": "Starter (Legacy)",
+        "monthly_amount": 83300,
+        "yearly_amount": 999900,
+        "reports_per_month": 5,
+        "supplier_limit": 5,
+        "features": ["5 reports/month", "Full gap analysis", "PDF export", "Email support"],
+    },
+    "professional": {
+        "name": "Professional (Legacy)",
+        "monthly_amount": 416700,
+        "yearly_amount": 4999900,
+        "reports_per_month": -1,
+        "supplier_limit": 25,
+        "features": ["Unlimited reports", "25 suppliers", "Multi-framework mapping", "Carbon calculator"],
     },
 }
 
@@ -68,8 +83,9 @@ async def get_plans():
 @router.post("/create-subscription")
 async def create_subscription(req: CreateSubscriptionRequest):
     """Create a Razorpay subscription for recurring billing."""
-    if req.plan not in PLANS or req.plan == "pay_per_report":
-        raise HTTPException(status_code=400, detail="Invalid plan for subscription")
+    valid_subscription_plans = ("growth", "scale", "starter", "professional")
+    if req.plan not in valid_subscription_plans:
+        raise HTTPException(status_code=400, detail=f"Invalid plan for subscription. Valid: {valid_subscription_plans}")
 
     plan_data = PLANS[req.plan]
     amount = plan_data["yearly_amount"] if req.billing_period == "yearly" else plan_data["monthly_amount"]
