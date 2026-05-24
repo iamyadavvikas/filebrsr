@@ -230,14 +230,14 @@ export default function HomePage() {
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
-                  href="/signup"
+                  href="/platform/supply-chain"
                   style={{ fontSize: 15, fontWeight: 700, padding: "16px 36px", borderRadius: 12, background: "#E8B931", color: "#1B4D3E", display: "inline-flex", alignItems: "center", gap: 8 }}
                 >
                   ASSESS MY SUPPLIERS
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </Link>
                 <Link
-                  href="/upload"
+                  href="/platform/upload-extract"
                   style={{ fontSize: 15, fontWeight: 600, padding: "16px 36px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.9)", display: "inline-flex", alignItems: "center", gap: 8 }}
                 >
                   TRY AI BRSR EXTRACTION
@@ -725,7 +725,7 @@ export default function HomePage() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </Link>
               <Link
-                href="/upload"
+                href="/platform/upload-extract"
                 style={{ fontSize: 15, fontWeight: 600, padding: "16px 36px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.9)", display: "inline-flex", alignItems: "center", gap: 8 }}
               >
                 TRY AI EXTRACTION

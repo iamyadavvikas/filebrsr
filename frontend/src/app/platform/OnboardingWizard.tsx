@@ -39,7 +39,6 @@ interface Props {
 
 export default function OnboardingWizard({ userId, onComplete }: Props) {
   const [step, setStep] = useState(1);
-  const [companyName, setCompanyName] = useState("");
   const [sector, setSector] = useState("");
   const [reportingCategory, setReportingCategory] = useState("");
   const [saving, setSaving] = useState(false);
@@ -48,7 +47,6 @@ export default function OnboardingWizard({ userId, onComplete }: Props) {
     setSaving(true);
     const supabase = createClient();
     await supabase.from("profiles").update({
-      company_name: companyName,
       sector,
       reporting_category: reportingCategory,
       onboarding_completed: true,
@@ -62,7 +60,7 @@ export default function OnboardingWizard({ userId, onComplete }: Props) {
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 relative">
         {/* Progress */}
         <div className="flex items-center gap-2 mb-6">
-          {[1, 2, 3].map((s) => (
+          {[1, 2].map((s) => (
             <div
               key={s}
               className={`h-1.5 flex-1 rounded-full transition-colors ${
@@ -80,31 +78,9 @@ export default function OnboardingWizard({ userId, onComplete }: Props) {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Welcome to FileBRSR</h2>
-                <p className="text-sm text-gray-500">Let&apos;s set up your company profile</p>
+                <p className="text-sm text-gray-500">Select your sector for relevant benchmarks</p>
               </div>
             </div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Company Name</label>
-            <input
-              type="text"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="e.g. Tata Consultancy Services Ltd."
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400 outline-none"
-            />
-            <button
-              onClick={() => setStep(2)}
-              disabled={!companyName.trim()}
-              className="mt-6 w-full flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Continue <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-1">Select your sector</h2>
-            <p className="text-sm text-gray-500 mb-4">This helps us provide relevant benchmarks and peer comparisons</p>
             <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
               {SECTORS.map((s) => (
                 <button
@@ -121,7 +97,7 @@ export default function OnboardingWizard({ userId, onComplete }: Props) {
               ))}
             </div>
             <button
-              onClick={() => setStep(3)}
+              onClick={() => setStep(2)}
               disabled={!sector}
               className="mt-6 w-full flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -130,7 +106,7 @@ export default function OnboardingWizard({ userId, onComplete }: Props) {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <div>
             <h2 className="text-lg font-bold text-gray-900 mb-1">Reporting category</h2>
             <p className="text-sm text-gray-500 mb-4">Which SEBI BRSR requirement applies to you?</p>

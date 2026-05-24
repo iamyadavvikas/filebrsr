@@ -17,6 +17,19 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+// Emission Factor Organizations
+const EMISSION_FACTOR_ORGS = [
+  { value: "cea_2024", label: "CEA India 2024", desc: "Central Electricity Authority — India grid factor", region: "India" },
+  { value: "cea_2023", label: "CEA India 2023", desc: "Central Electricity Authority — Previous year", region: "India" },
+  { value: "ipcc_ar6", label: "IPCC AR6 (2021)", desc: "Intergovernmental Panel on Climate Change — 6th Assessment", region: "Global" },
+  { value: "ipcc_ar5", label: "IPCC AR5 (2014)", desc: "IPCC 5th Assessment Report defaults", region: "Global" },
+  { value: "epa_2024", label: "US EPA (2024)", desc: "US Environmental Protection Agency — GHG Emission Factors Hub", region: "USA" },
+  { value: "defra_2024", label: "UK DEFRA (2024)", desc: "UK Dept for Environment, Food & Rural Affairs — Conversion Factors", region: "UK" },
+  { value: "defra_2023", label: "UK DEFRA (2023)", desc: "DEFRA/BEIS previous year conversion factors", region: "UK" },
+  { value: "ghg_protocol", label: "GHG Protocol", desc: "WRI/WBCSD GHG Protocol — Cross-sector tools", region: "Global" },
+  { value: "isro_india", label: "ISRO / BEE India", desc: "Bureau of Energy Efficiency — India-specific factors", region: "India" },
+];
+
 const FUEL_TYPES = [
   { value: "coal", label: "Coal", unit: "MT" },
   { value: "natural_gas", label: "Natural Gas", unit: "SCM" },
@@ -32,6 +45,15 @@ const FUEL_TYPES = [
   { value: "propane", label: "Propane", unit: "KL" },
   { value: "kerosene", label: "Kerosene", unit: "KL" },
   { value: "wood_charcoal", label: "Wood / Charcoal", unit: "MT" },
+  { value: "biogas", label: "Biogas / Biomethane", unit: "SCM" },
+  { value: "hsd", label: "High Speed Diesel (HSD)", unit: "KL" },
+  { value: "naphtha", label: "Naphtha", unit: "KL" },
+  { value: "acetylene", label: "Acetylene", unit: "kg" },
+  { value: "refrigerant_r22", label: "Refrigerant R-22 (HCFC)", unit: "kg" },
+  { value: "refrigerant_r410a", label: "Refrigerant R-410A (HFC)", unit: "kg" },
+  { value: "refrigerant_r134a", label: "Refrigerant R-134a", unit: "kg" },
+  { value: "sf6", label: "SF₆ (Switchgear)", unit: "kg" },
+  { value: "co2_fire_extinguisher", label: "CO₂ Fire Extinguishers", unit: "kg" },
 ];
 
 const SCOPE2_CATEGORIES = [
@@ -39,32 +61,44 @@ const SCOPE2_CATEGORIES = [
   { value: "purchased_electricity_market", label: "Purchased Electricity (Market-based)", unit: "MWh", subcategory: "market_based" },
   { value: "purchased_steam", label: "Purchased Steam / Heat", unit: "GJ", subcategory: "location_based" },
   { value: "purchased_cooling", label: "Purchased Cooling", unit: "GJ", subcategory: "location_based" },
+  { value: "purchased_hot_water", label: "Purchased Hot Water", unit: "GJ", subcategory: "location_based" },
   { value: "renewable_electricity_ppa", label: "Renewable (PPA / Open Access)", unit: "MWh", subcategory: "market_based" },
   { value: "renewable_electricity_rec", label: "Renewable (REC Certificates)", unit: "MWh", subcategory: "market_based" },
+  { value: "renewable_electricity_igc", label: "Renewable (I-GEC / Green Certificates)", unit: "MWh", subcategory: "market_based" },
   { value: "captive_solar", label: "Captive Solar Power", unit: "MWh", subcategory: "market_based" },
   { value: "captive_wind", label: "Captive Wind Power", unit: "MWh", subcategory: "market_based" },
+  { value: "captive_biomass_power", label: "Captive Biomass Power", unit: "MWh", subcategory: "market_based" },
+  { value: "wheeled_power", label: "Wheeled Power (Third Party)", unit: "MWh", subcategory: "market_based" },
 ];
 
 const SCOPE3_CATEGORIES = [
-  { value: "business_travel_air_domestic", label: "Air Travel (Domestic)", unit: "passenger-km" },
-  { value: "business_travel_air_short_haul", label: "Air Travel (Short-haul International)", unit: "passenger-km" },
-  { value: "business_travel_air_long_haul", label: "Air Travel (Long-haul International)", unit: "passenger-km" },
-  { value: "business_travel_rail", label: "Rail Travel", unit: "passenger-km" },
-  { value: "business_travel_taxi", label: "Taxi / Cab Travel", unit: "km" },
-  { value: "employee_commute_car", label: "Employee Commute (Car)", unit: "km" },
-  { value: "employee_commute_two_wheeler", label: "Employee Commute (2-Wheeler)", unit: "km" },
-  { value: "employee_commute_bus", label: "Employee Commute (Bus)", unit: "passenger-km" },
-  { value: "employee_commute_metro", label: "Employee Commute (Metro/Rail)", unit: "passenger-km" },
-  { value: "waste_landfill", label: "Waste to Landfill", unit: "MT" },
-  { value: "waste_incineration", label: "Waste Incineration", unit: "MT" },
-  { value: "waste_recycling", label: "Waste Recycled", unit: "MT" },
-  { value: "water_supply", label: "Water Supply & Treatment", unit: "KL" },
-  { value: "freight_road", label: "Freight (Road)", unit: "tonne-km" },
-  { value: "freight_rail", label: "Freight (Rail)", unit: "tonne-km" },
-  { value: "freight_sea", label: "Freight (Sea)", unit: "tonne-km" },
-  { value: "freight_air", label: "Freight (Air)", unit: "tonne-km" },
-  { value: "purchased_goods", label: "Purchased Goods & Services", unit: "₹ Lakhs spent" },
-  { value: "capital_goods", label: "Capital Goods", unit: "₹ Lakhs spent" },
+  { value: "business_travel_air_domestic", label: "Air Travel (Domestic)", unit: "passenger-km", cat: "Cat 6: Business Travel" },
+  { value: "business_travel_air_short_haul", label: "Air Travel (Short-haul International)", unit: "passenger-km", cat: "Cat 6: Business Travel" },
+  { value: "business_travel_air_long_haul", label: "Air Travel (Long-haul International)", unit: "passenger-km", cat: "Cat 6: Business Travel" },
+  { value: "business_travel_rail", label: "Rail Travel", unit: "passenger-km", cat: "Cat 6: Business Travel" },
+  { value: "business_travel_taxi", label: "Taxi / Cab Travel", unit: "km", cat: "Cat 6: Business Travel" },
+  { value: "business_travel_hotel", label: "Hotel Nights", unit: "nights", cat: "Cat 6: Business Travel" },
+  { value: "employee_commute_car", label: "Employee Commute (Car)", unit: "km", cat: "Cat 7: Employee Commute" },
+  { value: "employee_commute_two_wheeler", label: "Employee Commute (2-Wheeler)", unit: "km", cat: "Cat 7: Employee Commute" },
+  { value: "employee_commute_bus", label: "Employee Commute (Bus)", unit: "passenger-km", cat: "Cat 7: Employee Commute" },
+  { value: "employee_commute_metro", label: "Employee Commute (Metro/Rail)", unit: "passenger-km", cat: "Cat 7: Employee Commute" },
+  { value: "employee_commute_wfh", label: "Work from Home", unit: "FTE-days", cat: "Cat 7: Employee Commute" },
+  { value: "waste_landfill", label: "Waste to Landfill", unit: "MT", cat: "Cat 5: Waste" },
+  { value: "waste_incineration", label: "Waste Incineration", unit: "MT", cat: "Cat 5: Waste" },
+  { value: "waste_recycling", label: "Waste Recycled", unit: "MT", cat: "Cat 5: Waste" },
+  { value: "waste_composting", label: "Waste Composting", unit: "MT", cat: "Cat 5: Waste" },
+  { value: "water_supply", label: "Water Supply & Treatment", unit: "KL", cat: "Cat 5: Waste" },
+  { value: "freight_road", label: "Freight (Road)", unit: "tonne-km", cat: "Cat 4/9: Transport" },
+  { value: "freight_rail", label: "Freight (Rail)", unit: "tonne-km", cat: "Cat 4/9: Transport" },
+  { value: "freight_sea", label: "Freight (Sea)", unit: "tonne-km", cat: "Cat 4/9: Transport" },
+  { value: "freight_air", label: "Freight (Air)", unit: "tonne-km", cat: "Cat 4/9: Transport" },
+  { value: "purchased_goods", label: "Purchased Goods & Services", unit: "₹ Lakhs spent", cat: "Cat 1: Purchased Goods" },
+  { value: "capital_goods", label: "Capital Goods", unit: "₹ Lakhs spent", cat: "Cat 2: Capital Goods" },
+  { value: "fuel_energy_upstream", label: "Fuel & Energy (Upstream)", unit: "MWh", cat: "Cat 3: Fuel & Energy" },
+  { value: "end_of_life_products", label: "End-of-Life Treatment of Sold Products", unit: "MT", cat: "Cat 12: End of Life" },
+  { value: "use_of_sold_products", label: "Use of Sold Products", unit: "units × kWh", cat: "Cat 11: Use of Products" },
+  { value: "leased_assets", label: "Leased Assets (Downstream)", unit: "sq.ft", cat: "Cat 13: Leased Assets" },
+  { value: "investments", label: "Investments", unit: "₹ Cr invested", cat: "Cat 15: Investments" },
 ];
 
 const STATES = [
@@ -82,6 +116,10 @@ const STATES = [
   { value: "madhya_pradesh", label: "Madhya Pradesh" },
   { value: "kerala", label: "Kerala" },
   { value: "punjab", label: "Punjab" },
+  { value: "chhattisgarh", label: "Chhattisgarh" },
+  { value: "jharkhand", label: "Jharkhand" },
+  { value: "odisha", label: "Odisha" },
+  { value: "assam", label: "Assam" },
 ];
 
 interface EmissionEntry {
@@ -100,6 +138,7 @@ interface Scope2Entry {
 
 export default function CarbonClient() {
   const [financialYear, setFinancialYear] = useState("FY2025-26");
+  const [emissionFactorOrg, setEmissionFactorOrg] = useState("cea_2024");
   const [scope1Entries, setScope1Entries] = useState<EmissionEntry[]>([
     { id: "1", type: "diesel_dg_set", quantity: 0 },
   ]);
@@ -191,6 +230,7 @@ export default function CarbonClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           financial_year: financialYear,
+          emission_factor_source: emissionFactorOrg,
           scope1_entries: scope1Entries
             .filter((e) => e.quantity > 0)
             .map((e) => ({ fuel_type: e.type, quantity: e.quantity })),
@@ -230,7 +270,7 @@ export default function CarbonClient() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Carbon Calculator</h1>
           <p className="text-gray-500 mt-1">
-            Calculate GHG emissions using Indian emission factors (CEA, IPCC)
+            Calculate GHG emissions (Scope 1, 2, 3) with configurable emission factors
           </p>
         </div>
         <select
@@ -244,6 +284,40 @@ export default function CarbonClient() {
           <option value="FY2025-26">FY 2025-26</option>
           <option value="FY2026-27">FY 2026-27</option>
         </select>
+      </div>
+
+      {/* Emission Factor Organization Selector */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-gray-900 text-sm">Emission Factor Source</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Select the organization whose emission factors to use for calculations</p>
+          </div>
+          <select
+            value={emissionFactorOrg}
+            onChange={(e) => setEmissionFactorOrg(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white font-medium min-w-[260px]"
+          >
+            <optgroup label="India-Specific">
+              {EMISSION_FACTOR_ORGS.filter(o => o.region === "India").map((org) => (
+                <option key={org.value} value={org.value}>{org.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Global Standards">
+              {EMISSION_FACTOR_ORGS.filter(o => o.region === "Global").map((org) => (
+                <option key={org.value} value={org.value}>{org.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="International">
+              {EMISSION_FACTOR_ORGS.filter(o => !["India", "Global"].includes(o.region)).map((org) => (
+                <option key={org.value} value={org.value}>{org.label}</option>
+              ))}
+            </optgroup>
+          </select>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          {EMISSION_FACTOR_ORGS.find(o => o.value === emissionFactorOrg)?.desc}
+        </p>
       </div>
 
       {/* Info Banner */}
@@ -420,11 +494,16 @@ export default function CarbonClient() {
                   }}
                   className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
                 >
-                  {SCOPE3_CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label} ({c.unit})
-                    </option>
-                  ))}
+                  {(() => {
+                    const groups = Array.from(new Set(SCOPE3_CATEGORIES.map(c => c.cat)));
+                    return groups.map(group => (
+                      <optgroup key={group} label={group}>
+                        {SCOPE3_CATEGORIES.filter(c => c.cat === group).map(c => (
+                          <option key={c.value} value={c.value}>{c.label} ({c.unit})</option>
+                        ))}
+                      </optgroup>
+                    ));
+                  })()}
                 </select>
                 <input
                   type="number"
