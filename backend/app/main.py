@@ -109,6 +109,23 @@ async def extract_brsr(
 
     supabase = get_supabase_admin()
 
+    # ─── Backend Extraction Quota Enforcement ──────────────────
+    try:
+        profile = supabase.table("profiles").select("plan, credits_remaining").eq("id", user_id).single().execute()
+        if profile.data:
+            plan = profile.data.get("plan", "free")
+            credits = profile.data.get("credits_remaining", 0)
+            # Free/starter: limited credits; growth/pro/scale/enterprise: unlimited
+            if plan in ("free", "starter") and credits <= 0:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Extraction quota exhausted on {plan} plan. Upgrade for more extractions."
+                )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("Could not check extraction quota for user %s: %s", user_id, str(e))
+
     try:
         # Read PDF
         content = await file.read()
