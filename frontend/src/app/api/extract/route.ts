@@ -190,8 +190,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call backend synchronously (Cloud Run has no 60s limit)
-    const backendRes = await fetch(`${backendUrl}/api/extract-async`, {
+    // Call backend to queue extraction (returns immediately)
+    const backendRes = await fetch(`${backendUrl}/api/extract-queue`, {
       method: "POST",
       body: JSON.stringify({
         report_id: report.id,
@@ -202,16 +202,64 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
-      signal: AbortSignal.timeout(240000), // 4 min timeout
+      signal: AbortSignal.timeout(10000), // Queue insert is fast
     });
 
-    const backendData = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      // Fallback: try synchronous extract-async if queue fails
+      const fallbackRes = await fetch(`${backendUrl}/api/extract-async`, {
+        method: "POST",
+        body: JSON.stringify({
+          report_id: report.id,
+          user_id: user.id,
+          file_url: fileName,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        signal: AbortSignal.timeout(240000),
+      });
 
-    if (!backendRes.ok || backendData.status === "failed") {
-      // Backend already marks report as failed in DB
+      const fallbackData = await fallbackRes.json().catch(() => ({}));
+      if (!fallbackRes.ok || fallbackData.status === "failed") {
+        return NextResponse.json({
+          reportId: report.id,
+          message: "Extraction failed. Check results page for details.",
+        });
+      }
+    }
+
+    // Poll for completion (max 240s with 3s intervals)
+    let extractionDone = false;
+    const maxAttempts = 80;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      try {
+        const statusRes = await fetch(
+          `${backendUrl}/api/extract-status/${report.id}`,
+          {
+            headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
+            signal: AbortSignal.timeout(5000),
+          }
+        );
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (statusData.status === "completed" || statusData.status === "failed") {
+            extractionDone = true;
+            break;
+          }
+        }
+      } catch {
+        // Continue polling
+      }
+    }
+
+    if (!extractionDone) {
+      // Still processing — return reportId so user can check later
       return NextResponse.json({
         reportId: report.id,
-        message: "Extraction failed. Check results page for details.",
+        message: "Extraction in progress. Check your reports page for results.",
       });
     }
 

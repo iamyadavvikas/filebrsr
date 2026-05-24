@@ -330,11 +330,16 @@ async def track_event(
 @router.get("/analytics/dashboard")
 async def get_analytics_dashboard(days: int = 30, authorization: str = Header(...)):
     """
-    Get analytics dashboard data.
+    Get analytics dashboard data. Admin-only.
     Returns: user stats, extraction stats, event trends, top pages.
     """
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
+
+    # Admin gate: only users with is_admin=true can access analytics
+    profile = sb.table("profiles").select("is_admin").eq("id", user_id).single().execute()
+    if not profile.data or not profile.data.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     since = (datetime.utcnow() - timedelta(days=days)).isoformat()
 
@@ -426,8 +431,15 @@ async def get_analytics_events(
     limit: int = 50,
     authorization: str = Header(...),
 ):
-    """Query analytics events with filters."""
+    """Query analytics events with filters. Admin-only."""
+    user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
+
+    # Admin gate
+    profile = sb.table("profiles").select("is_admin").eq("id", user_id).single().execute()
+    if not profile.data or not profile.data.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
     since = (datetime.utcnow() - timedelta(days=days)).isoformat()
 
     query = sb.table("analytics_events").select("*").gte("created_at", since).order("created_at", desc=True).limit(limit)

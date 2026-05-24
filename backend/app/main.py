@@ -396,6 +396,42 @@ class ExtractAsyncRequest(BaseModel):
     file_url: str  # Supabase Storage path e.g. "user_id/timestamp-filename.pdf"
 
 
+@app.post("/api/extract-queue")
+async def queue_extraction(req: ExtractAsyncRequest, authorization: str = Header(...)):
+    """Queue an extraction job for background processing. Returns immediately."""
+    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
+    if authorization != expected_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    supabase = get_supabase_admin()
+
+    # Insert into extraction_jobs queue
+    result = supabase.table("extraction_jobs").insert({
+        "report_id": req.report_id,
+        "user_id": req.user_id,
+        "file_url": req.file_url,
+        "status": "queued",
+    }).execute()
+
+    return {"status": "queued", "report_id": req.report_id, "job_id": result.data[0]["id"] if result.data else None}
+
+
+@app.get("/api/extract-status/{report_id}")
+async def get_extraction_status(report_id: str, authorization: str = Header(...)):
+    """Poll extraction status for a report."""
+    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
+    if authorization != expected_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    supabase = get_supabase_admin()
+    result = supabase.table("reports").select("status, company_name, financial_year").eq("id", report_id).single().execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    return {"status": result.data["status"], "company_name": result.data.get("company_name"), "financial_year": result.data.get("financial_year")}
+
+
 @app.post("/api/extract-async")
 async def extract_brsr_async(
     req: ExtractAsyncRequest,
