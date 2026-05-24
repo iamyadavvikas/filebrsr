@@ -37,6 +37,8 @@ export default function ReportsClient({ initialReports }: { initialReports: Extr
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Year-over-year: group reports by FY
   const reportsByFY = reports.reduce<Record<string, ExtractionReport[]>>((acc, r) => {
@@ -86,6 +88,42 @@ export default function ReportsClient({ initialReports }: { initialReports: Extr
       }
     } catch {}
     setDeleting(null);
+  }
+
+  async function bulkDelete() {
+    if (selected.size === 0) return;
+    if (!confirm(`Delete ${selected.size} selected extraction(s)? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      for (const id of selected) {
+        await fetch(`/backend/api/platform/reports/${id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${user?.id || ""}` },
+        });
+      }
+      setReports((prev) => prev.filter((r) => !selected.has(r.id)));
+      setSelected(new Set());
+    } catch {}
+    setBulkDeleting(false);
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === reports.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(reports.map((r) => r.id)));
+    }
   }
 
   return (
@@ -144,12 +182,40 @@ export default function ReportsClient({ initialReports }: { initialReports: Extr
         </div>
       ) : (
         <div className="space-y-2">
+          {/* Bulk actions bar */}
+          <div className="flex items-center gap-3 px-1 py-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.size === reports.length && reports.length > 0}
+                onChange={toggleSelectAll}
+                className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="text-xs text-gray-500 font-medium">Select All</span>
+            </label>
+            {selected.size > 0 && (
+              <button
+                onClick={bulkDelete}
+                disabled={bulkDeleting}
+                className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete {selected.size} selected
+              </button>
+            )}
+          </div>
           {reports.map((report) => {
             const isExpanded = expandedId === report.id;
             return (
               <div key={report.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden transition-all">
                 {/* Report Row */}
                 <div className="flex items-center gap-4 p-4">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(report.id)}
+                    onChange={() => toggleSelect(report.id)}
+                    className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 flex-shrink-0"
+                  />
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     report.status === "completed" ? "bg-emerald-100" : "bg-amber-100"
                   }`}>
