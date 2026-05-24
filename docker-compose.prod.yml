@@ -20,6 +20,10 @@ services:
     depends_on:
       - backend
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
 
   backend:
     build:
@@ -40,6 +44,31 @@ services:
     ports:
       - "8000:8000"
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+
+  worker:
+    build:
+      context: ./backend
+    command: python -m app.worker
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AWS_DEFAULT_REGION=ap-south-1
+      - MAX_FILE_SIZE_MB=50
+      - ENVIRONMENT=production
+      - SENTRY_DSN=${SENTRY_DSN}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
 
   nginx:
     image: nginx:alpine

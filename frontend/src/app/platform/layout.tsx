@@ -101,11 +101,18 @@ export default function PlatformLayout({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setUserId(data.user.id);
+      if (data.user) {
+        setUserId(data.user.id);
+        // Check admin status
+        supabase.from("profiles").select("is_admin").eq("id", data.user.id).single().then(({ data: profile }) => {
+          if (profile?.is_admin) setIsAdmin(true);
+        });
+      }
     });
   }, []);
 
@@ -118,6 +125,15 @@ export default function PlatformLayout({
   const currentPage = navGroups
     .flatMap((g) => g.items)
     .find((item) => pathname === item.href || (item.href !== "/platform" && pathname?.startsWith(item.href)));
+
+  // Filter nav items: hide Analytics for non-admins
+  const filteredNavGroups = navGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item => {
+      if (item.href === "/platform/analytics" && !isAdmin) return false;
+      return true;
+    }),
+  })).filter(group => group.items.length > 0);
 
   return (
     <AnalyticsProvider userId={userId}>
@@ -166,7 +182,7 @@ export default function PlatformLayout({
 
             {/* Navigation */}
             <nav className="flex-1 py-3 overflow-y-auto">
-              {navGroups.map((group, gi) => (
+              {filteredNavGroups.map((group, gi) => (
                 <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-white/10" : ""}>
                   {group.label && (
                     <span className="px-4 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
@@ -218,7 +234,7 @@ export default function PlatformLayout({
 
         {/* Navigation */}
         <nav className="flex-1 py-2 overflow-y-auto">
-          {navGroups.map((group, gi) => (
+          {filteredNavGroups.map((group, gi) => (
             <div key={gi} className={gi > 0 ? "mt-3 pt-3 border-t border-white/10" : ""}>
               {!collapsed && group.label && (
                 <span className="px-4 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">

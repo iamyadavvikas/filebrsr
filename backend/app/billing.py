@@ -20,29 +20,29 @@ def _settings():
 PLANS = {
     "starter": {
         "name": "Starter",
-        "monthly_amount": 208300,  # ₹2,083/mo (₹25K/yr)
-        "yearly_amount": 2500000,   # ₹25,000/yr
+        "monthly_amount": 83300,  # ₹833/mo (₹9,999/yr)
+        "yearly_amount": 999900,   # ₹9,999/yr
         "reports_per_month": 5,
-        "features": ["5 reports/month", "Basic gap analysis", "Email support"],
+        "features": ["5 reports/month", "Full gap analysis", "PDF export", "Email support"],
     },
     "professional": {
         "name": "Professional",
-        "monthly_amount": 1250000,  # ₹12,500/mo (₹1.5L/yr)
-        "yearly_amount": 15000000,  # ₹1,50,000/yr
-        "reports_per_month": 50,
-        "features": ["50 reports/month", "NIFTY 50 benchmarks", "PDF reports", "Priority support", "Multi-user"],
+        "monthly_amount": 416700,  # ₹4,167/mo (₹49,999/yr)
+        "yearly_amount": 4999900,  # ₹49,999/yr
+        "reports_per_month": -1,  # unlimited
+        "features": ["Unlimited reports", "25 suppliers", "NIFTY 50 benchmarks", "Multi-framework mapping", "Carbon calculator", "PDF + XBRL-JSON export", "5 users", "Priority support"],
     },
     "enterprise": {
         "name": "Enterprise",
-        "monthly_amount": 4166700,  # ₹41,667/mo (₹5L/yr)
-        "yearly_amount": 50000000,  # ₹5,00,000/yr
+        "monthly_amount": 0,  # Custom pricing
+        "yearly_amount": 0,   # Custom pricing — handled via sales
         "reports_per_month": -1,  # unlimited
-        "features": ["Unlimited reports", "API access", "Custom integrations", "Dedicated support", "White-label"],
+        "features": ["Unlimited reports", "Unlimited suppliers", "XBRL filing", "Audit trail", "Dedicated support", "API access"],
     },
     "pay_per_report": {
         "name": "Pay Per Report",
         "amount": 250000,  # ₹2,500 per report
-        "features": ["Single report analysis", "Full gap analysis", "Benchmark comparison"],
+        "features": ["Single report analysis", "Full gap analysis", "NIFTY 50 benchmarks", "PDF export"],
     },
 }
 

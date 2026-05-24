@@ -178,37 +178,18 @@ async def _extract_with_groq(text: str, api_key: str) -> dict[str, Any]:
 
 
 async def extract_with_ai(text: str, gemini_key: str, groq_key: str = "", anthropic_key: str = "") -> dict[str, Any]:
-    """Extract BRSR metrics using AI. Chain: Bedrock → Claude → Gemini → Groq → regex."""
-    # Try AWS Bedrock first (uses IAM credentials, no API key needed)
-    try:
-        result = await _extract_with_bedrock(text)
-        if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
-            print("AI extraction: Bedrock Claude Sonnet succeeded")
-            return result
-    except Exception as e:
-        print(f"Bedrock failed: {e}")
-
-    # Try Claude direct API
-    if anthropic_key:
-        try:
-            result = await _extract_with_claude(text, anthropic_key)
-            if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
-                print("AI extraction: Claude succeeded")
-                return result
-        except Exception as e:
-            print(f"Claude failed: {e}")
-
-    # Fallback to Gemini
+    """Extract BRSR metrics using AI. Chain: Gemini (free, fast) → Groq → Bedrock → Claude."""
+    # Primary: Gemini Flash (free tier: 1500 RPD, 1M context)
     if gemini_key and gemini_key != "your_gemini_api_key":
         try:
             result = await _extract_with_gemini(text, gemini_key)
             if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
-                print("AI extraction: Gemini succeeded")
+                print("AI extraction: Gemini Flash succeeded")
                 return result
         except Exception as e:
             print(f"Gemini failed: {e}")
 
-    # Fallback to Groq
+    # Fallback 1: Groq (free tier: 30 RPM)
     if groq_key:
         try:
             result = await _extract_with_groq(text, groq_key)
@@ -217,6 +198,25 @@ async def extract_with_ai(text: str, gemini_key: str, groq_key: str = "", anthro
                 return result
         except Exception as e:
             print(f"Groq failed: {e}")
+
+    # Fallback 2: AWS Bedrock (uses IAM credentials)
+    try:
+        result = await _extract_with_bedrock(text)
+        if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
+            print("AI extraction: Bedrock succeeded")
+            return result
+    except Exception as e:
+        print(f"Bedrock failed: {e}")
+
+    # Fallback 3: Claude direct API (most expensive)
+    if anthropic_key:
+        try:
+            result = await _extract_with_claude(text, anthropic_key)
+            if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
+                print("AI extraction: Claude succeeded")
+                return result
+        except Exception as e:
+            print(f"Claude failed: {e}")
 
     print("AI extraction: all providers failed, using regex only")
     return {"section_a": {}, "section_b": {}, "section_c": {}}

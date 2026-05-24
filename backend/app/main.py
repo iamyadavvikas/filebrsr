@@ -338,10 +338,98 @@ async def compare_with_benchmark(req: BenchmarkCompareRequest):
     return get_benchmark_comparison(req.extracted_data, req.sector)
 
 
+# ─── Post-Extraction Email Notification ───────────────────────
+class NotifyExtractionRequest(BaseModel):
+    to_email: str
+    file_name: str
+    report_id: str
+
+
+@app.post("/api/notify/extraction-complete")
+async def notify_extraction_complete(
+    req: NotifyExtractionRequest,
+    authorization: str = Header(...),
+):
+    """Send email notification after extraction completes."""
+    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
+    if authorization != expected_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    from app.email_service import send_extraction_complete
+
+    # Get extraction stats from the report
+    supabase = get_supabase_admin()
+    report_data = supabase.table("reports").select("extracted_data, confidence_scores").eq("id", req.report_id).single().execute()
+
+    datapoints_count = 0
+    avg_confidence = 0
+    compliance_score = 0
+
+    if report_data.data and report_data.data.get("extracted_data"):
+        extracted = report_data.data["extracted_data"]
+        for section in ["section_a", "section_b", "section_c"]:
+            datapoints_count += len(extracted.get(section, {}))
+        # Compliance = filled / 216 total
+        compliance_score = min(100, round((datapoints_count / 216) * 100))
+
+    if report_data.data and report_data.data.get("confidence_scores"):
+        scores = report_data.data["confidence_scores"]
+        if isinstance(scores, dict) and scores:
+            vals = [v for v in scores.values() if isinstance(v, (int, float))]
+            avg_confidence = round(sum(vals) / len(vals)) if vals else 0
+
+    await send_extraction_complete(
+        to_email=req.to_email,
+        file_name=req.file_name,
+        report_id=req.report_id,
+        datapoints_count=datapoints_count,
+        avg_confidence=avg_confidence,
+        compliance_score=compliance_score,
+    )
+
+    return {"status": "sent"}
+
+
 class ExtractAsyncRequest(BaseModel):
     report_id: str
     user_id: str
     file_url: str  # Supabase Storage path e.g. "user_id/timestamp-filename.pdf"
+
+
+@app.post("/api/extract-queue")
+async def queue_extraction(req: ExtractAsyncRequest, authorization: str = Header(...)):
+    """Queue an extraction job for background processing. Returns immediately."""
+    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
+    if authorization != expected_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    supabase = get_supabase_admin()
+
+    # Insert into extraction_jobs queue
+    result = supabase.table("extraction_jobs").insert({
+        "report_id": req.report_id,
+        "user_id": req.user_id,
+        "file_url": req.file_url,
+        "status": "queued",
+    }).execute()
+
+    return {"status": "queued", "report_id": req.report_id, "job_id": result.data[0]["id"] if result.data else None}
+
+
+@app.get("/api/extract-status/{report_id}")
+async def get_extraction_status(report_id: str, authorization: str = Header(...)):
+    """Poll extraction status for a report."""
+    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
+    if authorization != expected_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    supabase = get_supabase_admin()
+    result = supabase.table("reports").select("status, company_name, financial_year").eq("id", report_id).single().execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    return {"status": result.data["status"], "company_name": result.data.get("company_name"), "financial_year": result.data.get("financial_year")}
 
 
 @app.post("/api/extract-async")

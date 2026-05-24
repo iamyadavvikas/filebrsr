@@ -20,10 +20,21 @@ import {
   Zap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import OnboardingWizard from "./OnboardingWizard";
+import UpgradeNudge from "./UpgradeNudge";
+
+interface UserProfile {
+  plan: string | null;
+  credits_remaining: number | null;
+  extractions_this_month: number | null;
+  month_reset_at: string | null;
+}
 
 interface OverviewProps {
   userId: string;
   initialReports: any[];
+  userProfile: UserProfile | null;
+  onboardingCompleted?: boolean;
 }
 
 interface ExtractionReport {
@@ -35,10 +46,11 @@ interface ExtractionReport {
   total_extracted?: number;
 }
 
-export default function PlatformOverview({ userId, initialReports }: OverviewProps) {
+export default function PlatformOverview({ userId, initialReports, userProfile, onboardingCompleted }: OverviewProps) {
   const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<ExtractionReport[]>(initialReports as ExtractionReport[]);
+  const [showOnboarding, setShowOnboarding] = useState(!onboardingCompleted);
   const [stats, setStats] = useState({
     completion: 0,
     coreCompletion: 0,
@@ -114,6 +126,11 @@ export default function PlatformOverview({ userId, initialReports }: OverviewPro
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
+      {/* Onboarding Wizard */}
+      {showOnboarding && (
+        <OnboardingWizard userId={userId} onComplete={() => setShowOnboarding(false)} />
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-3">
         <div>
@@ -135,6 +152,18 @@ export default function PlatformOverview({ userId, initialReports }: OverviewPro
         </select>
       </div>
 
+      {/* Usage Counter */}
+      {userProfile && <UsageCounter profile={userProfile} />}
+
+      {/* Upgrade Nudge for free users */}
+      {userProfile && (
+        <UpgradeNudge
+          plan={userProfile.plan}
+          extractionsUsed={userProfile.extractions_this_month || 0}
+          limit={3}
+        />
+      )}
+
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         <MetricCard
@@ -148,7 +177,7 @@ export default function PlatformOverview({ userId, initialReports }: OverviewPro
         <MetricCard
           title="Data Points Filled"
           value={stats.totalEntries.toString()}
-          subtitle="of 216 mandatory"
+          subtitle="of 276 mandatory"
           icon={<BarChart3 className="w-5 h-5" />}
           color="text-blue-600"
           bgColor="bg-blue-50"
@@ -289,6 +318,33 @@ export default function PlatformOverview({ userId, initialReports }: OverviewPro
         </div>
       </div>
 
+      {/* Peer Comparison Widget */}
+      <div className="mb-8 bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-blue-600" /> Peer Comparison (NIFTY 50 Benchmarks)
+          </h3>
+          <Link href="/platform/benchmarks" className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1">
+            View All <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "GHG Intensity", yours: "—", sectorAvg: "3.2", unit: "tCO2e/₹Cr" },
+            { label: "Renewable Energy", yours: "—", sectorAvg: "55%", unit: "" },
+            { label: "Women Employees", yours: "—", sectorAvg: "36%", unit: "" },
+            { label: "Training Hours", yours: "—", sectorAvg: "62", unit: "hrs/yr" },
+          ].map((m) => (
+            <div key={m.label} className="bg-gray-50 rounded-lg p-3">
+              <p className="text-[11px] text-gray-500 mb-1">{m.label}</p>
+              <p className="text-lg font-bold text-gray-900">{m.yours}</p>
+              <p className="text-[10px] text-gray-400">Sector avg: {m.sectorAvg}{m.unit ? ` ${m.unit}` : ""}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-gray-400 mt-3">Upload an extraction to see how your ESG metrics compare to sector peers.</p>
+      </div>
+
       {/* Quick Actions */}
       <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -341,6 +397,84 @@ export default function PlatformOverview({ userId, initialReports }: OverviewPro
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function UsageCounter({ profile }: { profile: UserProfile }) {
+  const plan = (profile.plan || "free").toLowerCase();
+  const PLAN_LABELS: Record<string, string> = {
+    free: "Free",
+    starter: "Starter",
+    professional: "Pro",
+    pro: "Pro",
+    enterprise: "Enterprise",
+  };
+  const PLAN_LIMITS: Record<string, { monthly: number; lifetime?: number }> = {
+    free: { monthly: 0, lifetime: 3 },
+    starter: { monthly: 5 },
+    professional: { monthly: -1 },
+    pro: { monthly: -1 },
+    enterprise: { monthly: -1 },
+  };
+
+  const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+  const used = profile.extractions_this_month || 0;
+  const creditsLeft = profile.credits_remaining ?? 0;
+
+  // Determine display
+  let usageText: string;
+  let usagePercent: number;
+  let barColor: string;
+
+  if (limits.lifetime !== undefined) {
+    // Free tier: lifetime counter
+    const totalUsed = limits.lifetime - creditsLeft;
+    usageText = `${totalUsed} of ${limits.lifetime} free extractions used`;
+    usagePercent = (totalUsed / limits.lifetime) * 100;
+    barColor = usagePercent >= 100 ? "bg-red-500" : usagePercent >= 66 ? "bg-amber-500" : "bg-emerald-500";
+  } else if (limits.monthly > 0) {
+    // Capped monthly
+    usageText = `${used} of ${limits.monthly} extractions this month`;
+    usagePercent = (used / limits.monthly) * 100;
+    barColor = usagePercent >= 100 ? "bg-red-500" : usagePercent >= 80 ? "bg-amber-500" : "bg-emerald-500";
+  } else {
+    // Unlimited
+    usageText = `${used} extractions this month (unlimited)`;
+    usagePercent = 0;
+    barColor = "bg-emerald-500";
+  }
+
+  return (
+    <div className="mb-6 bg-white rounded-xl border border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center">
+          <Zap className="w-4 h-4 text-emerald-600" />
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-900">{PLAN_LABELS[plan] || "Free"} Plan</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+              {plan === "free" ? "FREE" : "ACTIVE"}
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">{usageText}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 sm:min-w-[200px]">
+        {limits.monthly !== -1 && (
+          <div className="flex-1">
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${Math.min(usagePercent, 100)}%` }} />
+            </div>
+          </div>
+        )}
+        {(plan === "free" || plan === "starter") && (
+          <Link href="/pricing" className="text-xs font-medium text-emerald-600 hover:text-emerald-700 whitespace-nowrap">
+            Upgrade →
+          </Link>
+        )}
       </div>
     </div>
   );

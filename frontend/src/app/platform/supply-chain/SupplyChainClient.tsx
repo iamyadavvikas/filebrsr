@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Plus, AlertTriangle, CheckCircle, Clock, X, Send, Copy, ExternalLink, RefreshCw, Award } from "lucide-react";
+import { Search, Plus, AlertTriangle, CheckCircle, Clock, X, Send, Copy, ExternalLink, RefreshCw, Award, Upload } from "lucide-react";
 
 interface Supplier {
   id: string;
@@ -33,6 +33,7 @@ export default function SupplyChainClient() {
   const [riskFilter, setRiskFilter] = useState<string>("all");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState<Supplier | null>(null);
+  const [showCsvUpload, setShowCsvUpload] = useState(false);
   const [inviteUrl, setInviteUrl] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
 
@@ -97,6 +98,9 @@ export default function SupplyChainClient() {
         <div className="flex gap-2">
           <button onClick={fetchSuppliers} className="p-2 border rounded-lg hover:bg-gray-50" title="Refresh">
             <RefreshCw className="w-4 h-4 text-gray-600" />
+          </button>
+          <button onClick={() => setShowCsvUpload(true)} className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50">
+            <Upload className="w-4 h-4" /> CSV Upload
           </button>
           <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">
             <Plus className="w-4 h-4" /> Add Supplier
@@ -303,6 +307,9 @@ export default function SupplyChainClient() {
       {/* Add Supplier Modal */}
       {showAddModal && <AddSupplierModal onClose={() => setShowAddModal(false)} onAdded={(s) => { setSuppliers((prev) => [s, ...prev]); setShowAddModal(false); }} />}
 
+      {/* CSV Upload Modal */}
+      {showCsvUpload && <CsvUploadModal onClose={() => setShowCsvUpload(false)} onUploaded={fetchSuppliers} />}
+
       {/* Invite Modal */}
       {showInviteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -332,6 +339,27 @@ export default function SupplyChainClient() {
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   </div>
+                </div>
+                <div className="flex gap-2">
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(`Hi, please complete this ESG self-assessment for BRSR compliance: ${inviteUrl}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-lg text-sm font-medium hover:bg-[#20BD5A] transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.96 7.96 0 01-4.105-1.137l-.295-.176-2.868.852.852-2.868-.176-.295A7.96 7.96 0 014 12c0-4.411 3.589-8 8-8s8 3.589 8 8-3.589 8-8 8z"/></svg>
+                    Share via WhatsApp
+                  </a>
+                  <button
+                    onClick={() => {
+                      if (showInviteModal?.contact_email) {
+                        window.open(`mailto:${showInviteModal.contact_email}?subject=ESG%20Self-Assessment%20Request&body=${encodeURIComponent(`Please complete this ESG assessment: ${inviteUrl}`)}`);
+                      }
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    <Send className="w-4 h-4" /> Email Invite
+                  </button>
                 </div>
                 <p className="text-xs text-gray-500">Share this link with your supplier. They can complete the questionnaire without signing up.</p>
               </div>
@@ -423,6 +451,114 @@ function AddSupplierModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
             {saving ? "Saving..." : "Add Supplier"}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// CSV Upload Modal
+function CsvUploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState<{ added: number; errors: string[] } | null>(null);
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const text = await file.text();
+      const lines = text.trim().split("\n");
+      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/[^a-z_]/g, ""));
+      const suppliers = [];
+      const errors: string[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(",").map((c) => c.trim());
+        const name = cols[headers.indexOf("name")] || cols[headers.indexOf("company_name")] || cols[0];
+        if (!name) { errors.push(`Row ${i + 1}: missing name`); continue; }
+        suppliers.push({
+          name,
+          category: cols[headers.indexOf("category")] || "tier_1",
+          industry: cols[headers.indexOf("industry")] || "",
+          location_state: cols[headers.indexOf("state")] || cols[headers.indexOf("location_state")] || "",
+          annual_spend_inr: Number(cols[headers.indexOf("annual_spend_inr")] || cols[headers.indexOf("spend")]) || null,
+          contact_name: cols[headers.indexOf("contact_name")] || "",
+          contact_email: cols[headers.indexOf("contact_email")] || cols[headers.indexOf("email")] || "",
+        });
+      }
+
+      // Send to API in batch
+      let added = 0;
+      for (const s of suppliers) {
+        try {
+          const res = await fetch("/api/suppliers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(s),
+          });
+          if (res.ok) added++;
+          else errors.push(`${s.name}: failed to add`);
+        } catch {
+          errors.push(`${s.name}: network error`);
+        }
+      }
+      setResult({ added, errors });
+      if (added > 0) onUploaded();
+    } catch (e) {
+      setResult({ added: 0, errors: ["Failed to parse CSV file"] });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">Bulk Upload Suppliers (CSV)</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded"><X className="w-5 h-5" /></button>
+        </div>
+
+        {!result ? (
+          <div className="space-y-4">
+            <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
+              <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+              <p className="text-sm text-gray-600 mb-2">Upload a CSV file with supplier data</p>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className="text-sm"
+              />
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs font-medium text-gray-700 mb-1">Required columns:</p>
+              <code className="text-[11px] text-gray-600">name, category, industry, state, annual_spend_inr, contact_name, contact_email</code>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button onClick={handleUpload} disabled={!file || uploading} className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+                {uploading ? "Uploading..." : "Upload & Add"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 bg-emerald-50 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-emerald-600" />
+              <p className="text-sm font-medium text-emerald-800">{result.added} suppliers added successfully</p>
+            </div>
+            {result.errors.length > 0 && (
+              <div className="p-3 bg-red-50 rounded-lg">
+                <p className="text-xs font-medium text-red-700 mb-1">{result.errors.length} errors:</p>
+                <ul className="text-xs text-red-600 space-y-0.5 max-h-32 overflow-y-auto">
+                  {result.errors.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+              </div>
+            )}
+            <button onClick={onClose} className="w-full px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200">Done</button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -23,19 +23,70 @@ export async function POST(request: NextRequest) {
   const FOUNDER_EMAILS = ["ydvikasiitkgp@gmail.com", "ydvikas.iitkgp@gmail.com", "vkyadav.iitkgp@gmail.com", "vikaskashi896@gmail.com", "yvikas.free@gmail.com"];
   const isFounder = user && FOUNDER_EMAILS.includes(user.email || "");
 
-  // Check user credits only for authenticated non-founder users
+  // Plan-based extraction quota enforcement
+  const PLAN_LIMITS: Record<string, { monthly: number; lifetime?: number }> = {
+    free: { monthly: 0, lifetime: 3 },       // 3 total, ever
+    starter: { monthly: 5 },                  // 5/month
+    professional: { monthly: -1 },            // unlimited
+    pro: { monthly: -1 },                     // alias
+    enterprise: { monthly: -1 },              // unlimited
+  };
+
   if (user && !isFounder) {
     const { data: profile } = await adminDb
       .from("profiles")
-      .select("credits_remaining, plan")
+      .select("credits_remaining, plan, extractions_this_month, month_reset_at")
       .eq("id", user.id)
       .single();
 
-    if (!profile || profile.credits_remaining <= 0) {
+    // If profile query fails (missing columns), try minimal query
+    let effectiveProfile = profile;
+    if (!effectiveProfile) {
+      const { data: fallback } = await adminDb
+        .from("profiles")
+        .select("credits_remaining, plan")
+        .eq("id", user.id)
+        .single();
+      effectiveProfile = fallback ? { ...fallback, extractions_this_month: 0, month_reset_at: null } : null;
+    }
+
+    if (!effectiveProfile) {
       return NextResponse.json(
-        { error: "No credits remaining. Please upgrade your plan." },
+        { error: "No account profile found. Please contact support." },
         { status: 403 }
       );
+    }
+
+    const plan = (effectiveProfile.plan || "free").toLowerCase();
+    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+
+    // Check lifetime limit (free tier)
+    if (limits.lifetime !== undefined) {
+      if ((effectiveProfile.credits_remaining ?? 0) <= 0) {
+        return NextResponse.json(
+          { error: `Free tier limit reached (${limits.lifetime} extractions). Upgrade to Starter (₹9,999/yr) for 5/month.` },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Check monthly limit (paid tiers)
+    if (limits.monthly > 0) {
+      const now = new Date();
+      const resetAt = effectiveProfile.month_reset_at ? new Date(effectiveProfile.month_reset_at) : null;
+
+      // Auto-reset monthly counter if new month
+      if (!resetAt || now.getMonth() !== resetAt.getMonth() || now.getFullYear() !== resetAt.getFullYear()) {
+        await adminDb.from("profiles").update({
+          extractions_this_month: 0,
+          month_reset_at: now.toISOString(),
+        }).eq("id", user.id);
+      } else if ((effectiveProfile.extractions_this_month || 0) >= limits.monthly) {
+        return NextResponse.json(
+          { error: `Monthly limit reached (${limits.monthly} extractions/month on ${plan} plan). Upgrade for more.` },
+          { status: 403 }
+        );
+      }
     }
   }
 
@@ -139,8 +190,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call backend synchronously (Cloud Run has no 60s limit)
-    const backendRes = await fetch(`${backendUrl}/api/extract-async`, {
+    // Call backend to queue extraction (returns immediately)
+    const backendRes = await fetch(`${backendUrl}/api/extract-queue`, {
       method: "POST",
       body: JSON.stringify({
         report_id: report.id,
@@ -151,33 +202,103 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
-      signal: AbortSignal.timeout(240000), // 4 min timeout
+      signal: AbortSignal.timeout(10000), // Queue insert is fast
     });
 
-    const backendData = await backendRes.json().catch(() => ({}));
+    if (!backendRes.ok) {
+      // Fallback: try synchronous extract-async if queue fails
+      const fallbackRes = await fetch(`${backendUrl}/api/extract-async`, {
+        method: "POST",
+        body: JSON.stringify({
+          report_id: report.id,
+          user_id: user.id,
+          file_url: fileName,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        signal: AbortSignal.timeout(240000),
+      });
 
-    if (!backendRes.ok || backendData.status === "failed") {
-      // Backend already marks report as failed in DB
+      const fallbackData = await fallbackRes.json().catch(() => ({}));
+      if (!fallbackRes.ok || fallbackData.status === "failed") {
+        return NextResponse.json({
+          reportId: report.id,
+          message: "Extraction failed. Check results page for details.",
+        });
+      }
+    }
+
+    // Poll for completion (max 240s with 3s intervals)
+    let extractionDone = false;
+    const maxAttempts = 80;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      try {
+        const statusRes = await fetch(
+          `${backendUrl}/api/extract-status/${report.id}`,
+          {
+            headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
+            signal: AbortSignal.timeout(5000),
+          }
+        );
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (statusData.status === "completed" || statusData.status === "failed") {
+            extractionDone = true;
+            break;
+          }
+        }
+      } catch {
+        // Continue polling
+      }
+    }
+
+    if (!extractionDone) {
+      // Still processing — return reportId so user can check later
       return NextResponse.json({
         reportId: report.id,
-        message: "Extraction failed. Check results page for details.",
+        message: "Extraction in progress. Check your reports page for results.",
       });
     }
 
-    // Deduct credit (skip for founders)
+    // Deduct credit + increment monthly counter (skip for founders)
     if (!isFounder) {
       const { data: profile } = await adminDb
         .from("profiles")
-        .select("credits_remaining")
+        .select("credits_remaining, extractions_this_month")
         .eq("id", user.id)
         .single();
 
       if (profile) {
         await adminDb
           .from("profiles")
-          .update({ credits_remaining: profile.credits_remaining - 1 })
+          .update({
+            credits_remaining: Math.max(0, profile.credits_remaining - 1),
+            extractions_this_month: (profile.extractions_this_month || 0) + 1,
+          })
           .eq("id", user.id);
       }
+    }
+
+    // Send post-extraction email notification
+    try {
+      const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+      await fetch(`${backendUrl}/api/notify/extraction-complete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          to_email: user.email,
+          file_name: file.name,
+          report_id: report.id,
+        }),
+      });
+    } catch {
+      // Non-blocking — don't fail extraction if email fails
     }
 
     return NextResponse.json({

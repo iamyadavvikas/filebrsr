@@ -41,7 +41,7 @@ const painPoints = {
     icon: "📋",
     color: "#7C3AED",
     pains: [
-      { problem: "337 mandatory data points", detail: "Across 9 NGRBC Principles" },
+      { problem: "140+ mandatory indicators to fill", detail: "98 Essential (mandatory) + 42 Leadership across 9 NGRBC Principles" },
       { problem: "Data scattered across departments", detail: "HR has social data, ops has environmental, legal has governance" },
       { problem: "Manual compilation takes 4–8 weeks", detail: "Consultants charge ₹5–15L per company per year" },
       { problem: "Gap analysis is guesswork", detail: "\"Are we compliant?\" — no one knows until audit" },
@@ -102,7 +102,7 @@ const solutions = [
     color: "#E8B931",
     steps: [
       "Upload any sustainability PDF (annual report, CSR report)",
-      "AI extracts all 337 data points in 60 seconds",
+      "AI extracts all 140 BRSR indicators in 60 seconds",
       "Instant gap analysis: \"You're missing 47 disclosures\"",
       "Section-wise scoring: A (92%), B (75%), C (68%)",
       "Auto-maps to GRI, CDP, TCFD, SASB",
@@ -117,20 +117,20 @@ const solutions = [
   {
     id: "carbon-market",
     title: "Carbon Market & Credits",
-    subtitle: "For Net Zero Leaders",
+    subtitle: "Coming 2027 — For Net Zero Leaders",
     pain: "We reduce emissions but can't monetize or prove it",
     icon: "M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z",
     color: "#0891B2",
     steps: [
-      "Platform calculates Scope 1, 2 & 3 emissions from BRSR data",
-      "Tracks year-over-year reductions with India-specific emission factors",
-      "Connects verified reductions to India's Carbon Credit Trading Scheme (CCTS)",
-      "Facilitates carbon credit generation for SME suppliers",
-      "Marketplace: buyers purchase credits from verified supply chain reductions",
-      "Transaction fee model — FileBRSR earns 2% of each trade",
+      "Platform calculates Scope 1, 2 & 3 emissions from BRSR data (available now)",
+      "Tracks year-over-year reductions with India-specific emission factors (available now)",
+      "[Roadmap] Connects verified reductions to India's Carbon Credit Trading Scheme (CCTS)",
+      "[Roadmap] Facilitates carbon credit generation for SME suppliers",
+      "[Roadmap] Marketplace: buyers purchase credits from verified supply chain reductions",
+      "[Roadmap] Transaction fee model — FileBRSR earns 2% of each trade",
     ],
     metrics: [
-      { before: "No monetization", after: "Carbon credits", label: "from your reductions" },
+      { before: "No monetization", after: "Carbon credits", label: "from your reductions (2027)" },
       { before: "Manual MRV", after: "Auto-verified", label: "from platform data" },
       { before: "$0 value", after: "$35B market", label: "India carbon market by 2030" },
     ],
@@ -148,16 +148,16 @@ const timeline = [
 const valueTable = [
   { pain: "How to assess 500 suppliers?", who: "Enterprise compliance", solution: "One-click invite → auto-scored questionnaire", value: "Months → minutes" },
   { pain: "I fill 10 different ESG forms", who: "Supplier / SME", solution: "Fill once → shareable badge", value: "One assessment, prove to all" },
-  { pain: "BRSR filing costs ₹15L", who: "Listed company", solution: "AI extracts 337 datapoints from PDF", value: "₹15L → ₹49,999/yr" },
-  { pain: "We reduce emissions but can't monetize", who: "Net Zero teams", solution: "Carbon credit generation via India CCTS", value: "Reductions → revenue" },
+  { pain: "BRSR filing costs ₹15L", who: "Listed company", solution: "AI extracts all 140 BRSR indicators from PDF", value: "₹15L → ₹49,999/yr" },
+  { pain: "We reduce emissions but can't monetize", who: "Net Zero teams", solution: "Carbon calculator + tracking (CCTS marketplace 2027)", value: "Visibility now, revenue later" },
   { pain: "Are we compliant?", who: "Board / CFO", solution: "Instant gap analysis + scoring", value: "Real-time visibility" },
   { pain: "Show your process to auditors", who: "Assurance team", solution: "Structured audit trail", value: "Audit-ready from day 1" },
 ];
 
 const platformFeatures = [
   { title: "Supply Chain ESG Ratings", desc: "Rate and monitor sustainability across your entire supplier base. Auto-scoring aligned to SEBI BRSR.", color: "#059669" },
-  { title: "AI-Powered BRSR Filing", desc: "Upload any sustainability report — AI extracts all 337 data points across 9 NGRBC Principles in 60 seconds.", color: "#E8B931" },
-  { title: "Carbon Market & Credits", desc: "Scope 1/2/3 emissions from BRSR data → verified reductions → carbon credit generation via India CCTS. 2% transaction fee.", color: "#0891B2" },
+  { title: "AI-Powered BRSR Filing", desc: "Upload any sustainability report — AI extracts all 140 BRSR indicators (98 Essential + 42 Leadership) across 9 NGRBC Principles in 60 seconds.", color: "#E8B931" },
+  { title: "Carbon Calculator & Tracking", desc: "Scope 1/2/3 emissions from BRSR data with India-specific factors. Year-over-year reduction tracking. Carbon market integration coming 2027.", color: "#0891B2" },
   { title: "ESG Badges & Scorecards", desc: "Industry-wide percentile rankings. Platinum/Gold/Silver/Bronze medals. Public badges suppliers showcase to win business.", color: "#7C3AED" },
   { title: "Supplier Self-Assessment", desc: "Invite suppliers to complete BRSR-aligned ESG questionnaires. No signup needed. Auto-scored with instant results.", color: "#2563EB" },
   { title: "Multi-Framework Compliance", desc: "One assessment maps to BRSR, GRI, CDP, TCFD, SASB, UN SDGs & ESRS. Single platform for all frameworks.", color: "#DC2626" },
@@ -167,13 +167,13 @@ const platformFeatures = [
 ];
 
 const faqs = [
-  { q: "What is FileBRSR?", a: "FileBRSR is India's ESG infrastructure platform built on three pillars: AI-powered BRSR filing, supply chain ESG ratings, and carbon market facilitation. We help listed companies automate compliance, assess suppliers, and monetize emission reductions." },
+  { q: "What is FileBRSR?", a: "FileBRSR is India's ESG compliance platform built on two pillars today: AI-powered BRSR filing and supply chain ESG ratings. Carbon market facilitation is on our 2027 roadmap. We help listed companies automate compliance and assess suppliers." },
   { q: "Who needs this?", a: "SEBI mandates the top 1,000 listed companies to disclose value chain ESG data (BRSR Section A.V). This means 50,000–100,000 suppliers need to prove ESG readiness. FileBRSR serves both sides — enterprises assessing suppliers, and SMEs proving compliance." },
   { q: "How is this different from consultants?", a: "Consultants charge ₹5–15L/year, take months, use Excel, and provide no standardized scoring. FileBRSR automates the entire process — assessment, scoring, gap analysis, and filing — starting at ₹9,999/year with instant results." },
   { q: "How do supplier assessments work?", a: "Enterprise users add suppliers and send invite links. Suppliers complete a 20-question ESG questionnaire (no signup needed). Scores are auto-calculated across Environment (40%), Social (35%) & Governance (25%) dimensions." },
   { q: "What are FileBRSR badges?", a: "Based on assessment scores and industry percentile ranking, suppliers earn Platinum (top 1%), Gold (top 5%), Silver (top 15%), or Bronze (top 35%) badges. These are publicly shareable to attract new business." },
-  { q: "How does the carbon market work?", a: "FileBRSR calculates Scope 1/2/3 emissions from your BRSR data, tracks year-over-year reductions, and connects verified reductions to India's Carbon Credit Trading Scheme (CCTS). Suppliers can generate carbon credits from proven reductions — we facilitate the trade at 2% transaction fee." },
-  { q: "Does it support BRSR filing?", a: "Yes. Upload any sustainability PDF and AI extracts all 337 BRSR datapoints in 60 seconds. Includes gap analysis, scoring, XBRL generation, and multi-framework mapping (GRI, CDP, TCFD, SASB)." },
+  { q: "How does the carbon market work?", a: "Today, FileBRSR calculates Scope 1/2/3 emissions from your BRSR data and tracks year-over-year reductions using India-specific emission factors (CEA, BEE, IPCC). Carbon credit trading via India's CCTS is on our 2027 roadmap — once live, suppliers will be able to generate credits from verified reductions." },
+  { q: "Does it support BRSR filing?", a: "Yes. Upload any sustainability PDF and AI extracts all 140 BRSR indicators (Essential + Leadership) in 60 seconds. Includes gap analysis, scoring, XBRL generation, and multi-framework mapping (GRI, CDP, TCFD, SASB)." },
   { q: "What's the pricing model?", a: "Suppliers get assessed FREE. Plans start at ₹9,999/year (Starter), ₹49,999/year (Pro with 25 suppliers), or custom pricing for Enterprise. Single reports available at ₹2,500 each — no subscription needed." },
 ];
 
@@ -212,7 +212,7 @@ export default function HomePage() {
                 style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", background: "rgba(232,185,49,0.12)", color: "#E8B931", padding: "7px 16px", borderRadius: 24, border: "1px solid rgba(232,185,49,0.25)" }}
               >
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#E8B931", display: "inline-block", animation: "pulse 2s infinite" }} />
-                BRSR AUTOMATION · SUPPLY CHAIN ESG · CARBON MARKET
+                BRSR AUTOMATION · SUPPLY CHAIN ESG · CARBON TRACKING
               </div>
 
               <h1 className="text-white" style={{ fontSize: "clamp(36px, 5vw, 60px)", fontWeight: 800, lineHeight: 1.08, marginBottom: 24, letterSpacing: -2 }}>
@@ -257,8 +257,8 @@ export default function HomePage() {
                 </div>
                 <div className="hidden md:block w-px h-10 bg-white/10" />
                 <div className="text-center">
-                  <p className="text-xl md:text-3xl font-bold text-white">337</p>
-                  <p className="text-[10px] md:text-xs text-white/50 mt-1">BRSR data points mapped</p>
+                  <p className="text-xl md:text-3xl font-bold text-white">140+</p>
+                  <p className="text-[10px] md:text-xs text-white/50 mt-1">BRSR indicators mapped</p>
                 </div>
                 <div className="hidden md:block w-px h-10 bg-white/10" />
                 <div className="text-center">
@@ -548,9 +548,9 @@ export default function HomePage() {
                 PRICING
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 14 }}>
-                Replace ₹15L consultants with one tool
+                Replace ₹15L consultants with one platform
               </h2>
-              <p className="text-muted" style={{ fontSize: 15 }}>Companies pay ₹5–15 lakhs annually for manual BRSR compilation. FileBRSR does it in seconds.</p>
+              <p className="text-muted" style={{ fontSize: 15, maxWidth: 640, margin: "0 auto" }}>Indian companies pay ₹5–15 lakhs to consultants who take 4–8 weeks with Excel sheets. FileBRSR extracts BRSR data from your annual report in 60 seconds — starting at ₹2,500 per report.</p>
             </div>
 
             {/* Pay-per-report highlight */}
@@ -650,7 +650,7 @@ export default function HomePage() {
               <div className="bg-card rounded-2xl border border-border p-7">
                 <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-4">GLOBAL PLATFORMS (EcoVadis, Sphera, Sedex)</p>
                 <ul className="space-y-3 text-sm text-gray-600">
-                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> No BRSR schema — built for GRI/CDP/CSRD, not SEBI&apos;s 337-datapoint format</li>
+                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> No BRSR schema — built for GRI/CDP/CSRD, not SEBI&apos;s 140-indicator BRSR format</li>
                   <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> Pricing starts at $5K-$15K/year — unaffordable for Indian MSMEs</li>
                   <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> No India carbon market (CCTS) integration</li>
                   <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> Questionnaires in English only — 60% of Indian suppliers need Hindi/regional</li>
@@ -662,9 +662,9 @@ export default function HomePage() {
               <div className="bg-card rounded-2xl border-2 border-emerald-200 p-7">
                 <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-4">FileBRSR (Built for India)</p>
                 <ul className="space-y-3 text-sm text-gray-600">
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Native BRSR schema — all 337 SEBI datapoints mapped and extracted by AI</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Starts free for suppliers, ₹50K/year for enterprises (10x cheaper)</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> India Carbon Credit Trading Scheme (CCTS) integration from day one</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Native BRSR schema — all 140 SEBI BRSR indicators (Essential + Leadership) mapped and extracted by AI</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Starts free for suppliers, ₹9,999/year for Starter, ₹49,999/year for Pro</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Carbon calculator with India-specific factors (CCTS marketplace on roadmap)</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Hindi and regional language support (roadmap Q4 2026)</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> XBRL-JSON generation for direct BSE/NSE filing</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 9 NGRBC Principles + PAT + EPR compliance built in</li>
@@ -678,7 +678,7 @@ export default function HomePage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-600">
                 <div>
                   <p className="font-bold text-gray-900 mb-1">Regulatory depth</p>
-                  <p>SEBI BRSR is the world&apos;s most prescriptive ESG framework — 337 mandatory datapoints vs. GRI&apos;s flexible &ldquo;report what&apos;s material.&rdquo; Global tools can&apos;t handle this specificity without a full rebuild.</p>
+                  <p>SEBI BRSR is the world&apos;s most prescriptive ESG framework — 140 indicators (98 Essential + 42 Leadership) across 9 principles vs. GRI&apos;s flexible &ldquo;report what&apos;s material.&rdquo; Global tools can&apos;t handle this specificity without a full rebuild.</p>
                 </div>
                 <div>
                   <p className="font-bold text-gray-900 mb-1">Market structure</p>

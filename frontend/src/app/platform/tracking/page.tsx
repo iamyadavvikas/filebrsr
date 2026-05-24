@@ -10,5 +10,13 @@ export default async function TrackingPage() {
 
   if (!user) redirect("/login");
 
-  return <TrackingClient />;
+  // Fetch all completed reports for this user to build multi-year view
+  const { data: reports } = await supabase
+    .from("reports")
+    .select("id, extracted_data, company_name, financial_year, created_at, status")
+    .eq("user_id", user.id)
+    .eq("status", "completed")
+    .order("created_at", { ascending: true });
+
+  return <TrackingClient reports={reports || []} />;
 }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import AnalyticsClient from "./AnalyticsClient";
 
 export default async function AnalyticsPage() {
@@ -9,6 +9,16 @@ export default async function AnalyticsPage() {
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
+
+  // Admin gate: only admins can access analytics
+  const admin = createAdminClient();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.is_admin) redirect("/platform");
 
   return <AnalyticsClient userId={user.id} />;
 }
