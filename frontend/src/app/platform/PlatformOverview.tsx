@@ -20,7 +20,6 @@ import {
   Zap,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import OnboardingWizard from "./OnboardingWizard";
 import UpgradeNudge from "./UpgradeNudge";
 
 interface UserProfile {
@@ -34,7 +33,6 @@ interface OverviewProps {
   userId: string;
   initialReports: any[];
   userProfile: UserProfile | null;
-  onboardingCompleted?: boolean;
 }
 
 interface ExtractionReport {
@@ -46,11 +44,11 @@ interface ExtractionReport {
   total_extracted?: number;
 }
 
-export default function PlatformOverview({ userId, initialReports, userProfile, onboardingCompleted }: OverviewProps) {
+export default function PlatformOverview({ userId, initialReports, userProfile }: OverviewProps) {
   const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<ExtractionReport[]>(initialReports as ExtractionReport[]);
-  const [showOnboarding, setShowOnboarding] = useState(!onboardingCompleted);
+
   const [stats, setStats] = useState({
     completion: 0,
     coreCompletion: 0,
@@ -126,11 +124,6 @@ export default function PlatformOverview({ userId, initialReports, userProfile, 
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* Onboarding Wizard */}
-      {showOnboarding && (
-        <OnboardingWizard userId={userId} onComplete={() => setShowOnboarding(false)} />
-      )}
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-3">
         <div>
