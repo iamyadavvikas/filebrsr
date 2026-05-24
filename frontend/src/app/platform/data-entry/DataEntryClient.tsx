@@ -15,6 +15,8 @@ import {
   X,
   Download,
   RotateCcw,
+  ChevronDown,
+  FileText,
 } from "lucide-react";
 import { SECTIONS, TOTAL_DATAPOINTS, MANDATORY_DATAPOINTS, CORE_DATAPOINTS, LEADERSHIP_DATAPOINTS } from "./brsr-fields";
 
@@ -46,6 +48,7 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
   const [reports, setReports] = useState<ReportOption[]>([]);
   const [importResult, setImportResult] = useState<{ imported: number; total: number } | null>(null);
   const [saveAllSuccess, setSaveAllSuccess] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Check for autofill query param from Upload & Extract
   useEffect(() => {
@@ -71,6 +74,14 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
     0
   );
   const filledCount = Object.keys(formData).filter((k) => formData[k]?.trim()).length;
+
+  // Count mandatory filled
+  const allMandatoryFields = Object.values(SECTIONS).flatMap(s =>
+    s.subsections.flatMap(sub => sub.fields.filter(f => f.required).map(f => f.id))
+  );
+  const mandatoryFilledCount = allMandatoryFields.filter(id => formData[id]?.trim()).length;
+  const mandatoryPercent = Math.round((mandatoryFilledCount / MANDATORY_DATAPOINTS) * 100);
+  const isReadyToFile = mandatoryFilledCount === MANDATORY_DATAPOINTS;
 
   // Load saved entries on mount / FY change
   useEffect(() => {
@@ -255,6 +266,67 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Download failed:", err);
+    }
+  }
+
+  async function getAuthToken() {
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || "";
+  }
+
+  async function handleDownloadXBRL() {
+    try {
+      const token = await getAuthToken();
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+      const res = await fetch(
+        `${backendUrl}/api/v2/filing/xbrl-xml?financial_year=${financialYear}`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.detail || "XBRL generation failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `BRSR_${financialYear}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("XBRL download failed:", err);
+    }
+  }
+
+  async function handleDownloadSEBIPDF() {
+    try {
+      const token = await getAuthToken();
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+      const res = await fetch(
+        `${backendUrl}/api/v2/filing/sebi-pdf?financial_year=${financialYear}`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.detail || "PDF generation failed");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `BRSR_${financialYear}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("SEBI PDF download failed:", err);
     }
   }
 
@@ -465,8 +537,8 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
 
         {/* Right: Form */}
         <div className="flex-1 min-w-0">
-          {/* Search & Actions */}
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
+          {/* Actions Bar */}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
             <div className="flex-1 relative min-w-[200px]">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -479,34 +551,87 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
             </div>
             <button
               onClick={handleResetSection}
-              className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"
+              className="p-2 bg-white border border-gray-200 text-gray-500 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+              title="Reset section"
             >
               <RotateCcw className="w-4 h-4" />
-              Reset
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
+              className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5"
             >
               <Save className="w-4 h-4" />
-              {saving ? "Saving..." : "Save Section"}
+              {saving ? "..." : "Save"}
             </button>
             <button
               onClick={handleSaveAll}
               disabled={saving}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+              className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5"
             >
               <Save className="w-4 h-4" />
-              {saving ? "Saving..." : "Save All"}
+              {saving ? "..." : "Save All"}
             </button>
-            <button
-              onClick={handleDownloadExcel}
-              className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              Excel
-            </button>
+
+            {/* Progress indicator */}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${isReadyToFile ? "bg-emerald-500" : "bg-amber-500"}`}
+                  style={{ width: `${mandatoryPercent}%` }}
+                />
+              </div>
+              <span className={`text-xs font-medium ${isReadyToFile ? "text-emerald-600" : "text-gray-500"}`}>
+                {isReadyToFile ? "✓ Ready" : `${mandatoryFilledCount}/${MANDATORY_DATAPOINTS}`}
+              </span>
+            </div>
+
+            {/* Export dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setExportOpen(!exportOpen)}
+                className="px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-1.5"
+              >
+                <Download className="w-4 h-4" />
+                Export
+                <ChevronDown className={`w-3 h-3 transition-transform ${exportOpen ? "rotate-180" : ""}`} />
+              </button>
+              {exportOpen && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
+                  <button
+                    onClick={() => { handleDownloadExcel(); setExportOpen(false); }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4 text-gray-400" />
+                    Excel (.xlsx)
+                  </button>
+                  <button
+                    onClick={() => { handleDownloadXBRL(); setExportOpen(false); }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4 text-indigo-500" />
+                    XBRL XML (.xml)
+                  </button>
+                  <button
+                    onClick={() => { handleDownloadSEBIPDF(); setExportOpen(false); }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4 text-emerald-500" />
+                    SEBI PDF (.pdf)
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* File button - only when ready */}
+            {isReadyToFile && (
+              <a
+                href="/platform/xbrl"
+                className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-center gap-1.5 animate-pulse"
+              >
+                📤 File
+              </a>
+            )}
           </div>
 
           {/* Save All Success Toast */}
