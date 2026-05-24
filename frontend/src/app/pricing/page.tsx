@@ -41,47 +41,34 @@ const plans = [
     name: "Free",
     price: "₹0",
     period: "forever",
-    desc: "For suppliers / SMEs getting assessed",
-    reports: "Unlimited self-assessments",
-    features: ["ESG self-assessment", "Basic scorecard", "1 shareable badge", "Industry benchmark", "3 AI extractions (one-time)"],
+    desc: "Get started — assess up to 5 suppliers free",
+    reports: "3 AI extractions + 5 suppliers",
+    features: [
+      "5 supplier ESG assessments",
+      "3 AI BRSR extractions (one-time)",
+      "Scope 1 & 2 carbon calculator",
+      "Basic gap analysis & scoring",
+      "Shareable ESG badge",
+      "Industry benchmarks",
+    ],
     cta: "Start Free",
     popular: false,
     ctaBg: "white", ctaColor: "#1B4D3E", ctaBorder: "1px solid #E5E7DF",
   },
   {
-    key: "starter",
-    name: "Starter",
-    price: "₹9,999",
-    period: "/year",
-    monthlyEquiv: "₹833/month",
-    desc: "For companies exploring AI-powered BRSR filing",
-    reports: "5 AI extractions/month",
-    features: [
-      "Full BRSR filing (AI extraction)",
-      "5 AI reports per month",
-      "Gap analysis & scoring",
-      "PDF export",
-      "Email support",
-    ],
-    cta: "Subscribe",
-    popular: false,
-    ctaBg: "white", ctaColor: "#1B4D3E", ctaBorder: "1px solid #E5E7DF",
-  },
-  {
-    key: "pro",
-    name: "Pro",
+    key: "growth",
+    name: "Growth",
     price: "₹49,999",
     period: "/year",
     monthlyEquiv: "₹4,167/month",
-    desc: "For listed companies with full BRSR + supplier needs",
-    reports: "Unlimited AI reports + 25 suppliers",
+    desc: "For listed companies scaling supplier oversight",
+    reports: "Unlimited extractions + 25 suppliers + Scope 3",
     features: [
-      "Unlimited AI extractions",
-      "Full BRSR filing + gap analysis",
-      "Assess up to 25 suppliers",
-      "Multi-framework mapping (GRI, CDP, TCFD)",
+      "25 supplier assessments",
+      "Unlimited AI BRSR extractions",
+      "Full Scope 1, 2 & 3 carbon",
+      "Multi-framework mapping (GRI, CDP, TCFD, SASB)",
       "NIFTY 50 sector benchmarks",
-      "Carbon calculator",
       "PDF + XBRL-JSON export",
       "5 users",
       "Priority email support",
@@ -91,25 +78,41 @@ const plans = [
     ctaBg: "#1B4D3E", ctaColor: "white", ctaBorder: "none",
   },
   {
+    key: "scale",
+    name: "Scale",
+    price: "₹1,99,999",
+    period: "/year",
+    monthlyEquiv: "₹16,667/month",
+    desc: "For enterprises with large supply chains",
+    reports: "Unlimited suppliers + XBRL filing + audit",
+    features: [
+      "Everything in Growth +",
+      "Unlimited supplier assessments",
+      "XBRL filing generation",
+      "Audit trail & compliance log",
+      "Supplier-side dashboard (coming soon)",
+      "10 users",
+      "Dedicated account manager",
+    ],
+    cta: "Subscribe",
+    popular: false,
+    ctaBg: "white", ctaColor: "#1B4D3E", ctaBorder: "1px solid #E5E7DF",
+  },
+  {
     key: "enterprise",
     name: "Enterprise",
     price: "Custom",
     period: "",
-    desc: "For large listed companies with 100+ suppliers",
-    reports: "Unlimited everything",
+    desc: "For conglomerates with 500+ suppliers across BUs",
+    reports: "Custom limits + API + SSO",
     features: [
-      "Everything in Pro +",
-      "Unlimited suppliers",
-      "XBRL filing generation",
-      "Audit trail & compliance",
-      "Dedicated account manager",
-    ],
-    roadmap: [
-      "API & SAP integration",
+      "Everything in Scale +",
+      "API & ERP integration",
+      "SSO / SAML login",
       "Workflow approvals (maker-checker)",
-      "Multi-user + SSO",
       "White-label option",
       "SLA guarantee",
+      "Unlimited users",
     ],
     cta: "Contact Sales",
     popular: false,
@@ -118,18 +121,19 @@ const plans = [
 ];
 
 const comparisonData = [
-  { feature: "AI report extractions", free: "3 (one-time)", starter: "5/month", pro: "Unlimited", enterprise: "Unlimited" },
-  { feature: "Supplier assessments", free: "Self only", starter: "—", pro: "25 suppliers", enterprise: "Unlimited" },
-  { feature: "ESG scorecard & badge", free: "✓", starter: "✓", pro: "✓", enterprise: "✓" },
-  { feature: "Gap analysis", free: "Basic", starter: "Full", pro: "Full", enterprise: "Full" },
-  { feature: "Multi-framework mapping", free: "—", starter: "—", pro: "✓", enterprise: "✓" },
-  { feature: "NIFTY 50 benchmarks", free: "—", starter: "—", pro: "✓", enterprise: "✓" },
-  { feature: "Carbon calculator", free: "—", starter: "—", pro: "✓", enterprise: "✓" },
-  { feature: "XBRL filing", free: "—", starter: "—", pro: "Export only", enterprise: "Full generation" },
-  { feature: "Workflow approvals", free: "—", starter: "—", pro: "—", enterprise: "Q3 2026" },
-  { feature: "API access", free: "—", starter: "—", pro: "—", enterprise: "Q3 2026" },
-  { feature: "Users", free: "1", starter: "1", pro: "5", enterprise: "Unlimited (SSO Q3 2026)" },
-  { feature: "Support", free: "Community", starter: "Email", pro: "Priority email", enterprise: "Dedicated" },
+  { feature: "AI BRSR extractions", free: "3 (one-time)", growth: "Unlimited", scale: "Unlimited", enterprise: "Unlimited" },
+  { feature: "Supplier assessments", free: "5", growth: "25", scale: "Unlimited", enterprise: "Unlimited" },
+  { feature: "Carbon calculator", free: "Scope 1 & 2", growth: "Scope 1, 2 & 3", scale: "Scope 1, 2 & 3", enterprise: "Scope 1, 2 & 3" },
+  { feature: "ESG scorecard & badge", free: "✓", growth: "✓", scale: "✓", enterprise: "✓" },
+  { feature: "Gap analysis", free: "Basic", growth: "Full", scale: "Full", enterprise: "Full" },
+  { feature: "Multi-framework mapping", free: "—", growth: "✓", scale: "✓", enterprise: "✓" },
+  { feature: "NIFTY 50 benchmarks", free: "—", growth: "✓", scale: "✓", enterprise: "✓" },
+  { feature: "XBRL filing", free: "—", growth: "Export only", scale: "Full generation", enterprise: "Full generation" },
+  { feature: "Supplier dashboard", free: "—", growth: "—", scale: "✓", enterprise: "✓" },
+  { feature: "Audit trail", free: "—", growth: "—", scale: "✓", enterprise: "✓" },
+  { feature: "API access", free: "—", growth: "—", scale: "—", enterprise: "✓" },
+  { feature: "Users", free: "1", growth: "5", scale: "10", enterprise: "Unlimited (SSO)" },
+  { feature: "Support", free: "Community", growth: "Priority email", scale: "Dedicated AM", enterprise: "Dedicated + SLA" },
 ];
 
 export default function PricingPage() {
@@ -137,7 +141,7 @@ export default function PricingPage() {
 
   const handlePurchase = async (planKey: string) => {
     if (planKey === "free") {
-      window.location.href = "/upload";
+      window.location.href = "/platform/supply-chain";
       return;
     }
     if (planKey === "enterprise") {
@@ -147,7 +151,7 @@ export default function PricingPage() {
 
     setLoadingPlan(planKey);
     try {
-      const isSubscription = planKey === "pro" || planKey === "starter";
+      const isSubscription = planKey === "growth" || planKey === "scale";
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const endpoint = isSubscription
         ? `${backendUrl}/api/billing/create-subscription`
@@ -322,17 +326,6 @@ export default function PricingPage() {
                         {f}
                       </div>
                     ))}
-                    {"roadmap" in p && (p as typeof plans[2]).roadmap && (
-                      <>
-                        <p className="mt-3 text-[10px] font-bold uppercase tracking-wider" style={{ color: "#D97706" }}>Coming Q3 2026</p>
-                        {(p as typeof plans[2]).roadmap!.map((f) => (
-                          <div key={f} className="flex items-start gap-2" style={{ fontSize: 13, color: "var(--muted)", opacity: 0.6 }}>
-                            <span style={{ color: "#D97706", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>◇</span>
-                            {f}
-                          </div>
-                        ))}
-                      </>
-                    )}
                   </div>
                 </div>
               ))}
@@ -353,8 +346,8 @@ export default function PricingPage() {
                   <tr style={{ background: "var(--surface)" }}>
                     <th style={{ padding: "14px 16px", textAlign: "left", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Feature</th>
                     <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Free</th>
-                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Starter</th>
-                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>Pro</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>Growth</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Scale</th>
                     <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Enterprise</th>
                   </tr>
                 </thead>
@@ -363,8 +356,8 @@ export default function PricingPage() {
                     <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
                       <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500, color: "var(--foreground)" }}>{row.feature}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.free}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.starter}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", fontWeight: 600, color: "var(--primary)" }}>{row.pro}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", fontWeight: 600, color: "var(--primary)" }}>{row.growth}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.scale}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.enterprise}</td>
                     </tr>
                   ))}
