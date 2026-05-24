@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { FileText, Download, AlertTriangle, CheckCircle, Code } from "lucide-react";
 
 interface XBRLField {
@@ -11,62 +11,127 @@ interface XBRLField {
   status: "filled" | "missing" | "invalid";
 }
 
-const XBRL_FIELDS: XBRLField[] = [
-  { tag: "brsr:CINNumber", label: "CIN", value: "L29100MH1995PLC084781", section: "A", status: "filled" },
-  { tag: "brsr:CompanyName", label: "Name of Entity", value: "Tata Consultancy Services Ltd", section: "A", status: "filled" },
-  { tag: "brsr:YearOfIncorporation", label: "Year of Incorporation", value: "1995", section: "A", status: "filled" },
-  { tag: "brsr:RegisteredOffice", label: "Registered Office", value: "Nirmal Building, Nariman Point, Mumbai", section: "A", status: "filled" },
-  { tag: "brsr:PaidUpCapital", label: "Paid-up Capital (₹ Cr)", value: "366", section: "A", status: "filled" },
-  { tag: "brsr:Turnover", label: "Turnover (₹ Cr)", value: "240893", section: "A", status: "filled" },
-  { tag: "brsr:TotalEmployees", label: "Total Employees", value: "615000", section: "A", status: "filled" },
-  { tag: "brsr:GHGScope1", label: "Scope 1 Emissions (tCO2e)", value: "25000", section: "C", status: "filled" },
-  { tag: "brsr:GHGScope2", label: "Scope 2 Emissions (tCO2e)", value: "150000", section: "C", status: "filled" },
-  { tag: "brsr:GHGScope3", label: "Scope 3 Emissions (tCO2e)", value: "", section: "C", status: "missing" },
-  { tag: "brsr:EnergyConsumption", label: "Total Energy (GJ)", value: "1250000", section: "C", status: "filled" },
-  { tag: "brsr:RenewablePercent", label: "Renewable Energy (%)", value: "45", section: "C", status: "filled" },
-  { tag: "brsr:WaterWithdrawal", label: "Water Withdrawal (KL)", value: "850000", section: "C", status: "filled" },
-  { tag: "brsr:WasteGenerated", label: "Waste Generated (MT)", value: "12000", section: "C", status: "filled" },
-  { tag: "brsr:WasteRecycled", label: "Waste Recycled (%)", value: "65", section: "C", status: "filled" },
-  { tag: "brsr:LTIFR", label: "LTIFR", value: "0.02", section: "C", status: "filled" },
-  { tag: "brsr:TrainingHours", label: "Avg Training Hours", value: "85", section: "C", status: "filled" },
-  { tag: "brsr:WomenPercent", label: "Women Employees (%)", value: "34.1", section: "C", status: "filled" },
-  { tag: "brsr:CSRSpend", label: "CSR Expenditure (₹ Cr)", value: "850", section: "C", status: "filled" },
-  { tag: "brsr:ConsumerComplaints", label: "Consumer Complaints", value: "2450", section: "C", status: "filled" },
-  { tag: "brsr:DataPrivacyComplaints", label: "Data Privacy Complaints", value: "", section: "C", status: "missing" },
-  { tag: "brsr:BoardIndependence", label: "Independent Directors (%)", value: "", section: "B", status: "missing" },
+// Mapping from extracted_data keys to XBRL tags
+const XBRL_TAG_MAP: { tag: string; label: string; section: string; keys: string[] }[] = [
+  { tag: "brsr:CINNumber", label: "CIN", section: "A", keys: ["cin", "corporate_identity_number", "CIN"] },
+  { tag: "brsr:CompanyName", label: "Name of Entity", section: "A", keys: ["company_name", "name_of_entity", "entity_name"] },
+  { tag: "brsr:YearOfIncorporation", label: "Year of Incorporation", section: "A", keys: ["year_of_incorporation"] },
+  { tag: "brsr:RegisteredOffice", label: "Registered Office", section: "A", keys: ["registered_office", "registered_address"] },
+  { tag: "brsr:PaidUpCapital", label: "Paid-up Capital (₹ Cr)", section: "A", keys: ["paid_up_capital"] },
+  { tag: "brsr:Turnover", label: "Turnover (₹ Cr)", section: "A", keys: ["turnover", "revenue", "total_revenue", "net_revenue"] },
+  { tag: "brsr:TotalEmployees", label: "Total Employees", section: "A", keys: ["total_employees", "permanent_employees", "employee_count"] },
+  { tag: "brsr:GHGScope1", label: "Scope 1 Emissions (tCO2e)", section: "C", keys: ["scope1_emissions", "ghg_scope1", "scope_1"] },
+  { tag: "brsr:GHGScope2", label: "Scope 2 Emissions (tCO2e)", section: "C", keys: ["scope2_emissions", "ghg_scope2", "scope_2"] },
+  { tag: "brsr:GHGScope3", label: "Scope 3 Emissions (tCO2e)", section: "C", keys: ["scope3_emissions", "ghg_scope3", "scope_3"] },
+  { tag: "brsr:EnergyConsumption", label: "Total Energy (GJ)", section: "C", keys: ["total_energy_consumption", "energy_consumed_gj", "total_energy_gj"] },
+  { tag: "brsr:RenewablePercent", label: "Renewable Energy (%)", section: "C", keys: ["renewable_energy_percent", "renewable_pct", "renewable_energy_percentage"] },
+  { tag: "brsr:WaterWithdrawal", label: "Water Withdrawal (KL)", section: "C", keys: ["water_withdrawal", "total_water_withdrawal_kl"] },
+  { tag: "brsr:WasteGenerated", label: "Waste Generated (MT)", section: "C", keys: ["total_waste_generated", "waste_generated_mt"] },
+  { tag: "brsr:WasteRecycled", label: "Waste Recycled (%)", section: "C", keys: ["waste_recycled_pct", "waste_recycled_percent"] },
+  { tag: "brsr:LTIFR", label: "LTIFR", section: "C", keys: ["ltifr", "lost_time_injury_frequency_rate"] },
+  { tag: "brsr:TrainingHours", label: "Avg Training Hours", section: "C", keys: ["average_training_hours", "training_hours_per_employee"] },
+  { tag: "brsr:WomenPercent", label: "Women Employees (%)", section: "C", keys: ["women_employees_percent", "female_pct"] },
+  { tag: "brsr:CSRSpend", label: "CSR Expenditure (₹ Cr)", section: "C", keys: ["csr_expenditure", "csr_spend"] },
+  { tag: "brsr:ConsumerComplaints", label: "Consumer Complaints", section: "C", keys: ["consumer_complaints", "customer_complaints_received"] },
+  { tag: "brsr:DataPrivacyComplaints", label: "Data Privacy Complaints", section: "C", keys: ["data_privacy_complaints", "cybersecurity_complaints"] },
+  { tag: "brsr:BoardIndependence", label: "Independent Directors (%)", section: "B", keys: ["independent_directors_percent", "board_independence_pct"] },
 ];
 
-export default function XBRLClient() {
-  const [fields] = useState(XBRL_FIELDS);
+function extractValue(data: Record<string, unknown> | null, keys: string[]): string {
+  if (!data) return "";
+  for (const key of keys) {
+    // Direct key match
+    if (data[key] !== undefined && data[key] !== null && data[key] !== "") {
+      return String(data[key]);
+    }
+    // Nested search in common patterns
+    for (const topKey of Object.keys(data)) {
+      const nested = data[topKey];
+      if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+        const obj = nested as Record<string, unknown>;
+        if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") {
+          return String(obj[key]);
+        }
+      }
+    }
+  }
+  return "";
+}
+
+interface Props {
+  extractedData: Record<string, unknown> | null;
+  companyName: string | null;
+  financialYear: string | null;
+}
+
+export default function XBRLClient({ extractedData, companyName, financialYear }: Props) {
   const [exchange, setExchange] = useState<"bse" | "nse" | "both">("both");
   const [validated, setValidated] = useState(false);
+
+  const fields: XBRLField[] = useMemo(() => {
+    return XBRL_TAG_MAP.map(mapping => {
+      let value = extractValue(extractedData, mapping.keys);
+      // Override company name from report metadata
+      if (mapping.tag === "brsr:CompanyName" && !value && companyName) value = companyName;
+      return {
+        tag: mapping.tag,
+        label: mapping.label,
+        value,
+        section: mapping.section,
+        status: value ? "filled" : "missing",
+      };
+    });
+  }, [extractedData, companyName]);
 
   const filledCount = fields.filter(f => f.status === "filled").length;
   const missingCount = fields.filter(f => f.status === "missing").length;
   const completionPct = ((filledCount / fields.length) * 100).toFixed(1);
 
+  const fy = financialYear || "FY2024-25";
+  const fyStart = fy.includes("2025") ? "2025-04-01" : "2024-04-01";
+  const fyEnd = fy.includes("2025") ? "2026-03-31" : "2025-03-31";
+
   const handleValidate = () => setValidated(true);
 
   const generateXBRL = () => {
+    const cin = fields.find(f => f.tag === "brsr:CINNumber")?.value || "UNKNOWN";
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance"
             xmlns:brsr="http://www.sebi.gov.in/brsr/2024">
-  <xbrli:context id="FY2024-25">
-    <xbrli:entity><xbrli:identifier scheme="http://www.mca.gov.in/CIN">${fields.find(f => f.tag === "brsr:CINNumber")?.value}</xbrli:identifier></xbrli:entity>
-    <xbrli:period><xbrli:startDate>2024-04-01</xbrli:startDate><xbrli:endDate>2025-03-31</xbrli:endDate></xbrli:period>
+  <xbrli:context id="${fy}">
+    <xbrli:entity><xbrli:identifier scheme="http://www.mca.gov.in/CIN">${cin}</xbrli:identifier></xbrli:entity>
+    <xbrli:period><xbrli:startDate>${fyStart}</xbrli:startDate><xbrli:endDate>${fyEnd}</xbrli:endDate></xbrli:period>
   </xbrli:context>
-${fields.filter(f => f.value).map(f => `  <${f.tag} contextRef="FY2024-25">${f.value}</${f.tag}>`).join("\n")}
+${fields.filter(f => f.value).map(f => `  <${f.tag} contextRef="${fy}">${f.value}</${f.tag}>`).join("\n")}
 </xbrli:xbrl>`;
     return xml;
   };
 
+  const handleDownload = () => {
+    const xml = generateXBRL();
+    const blob = new Blob([xml], { type: "application/xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `brsr_${fy}_${exchange}.xbrl`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-6 lg:p-8 space-y-6">
-      {/* Sample Data Banner */}
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-        <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-        <p className="text-xs text-amber-800">Showing sample XBRL fields. Complete Data Entry to auto-populate values from your actual BRSR disclosures.</p>
-      </div>
+      {/* Data Status Banner */}
+      {!extractedData ? (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <p className="text-xs text-amber-800">No extraction data found. Upload and extract an annual report first, then XBRL fields will auto-populate.</p>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+          <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          <p className="text-xs text-emerald-800">XBRL fields populated from your latest extraction{companyName ? ` (${companyName})` : ""}. Review and download.</p>
+        </div>
+      )}
 
       <div className="flex items-center justify-between">
         <div>
@@ -77,7 +142,7 @@ ${fields.filter(f => f.value).map(f => `  <${f.tag} contextRef="FY2024-25">${f.v
           <button onClick={handleValidate} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
             Validate XBRL
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">
+          <button onClick={handleDownload} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">
             <Download className="w-4 h-4" /> Download XBRL
           </button>
         </div>
@@ -98,7 +163,7 @@ ${fields.filter(f => f.value).map(f => `  <${f.tag} contextRef="FY2024-25">${f.v
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Financial Year</p>
-          <p className="text-sm font-medium">FY 2024-25</p>
+          <p className="text-sm font-medium">{fy}</p>
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Filing Type</p>
