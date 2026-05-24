@@ -39,12 +39,30 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    const plan = (profile?.plan || "free").toLowerCase();
+    // If profile query fails (missing columns), try minimal query
+    let effectiveProfile = profile;
+    if (!effectiveProfile) {
+      const { data: fallback } = await adminDb
+        .from("profiles")
+        .select("credits_remaining, plan")
+        .eq("id", user.id)
+        .single();
+      effectiveProfile = fallback ? { ...fallback, extractions_this_month: 0, month_reset_at: null } : null;
+    }
+
+    if (!effectiveProfile) {
+      return NextResponse.json(
+        { error: "No account profile found. Please contact support." },
+        { status: 403 }
+      );
+    }
+
+    const plan = (effectiveProfile.plan || "free").toLowerCase();
     const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
 
     // Check lifetime limit (free tier)
-    if (limits.lifetime !== undefined && profile) {
-      if (profile.credits_remaining <= 0) {
+    if (limits.lifetime !== undefined) {
+      if ((effectiveProfile.credits_remaining ?? 0) <= 0) {
         return NextResponse.json(
           { error: `Free tier limit reached (${limits.lifetime} extractions). Upgrade to Starter (₹9,999/yr) for 5/month.` },
           { status: 403 }
@@ -53,9 +71,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check monthly limit (paid tiers)
-    if (limits.monthly > 0 && profile) {
+    if (limits.monthly > 0) {
       const now = new Date();
-      const resetAt = profile.month_reset_at ? new Date(profile.month_reset_at) : null;
+      const resetAt = effectiveProfile.month_reset_at ? new Date(effectiveProfile.month_reset_at) : null;
 
       // Auto-reset monthly counter if new month
       if (!resetAt || now.getMonth() !== resetAt.getMonth() || now.getFullYear() !== resetAt.getFullYear()) {
@@ -63,20 +81,12 @@ export async function POST(request: NextRequest) {
           extractions_this_month: 0,
           month_reset_at: now.toISOString(),
         }).eq("id", user.id);
-      } else if ((profile.extractions_this_month || 0) >= limits.monthly) {
+      } else if ((effectiveProfile.extractions_this_month || 0) >= limits.monthly) {
         return NextResponse.json(
           { error: `Monthly limit reached (${limits.monthly} extractions/month on ${plan} plan). Upgrade for more.` },
           { status: 403 }
         );
       }
-    }
-
-    // If no profile exists at all
-    if (!profile) {
-      return NextResponse.json(
-        { error: "No account profile found. Please contact support." },
-        { status: 403 }
-      );
     }
   }
 

@@ -19,12 +19,28 @@ export default async function PlatformPage() {
     .order("created_at", { ascending: false })
     .limit(20);
 
-  // Fetch user profile for usage counter
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("plan, credits_remaining, extractions_this_month, month_reset_at")
-    .eq("id", user.id)
-    .single();
+  // Fetch user profile for usage counter (gracefully handle missing columns)
+  let profile = null;
+  try {
+    const { data } = await admin
+      .from("profiles")
+      .select("plan, credits_remaining, extractions_this_month, month_reset_at")
+      .eq("id", user.id)
+      .single();
+    profile = data;
+  } catch {
+    // If columns don't exist yet, try minimal query
+    try {
+      const { data } = await admin
+        .from("profiles")
+        .select("plan, credits_remaining")
+        .eq("id", user.id)
+        .single();
+      profile = data ? { ...data, extractions_this_month: 0, month_reset_at: null } : null;
+    } catch {
+      // No profile at all
+    }
+  }
 
   return <PlatformOverview userId={user.id} initialReports={reports || []} userProfile={profile} />;
 }
