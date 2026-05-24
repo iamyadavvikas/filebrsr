@@ -59,21 +59,19 @@ export default function BenchmarksClient({ extractedData, companyName }: Props) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-fetch benchmark comparison on mount if we have extracted data
+  // Always fetch benchmark comparison on mount
   useEffect(() => {
-    if (!extractedData) return;
     fetchComparison();
-  }, [extractedData]);
+  }, []);
 
   async function fetchComparison() {
-    if (!extractedData) return;
     setLoading(true);
     setError(null);
     try {
       const res = await fetch("/backend/api/benchmarks/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ extracted_data: extractedData }),
+        body: JSON.stringify({ extracted_data: extractedData || { section_a: {}, section_b: {}, section_c: {} } }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -98,7 +96,7 @@ export default function BenchmarksClient({ extractedData, companyName }: Props) 
     return { total: metrics.length, disclosed: disclosed.length, topQuartile: topQuartile.length, aboveMedian: aboveMedian.length, belowMedian: belowMedian.length };
   }, [comparison]);
 
-  if (!extractedData) {
+  if (!comparison && !loading && !error) {
     return (
       <div className="p-6 lg:p-8 max-w-6xl mx-auto">
         <div className="mb-6">
@@ -107,16 +105,10 @@ export default function BenchmarksClient({ extractedData, companyName }: Props) 
         </div>
         <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
           <Target className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No extraction data available</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading benchmarks...</h3>
           <p className="text-gray-500 mb-4 max-w-md mx-auto">
-            Upload and extract your annual report first. Your ESG metrics will be automatically compared against NIFTY 50 sector benchmarks.
+            Preparing NIFTY 50 sector benchmark comparison.
           </p>
-          <a
-            href="/platform/upload-extract"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700"
-          >
-            Upload Annual Report
-          </a>
         </div>
       </div>
     );

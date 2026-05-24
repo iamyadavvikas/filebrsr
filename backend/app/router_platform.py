@@ -966,16 +966,22 @@ async def board_dashboard(financial_year: str = "FY2025-26", authorization: str 
         raise HTTPException(status_code=401, detail="Unauthorized")
     
     # Get all entries for this user/FY
-    entries_resp = supabase.table("brsr_entries").select("datapoint_id, value, verified").eq(
-        "user_id", user_id
-    ).eq("financial_year", financial_year).execute()
-    entries = entries_resp.data or []
+    try:
+        entries_resp = supabase.table("brsr_entries").select("datapoint_id, value, verified").eq(
+            "user_id", user_id
+        ).eq("financial_year", financial_year).execute()
+        entries = entries_resp.data or []
+    except Exception:
+        entries = []
     
     # Get reports for this user
-    reports_resp = supabase.table("reports").select("id, status, created_at, company_name").eq(
-        "user_id", user_id
-    ).execute()
-    reports = reports_resp.data or []
+    try:
+        reports_resp = supabase.table("reports").select("id, status, created_at, company_name").eq(
+            "user_id", user_id
+        ).execute()
+        reports = reports_resp.data or []
+    except Exception:
+        reports = []
     
     # Calculate completion
     total_required = 216  # BRSR Full has 216 datapoints
