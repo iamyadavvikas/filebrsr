@@ -329,14 +329,19 @@ def get_benchmark_comparison(extracted_data: dict, sector: str = None) -> dict:
     # Map extracted keys to benchmark keys
     key_mapping = {
         "women_board_pct": ["women_board_pct", "women_employees_pct", "A.IV.17"],
-        "renewable_energy_pct": ["renewable_energy_pct", "energy_from_renewable", "p6_energy_from_renewable"],
-        "ghg_scope1": ["ghg_scope1", "p6_ghg_scope1"],
-        "ghg_scope2": ["ghg_scope2", "p6_ghg_scope2"],
-        "waste_recycled_pct": ["waste_recycled_pct", "p6_waste_recovered"],
-        "ltifr": ["safety_incidents", "p3_safety_incidents"],
-        "csr_spend_pct": ["csr_spend", "p8_csr_spend"],
-        "employee_turnover_rate": ["employee_turnover_rate", "turnover_rate_employees"],
-        "training_hours_per_employee": ["training_hours_per_employee", "p3_training_details"],
+        "renewable_energy_pct": ["renewable_energy_pct", "energy_from_renewable", "p6_energy_from_renewable", "C.P6.E.6"],
+        "ghg_scope1": ["ghg_scope1", "p6_ghg_scope1", "C.P6.E.16"],
+        "ghg_scope2": ["ghg_scope2", "p6_ghg_scope2", "C.P6.E.17"],
+        "ghg_intensity": ["ghg_intensity", "C.P6.E.18"],
+        "energy_intensity": ["energy_intensity", "C.P6.E.5"],
+        "water_intensity": ["water_intensity", "C.P6.E.13"],
+        "waste_recycled_pct": ["waste_recycled_pct", "p6_waste_recovered", "C.P6.E.22"],
+        "ltifr": ["safety_incidents", "p3_safety_incidents", "ltifr", "C.P3.E.20"],
+        "csr_spend_pct": ["csr_spend", "p8_csr_spend", "C.P8.E.1"],
+        "employee_turnover_rate": ["employee_turnover_rate", "turnover_rate_employees", "A.IV.19"],
+        "training_hours_per_employee": ["training_hours_per_employee", "p3_training_details", "C.P3.E.13"],
+        "women_employees_pct": ["women_employees_pct", "A.IV.16"],
+        "data_privacy_complaints": ["data_privacy_complaints", "C.P9.E.5"],
     }
     
     all_data = {}
