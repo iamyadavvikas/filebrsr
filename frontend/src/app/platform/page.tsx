@@ -19,5 +19,12 @@ export default async function PlatformPage() {
     .order("created_at", { ascending: false })
     .limit(20);
 
-  return <PlatformOverview userId={user.id} initialReports={reports || []} />;
+  // Fetch user profile for usage counter
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("plan, credits_remaining, extractions_this_month, month_reset_at")
+    .eq("id", user.id)
+    .single();
+
+  return <PlatformOverview userId={user.id} initialReports={reports || []} userProfile={profile} />;
 }

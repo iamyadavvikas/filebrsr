@@ -23,17 +23,58 @@ export async function POST(request: NextRequest) {
   const FOUNDER_EMAILS = ["ydvikasiitkgp@gmail.com", "ydvikas.iitkgp@gmail.com", "vkyadav.iitkgp@gmail.com", "vikaskashi896@gmail.com", "yvikas.free@gmail.com"];
   const isFounder = user && FOUNDER_EMAILS.includes(user.email || "");
 
-  // Check user credits only for authenticated non-founder users
+  // Plan-based extraction quota enforcement
+  const PLAN_LIMITS: Record<string, { monthly: number; lifetime?: number }> = {
+    free: { monthly: 0, lifetime: 3 },       // 3 total, ever
+    starter: { monthly: 5 },                  // 5/month
+    professional: { monthly: -1 },            // unlimited
+    pro: { monthly: -1 },                     // alias
+    enterprise: { monthly: -1 },              // unlimited
+  };
+
   if (user && !isFounder) {
     const { data: profile } = await adminDb
       .from("profiles")
-      .select("credits_remaining, plan")
+      .select("credits_remaining, plan, extractions_this_month, month_reset_at")
       .eq("id", user.id)
       .single();
 
-    if (!profile || profile.credits_remaining <= 0) {
+    const plan = (profile?.plan || "free").toLowerCase();
+    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+
+    // Check lifetime limit (free tier)
+    if (limits.lifetime !== undefined && profile) {
+      if (profile.credits_remaining <= 0) {
+        return NextResponse.json(
+          { error: `Free tier limit reached (${limits.lifetime} extractions). Upgrade to Starter (₹9,999/yr) for 5/month.` },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Check monthly limit (paid tiers)
+    if (limits.monthly > 0 && profile) {
+      const now = new Date();
+      const resetAt = profile.month_reset_at ? new Date(profile.month_reset_at) : null;
+
+      // Auto-reset monthly counter if new month
+      if (!resetAt || now.getMonth() !== resetAt.getMonth() || now.getFullYear() !== resetAt.getFullYear()) {
+        await adminDb.from("profiles").update({
+          extractions_this_month: 0,
+          month_reset_at: now.toISOString(),
+        }).eq("id", user.id);
+      } else if ((profile.extractions_this_month || 0) >= limits.monthly) {
+        return NextResponse.json(
+          { error: `Monthly limit reached (${limits.monthly} extractions/month on ${plan} plan). Upgrade for more.` },
+          { status: 403 }
+        );
+      }
+    }
+
+    // If no profile exists at all
+    if (!profile) {
       return NextResponse.json(
-        { error: "No credits remaining. Please upgrade your plan." },
+        { error: "No account profile found. Please contact support." },
         { status: 403 }
       );
     }
@@ -164,20 +205,42 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Deduct credit (skip for founders)
+    // Deduct credit + increment monthly counter (skip for founders)
     if (!isFounder) {
       const { data: profile } = await adminDb
         .from("profiles")
-        .select("credits_remaining")
+        .select("credits_remaining, extractions_this_month")
         .eq("id", user.id)
         .single();
 
       if (profile) {
         await adminDb
           .from("profiles")
-          .update({ credits_remaining: profile.credits_remaining - 1 })
+          .update({
+            credits_remaining: Math.max(0, profile.credits_remaining - 1),
+            extractions_this_month: (profile.extractions_this_month || 0) + 1,
+          })
           .eq("id", user.id);
       }
+    }
+
+    // Send post-extraction email notification
+    try {
+      const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+      await fetch(`${backendUrl}/api/notify/extraction-complete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          to_email: user.email,
+          file_name: file.name,
+          report_id: report.id,
+        }),
+      });
+    } catch {
+      // Non-blocking — don't fail extraction if email fails
     }
 
     return NextResponse.json({

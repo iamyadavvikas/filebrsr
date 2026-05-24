@@ -21,9 +21,17 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+interface UserProfile {
+  plan: string | null;
+  credits_remaining: number | null;
+  extractions_this_month: number | null;
+  month_reset_at: string | null;
+}
+
 interface OverviewProps {
   userId: string;
   initialReports: any[];
+  userProfile: UserProfile | null;
 }
 
 interface ExtractionReport {
@@ -35,7 +43,7 @@ interface ExtractionReport {
   total_extracted?: number;
 }
 
-export default function PlatformOverview({ userId, initialReports }: OverviewProps) {
+export default function PlatformOverview({ userId, initialReports, userProfile }: OverviewProps) {
   const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<ExtractionReport[]>(initialReports as ExtractionReport[]);
@@ -134,6 +142,9 @@ export default function PlatformOverview({ userId, initialReports }: OverviewPro
           <option value="FY2026-27">FY 2026-27</option>
         </select>
       </div>
+
+      {/* Usage Counter */}
+      {userProfile && <UsageCounter profile={userProfile} />}
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
@@ -341,6 +352,84 @@ export default function PlatformOverview({ userId, initialReports }: OverviewPro
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function UsageCounter({ profile }: { profile: UserProfile }) {
+  const plan = (profile.plan || "free").toLowerCase();
+  const PLAN_LABELS: Record<string, string> = {
+    free: "Free",
+    starter: "Starter",
+    professional: "Pro",
+    pro: "Pro",
+    enterprise: "Enterprise",
+  };
+  const PLAN_LIMITS: Record<string, { monthly: number; lifetime?: number }> = {
+    free: { monthly: 0, lifetime: 3 },
+    starter: { monthly: 5 },
+    professional: { monthly: -1 },
+    pro: { monthly: -1 },
+    enterprise: { monthly: -1 },
+  };
+
+  const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+  const used = profile.extractions_this_month || 0;
+  const creditsLeft = profile.credits_remaining ?? 0;
+
+  // Determine display
+  let usageText: string;
+  let usagePercent: number;
+  let barColor: string;
+
+  if (limits.lifetime !== undefined) {
+    // Free tier: lifetime counter
+    const totalUsed = limits.lifetime - creditsLeft;
+    usageText = `${totalUsed} of ${limits.lifetime} free extractions used`;
+    usagePercent = (totalUsed / limits.lifetime) * 100;
+    barColor = usagePercent >= 100 ? "bg-red-500" : usagePercent >= 66 ? "bg-amber-500" : "bg-emerald-500";
+  } else if (limits.monthly > 0) {
+    // Capped monthly
+    usageText = `${used} of ${limits.monthly} extractions this month`;
+    usagePercent = (used / limits.monthly) * 100;
+    barColor = usagePercent >= 100 ? "bg-red-500" : usagePercent >= 80 ? "bg-amber-500" : "bg-emerald-500";
+  } else {
+    // Unlimited
+    usageText = `${used} extractions this month (unlimited)`;
+    usagePercent = 0;
+    barColor = "bg-emerald-500";
+  }
+
+  return (
+    <div className="mb-6 bg-white rounded-xl border border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center">
+          <Zap className="w-4 h-4 text-emerald-600" />
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-900">{PLAN_LABELS[plan] || "Free"} Plan</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+              {plan === "free" ? "FREE" : "ACTIVE"}
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">{usageText}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 sm:min-w-[200px]">
+        {limits.monthly !== -1 && (
+          <div className="flex-1">
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${Math.min(usagePercent, 100)}%` }} />
+            </div>
+          </div>
+        )}
+        {(plan === "free" || plan === "starter") && (
+          <Link href="/pricing" className="text-xs font-medium text-emerald-600 hover:text-emerald-700 whitespace-nowrap">
+            Upgrade →
+          </Link>
+        )}
       </div>
     </div>
   );
