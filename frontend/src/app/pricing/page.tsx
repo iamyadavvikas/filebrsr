@@ -5,6 +5,7 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 declare global {
   interface Window {
@@ -151,6 +152,16 @@ export default function PricingPage() {
 
     setLoadingPlan(planKey);
     try {
+      // Require authenticated user before checkout — entitlement bound to JWT
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        const next = encodeURIComponent(`/pricing?plan=${planKey}`);
+        window.location.href = `/login?next=${next}`;
+        setLoadingPlan(null);
+        return;
+      }
+
       const isSubscription = planKey === "growth" || planKey === "scale";
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const endpoint = isSubscription
@@ -159,8 +170,11 @@ export default function PricingPage() {
 
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: planKey, billing_period: "yearly", user_id: "guest" }),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ plan: planKey, billing_period: "yearly" }),
       });
 
       const data = await res.json();
@@ -177,18 +191,25 @@ export default function PricingPage() {
         name: "FileBRSR",
         description: `${planKey.charAt(0).toUpperCase() + planKey.slice(1)} Plan`,
         handler: async (response: RazorpayResponse) => {
-          await fetch(`${backendUrl}/api/billing/verify-payment`, {
+          const verifyRes = await fetch(`${backendUrl}/api/billing/verify-payment`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${session.access_token}`,
+            },
             body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id || "",
+              razorpay_order_id: response.razorpay_order_id || null,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              user_id: "guest",
-              plan: planKey,
+              razorpay_subscription_id: response.razorpay_subscription_id || null,
             }),
           });
-          window.location.href = "/dashboard";
+          if (!verifyRes.ok) {
+            const err = await verifyRes.json().catch(() => ({}));
+            alert(`Payment verification failed: ${err.detail || verifyRes.statusText}. Please contact support.`);
+            return;
+          }
+          window.location.href = "/platform?upgraded=1";
         },
         theme: { color: "#1B4D3E" },
       };

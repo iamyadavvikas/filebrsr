@@ -36,7 +36,7 @@ from app.brsr_framework import analyze_gaps, BRSR_FRAMEWORK, get_mandatory_field
 from app.brsr_datapoints import BRSR_DATAPOINTS, get_datapoints_stats, analyze_gaps_v2, get_esrs_mapped_datapoints
 from app.nifty50_benchmarks import (
     SECTOR_BENCHMARKS, detect_sector, get_benchmark_comparison,
-    NIFTY50_DISCLOSURE_PATTERNS
+    NIFTY50_DISCLOSURE_PATTERNS, BENCHMARK_METADATA,
 )
 from app.billing import router as billing_router
 from app.pdf_generator import generate_compliance_pdf
@@ -56,6 +56,50 @@ from app.router_trends import router as trends_router
 app = FastAPI(title="FileBRSR Platform API", version="4.0.0")
 
 settings = get_settings()
+
+
+# ─── Simple IP rate limiter for public endpoints ──────────────────────────
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+_GUEST_EXTRACT_LOG: dict[str, list[datetime]] = defaultdict(list)
+_GUEST_EXTRACT_DAILY_LIMIT = 3  # per IP per 24h, per worker process
+
+
+def _client_ip(request: Request) -> str:
+    """Resolve the real client IP behind nginx/Cloudflare proxies."""
+    fwd = request.headers.get("x-forwarded-for", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    real = request.headers.get("x-real-ip", "")
+    if real:
+        return real
+    return request.client.host if request.client else "unknown"
+
+
+def _check_guest_rate_limit(request: Request) -> None:
+    """Raise 429 if this IP has exceeded the guest extraction quota."""
+    ip = _client_ip(request)
+    now = datetime.utcnow()
+    cutoff = now - timedelta(hours=24)
+    history = [t for t in _GUEST_EXTRACT_LOG[ip] if t > cutoff]
+    if len(history) >= _GUEST_EXTRACT_DAILY_LIMIT:
+        oldest = min(history)
+        retry_in = int((oldest + timedelta(hours=24) - now).total_seconds())
+        logger.warning("Guest rate limit hit: ip=%s count=%d", ip, len(history))
+        raise HTTPException(
+            status_code=429,
+            detail=f"Free demo limit reached ({_GUEST_EXTRACT_DAILY_LIMIT}/day). Sign up for a free account to continue. Try again in {max(1, retry_in // 60)} minutes.",
+            headers={"Retry-After": str(max(60, retry_in))},
+        )
+    history.append(now)
+    _GUEST_EXTRACT_LOG[ip] = history
+    # Periodic cleanup to avoid unbounded memory growth
+    if len(_GUEST_EXTRACT_LOG) > 10000:
+        for k in list(_GUEST_EXTRACT_LOG.keys()):
+            _GUEST_EXTRACT_LOG[k] = [t for t in _GUEST_EXTRACT_LOG[k] if t > cutoff]
+            if not _GUEST_EXTRACT_LOG[k]:
+                del _GUEST_EXTRACT_LOG[k]
 
 # Register routers
 app.include_router(billing_router)
@@ -235,9 +279,11 @@ async def extract_brsr(
 
 @app.post("/api/guest-extract")
 async def guest_extract_brsr(
+    request: Request,
     file: UploadFile = File(...),
 ):
-    """Public guest extraction endpoint — no auth, limited to 50MB."""
+    """Public guest extraction endpoint — no auth, IP-rate-limited, 50MB max."""
+    _check_guest_rate_limit(request)
     try:
         content = await file.read()
 
@@ -333,10 +379,11 @@ async def gap_analysis(extracted_data: dict):
 
 @app.get("/api/benchmarks")
 async def get_all_benchmarks():
-    """Return all NIFTY 50 sector benchmarks."""
+    """Return all NIFTY 50 sector benchmarks with disclaimer metadata."""
     return {
         "sectors": {k: {"name": v["name"], "companies": v["companies"], "typical_disclosure_rate": v["typical_disclosure_rate"]} for k, v in SECTOR_BENCHMARKS.items()},
         "disclosure_patterns": NIFTY50_DISCLOSURE_PATTERNS,
+        "metadata": BENCHMARK_METADATA,
     }
 
 

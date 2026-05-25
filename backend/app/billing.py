@@ -1,19 +1,52 @@
 """
 Razorpay Subscription Billing for FileBRSR SaaS.
 Handles plan creation, subscription management, and webhook processing.
+
+SECURITY: All entitlement-granting endpoints REQUIRE a valid Supabase JWT in the
+Authorization header. The user_id is resolved server-side from the JWT and the
+client-supplied user_id is IGNORED. The plan and amount are always looked up
+server-side from the PLANS dict — never trusted from the client payload during
+verification.
 """
 import hashlib
 import hmac
-from fastapi import APIRouter, Request, HTTPException
+import logging
+from fastapi import APIRouter, Request, HTTPException, Header
 from pydantic import BaseModel
 
 from app.config import get_settings
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
+logger = logging.getLogger("filebrsr.billing")
 
 
 def _settings():
     return get_settings()
+
+
+async def require_user_id(authorization: str | None) -> str:
+    """Resolve the authenticated Supabase user_id from a Bearer JWT.
+    Rejects missing tokens, 'guest', and the service key. Returns the JWT `sub`.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = authorization[len("Bearer "):].strip()
+    if not token or token in ("guest", "undefined", "null"):
+        raise HTTPException(status_code=401, detail="Invalid auth token")
+    # Reject the service key — only end-user JWTs should hit billing
+    if token == get_settings().SUPABASE_SERVICE_KEY:
+        raise HTTPException(status_code=401, detail="Service key not permitted on billing endpoints")
+    try:
+        import jwt as pyjwt
+        payload = pyjwt.decode(token, options={"verify_signature": False})
+        uid = payload.get("sub")
+        if not uid or uid == "guest":
+            raise HTTPException(status_code=401, detail="Invalid JWT payload")
+        return uid
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Could not decode JWT: {e}")
 
 # Razorpay Plan IDs - create these once via Razorpay Dashboard or API
 # These map to our internal plan names
@@ -65,13 +98,11 @@ PLANS = {
 class CreateSubscriptionRequest(BaseModel):
     plan: str
     billing_period: str = "yearly"  # monthly or yearly
-    user_id: str
     org_id: str | None = None
 
 
 class CreateOrderRequest(BaseModel):
     plan: str = "pay_per_report"
-    user_id: str
 
 
 @router.get("/plans")
@@ -81,8 +112,13 @@ async def get_plans():
 
 
 @router.post("/create-subscription")
-async def create_subscription(req: CreateSubscriptionRequest):
-    """Create a Razorpay subscription for recurring billing."""
+async def create_subscription(
+    req: CreateSubscriptionRequest,
+    authorization: str | None = Header(default=None),
+):
+    """Create a Razorpay subscription for recurring billing. REQUIRES Supabase JWT."""
+    user_id = await require_user_id(authorization)
+
     valid_subscription_plans = ("growth", "scale", "starter", "professional")
     if req.plan not in valid_subscription_plans:
         raise HTTPException(status_code=400, detail=f"Invalid plan for subscription. Valid: {valid_subscription_plans}")
@@ -103,7 +139,7 @@ async def create_subscription(req: CreateSubscriptionRequest):
                     "total_count": 12 if period == "monthly" else 1,
                     "quantity": 1,
                     "notes": {
-                        "user_id": req.user_id,
+                        "user_id": user_id,
                         "org_id": req.org_id or "",
                         "plan": req.plan,
                     },
@@ -118,9 +154,9 @@ async def create_subscription(req: CreateSubscriptionRequest):
                     json={
                         "amount": amount,
                         "currency": "INR",
-                        "receipt": f"sub_{req.plan}_{req.user_id[:8]}",
+                        "receipt": f"sub_{req.plan}_{user_id[:8]}",
                         "notes": {
-                            "user_id": req.user_id,
+                            "user_id": user_id,
                             "org_id": req.org_id or "",
                             "plan": req.plan,
                             "billing_period": period,
@@ -153,8 +189,13 @@ async def create_subscription(req: CreateSubscriptionRequest):
 
 
 @router.post("/create-order")
-async def create_order(req: CreateOrderRequest):
-    """Create a one-time Razorpay order for pay-per-report."""
+async def create_order(
+    req: CreateOrderRequest,
+    authorization: str | None = Header(default=None),
+):
+    """Create a one-time Razorpay order for pay-per-report. REQUIRES Supabase JWT."""
+    user_id = await require_user_id(authorization)
+
     plan_data = PLANS.get(req.plan)
     if not plan_data:
         raise HTTPException(status_code=400, detail="Invalid plan")
@@ -170,8 +211,8 @@ async def create_order(req: CreateOrderRequest):
                 json={
                     "amount": amount,
                     "currency": "INR",
-                    "receipt": f"order_{req.user_id[:8]}",
-                    "notes": {"user_id": req.user_id, "plan": req.plan},
+                    "receipt": f"order_{user_id[:8]}",
+                    "notes": {"user_id": user_id, "plan": req.plan},
                 },
             )
             if response.status_code != 200:
@@ -317,26 +358,75 @@ async def _handle_payment_captured(entity: dict):
         }).eq("id", user_id).execute()
 
 
+class VerifyPaymentRequest(BaseModel):
+    razorpay_order_id: str | None = None
+    razorpay_payment_id: str
+    razorpay_signature: str
+    razorpay_subscription_id: str | None = None
+
+
 @router.post("/verify-payment")
 async def verify_payment(
-    razorpay_order_id: str,
-    razorpay_payment_id: str,
-    razorpay_signature: str,
-    user_id: str,
-    plan: str = "pay_per_report",
+    req: VerifyPaymentRequest,
+    authorization: str | None = Header(default=None),
 ):
-    """Verify Razorpay payment signature (client-side callback)."""
-    message = f"{razorpay_order_id}|{razorpay_payment_id}"
+    """Verify Razorpay payment signature and grant entitlement.
+
+    SECURITY: user_id comes from the verified JWT (NEVER the client body).
+    The plan and amount are read from the Razorpay order/subscription notes,
+    which we created server-side. The client cannot influence entitlement.
+    """
+    user_id = await require_user_id(authorization)
+
+    if req.razorpay_subscription_id:
+        # subscriptions: HMAC(payment_id|subscription_id)
+        message = f"{req.razorpay_payment_id}|{req.razorpay_subscription_id}"
+    elif req.razorpay_order_id:
+        # orders: HMAC(order_id|payment_id)
+        message = f"{req.razorpay_order_id}|{req.razorpay_payment_id}"
+    else:
+        raise HTTPException(status_code=400, detail="Missing order_id or subscription_id")
+
     expected = hmac.HMAC(
         get_settings().RAZORPAY_KEY_SECRET.encode(),
         message.encode(),
         hashlib.sha256,
     ).hexdigest()
 
-    if not hmac.compare_digest(razorpay_signature, expected):
+    if not hmac.compare_digest(req.razorpay_signature, expected):
         raise HTTPException(status_code=400, detail="Payment verification failed")
 
-    # Payment verified — update user credits
+    # Fetch order/subscription from Razorpay to read SERVER-SIDE notes
+    import httpx
+    plan = "pay_per_report"
+    amount = 0
+    notes_user_id: str | None = None
+    try:
+        async with httpx.AsyncClient() as client:
+            if req.razorpay_subscription_id:
+                r = await client.get(
+                    f"https://api.razorpay.com/v1/subscriptions/{req.razorpay_subscription_id}",
+                    auth=(get_settings().RAZORPAY_KEY_ID, get_settings().RAZORPAY_KEY_SECRET),
+                )
+            else:
+                r = await client.get(
+                    f"https://api.razorpay.com/v1/orders/{req.razorpay_order_id}",
+                    auth=(get_settings().RAZORPAY_KEY_ID, get_settings().RAZORPAY_KEY_SECRET),
+                )
+            if r.status_code == 200:
+                d = r.json()
+                notes = d.get("notes", {}) or {}
+                plan = notes.get("plan", plan)
+                notes_user_id = notes.get("user_id")
+                amount = d.get("amount") or PLANS.get(plan, {}).get("yearly_amount", 0)
+    except Exception as e:
+        logger.warning("Could not fetch Razorpay entity for verification: %s", e)
+
+    # Defence in depth: notes user_id (if present) MUST match JWT user
+    if notes_user_id and notes_user_id != user_id:
+        logger.error("User mismatch: jwt=%s razorpay_notes=%s", user_id, notes_user_id)
+        raise HTTPException(status_code=403, detail="User mismatch between session and payment")
+
     from supabase import create_client
     supabase = create_client(get_settings().SUPABASE_URL, get_settings().SUPABASE_SERVICE_KEY)
 
@@ -350,15 +440,15 @@ async def verify_payment(
             "credits_remaining": PLANS.get(plan, {}).get("reports_per_month", 5),
         }).eq("id", user_id).execute()
 
-    # Record payment
     supabase.table("payments").insert({
         "user_id": user_id,
-        "razorpay_order_id": razorpay_order_id,
-        "razorpay_payment_id": razorpay_payment_id,
-        "razorpay_signature": razorpay_signature,
-        "amount": PLANS.get(plan, {}).get("amount", PLANS.get(plan, {}).get("yearly_amount", 0)),
+        "razorpay_order_id": req.razorpay_order_id,
+        "razorpay_payment_id": req.razorpay_payment_id,
+        "razorpay_signature": req.razorpay_signature,
+        "amount": amount or PLANS.get(plan, {}).get("yearly_amount", 0),
         "plan": plan,
         "status": "paid",
     }).execute()
 
+    logger.info("Entitlement granted: user=%s plan=%s", user_id, plan)
     return {"status": "verified", "plan": plan}

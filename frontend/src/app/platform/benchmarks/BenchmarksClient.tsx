@@ -25,6 +25,14 @@ interface SectorInfo {
   typical_disclosure_rate: number;
 }
 
+interface BenchmarkMetadata {
+  source?: string;
+  reporting_period?: string;
+  methodology?: string;
+  last_updated?: string;
+  disclaimer?: string;
+}
+
 interface Report {
   id: string;
   company_name: string | null;
@@ -71,6 +79,7 @@ const LOWER_IS_BETTER = new Set([
 export default function BenchmarksClient({ userId, reports, availableFYs }: Props) {
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [sectors, setSectors] = useState<Record<string, SectorInfo>>({});
+  const [metadata, setMetadata] = useState<BenchmarkMetadata | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,7 +92,10 @@ export default function BenchmarksClient({ userId, reports, availableFYs }: Prop
   useEffect(() => {
     fetch("/backend/api/benchmarks")
       .then((r) => r.json())
-      .then((d) => setSectors(d.sectors || {}))
+      .then((d) => {
+        setSectors(d.sectors || {});
+        setMetadata(d.metadata || null);
+      })
       .catch(() => {});
   }, []);
 
@@ -176,6 +188,18 @@ export default function BenchmarksClient({ userId, reports, availableFYs }: Prop
           </p>
         </div>
       </div>
+
+      {/* Disclaimer banner */}
+      {metadata?.disclaimer && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+          <p className="text-xs text-amber-800 leading-relaxed">
+            <strong>Indicative values — not audited.</strong> {metadata.disclaimer}
+            {metadata.reporting_period && <> Reporting period: <strong>{metadata.reporting_period}</strong>.</>}
+            {metadata.last_updated && <> Last updated: <strong>{metadata.last_updated}</strong>.</>}
+            {" "}For authoritative peer data, refer to each company&apos;s filed BRSR on BSE/NSE.
+          </p>
+        </div>
+      )}
 
       {/* Data Source Selector */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">

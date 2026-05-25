@@ -1,12 +1,36 @@
 """
-NIFTY 50 BRSR Benchmark Data - Derived from studying publicly filed BRSR reports
-of top Indian listed companies (Reliance, TCS, Infosys, HDFC Bank, ITC, etc.)
+NIFTY 50 BRSR Sector Benchmark Ranges — INDICATIVE VALUES
 
-This provides sector-wise benchmarks that our gap analysis uses to:
-1. Score reports against industry peers
-2. Identify outliers (too low = gap, too high = verify)
-3. Provide actionable recommendations based on what leaders disclose
+⚠️  IMPORTANT DISCLAIMER (read before using):
+
+These numbers are *indicative sector ranges* hand-curated from reviewing publicly
+filed BRSR reports of NIFTY 50 companies (FY24-25 cycle). They are NOT:
+  - audited or verified against original filings
+  - company-specific (no individual company value is reported here)
+  - guaranteed to be current beyond the FY24-25 reporting period
+  - a substitute for the company's own filed BRSR
+
+Use for:
+  ✓ directional gap analysis ("my Scope 1 looks 5x sector median — worth checking")
+  ✓ prioritising which datapoints to disclose
+
+Do NOT use for:
+  ✗ marketing claims about specific peer companies
+  ✗ audit-grade compliance assessments
+  ✗ regulatory submissions
+
+For authoritative peer data, refer to each company's filed BRSR on BSE/NSE
+disclosure portals. A scraped-and-aggregated benchmark pipeline with per-metric
+source citations is planned (see Phase 2 of the market-readiness roadmap).
 """
+
+BENCHMARK_METADATA = {
+    "source": "Indicative sector ranges curated from public NIFTY 50 BRSR filings",
+    "reporting_period": "FY24-25",
+    "methodology": "Hand-curated; not statistically aggregated",
+    "last_updated": "2025-Q4",
+    "disclaimer": "Indicative only. Not audited. Not company-specific. Do not cite as authoritative peer values.",
+}
 
 # Sector-wise benchmark data from NIFTY 50 BRSR filings
 # Values represent median/typical disclosure for well-filed BRSR reports
