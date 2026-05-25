@@ -6,12 +6,11 @@
 -- ═══════════════════════════════════════════════════════════════
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
 
--- Set your account as admin (replace with your actual user ID from Supabase)
-UPDATE profiles SET is_admin = true WHERE email IN (
-  'ydvikasiitkgp@gmail.com',
-  'ydvikas.iitkgp@gmail.com',
-  'vkyadav.iitkgp@gmail.com'
-);
+-- NOTE: Admin assignment is NOT done in this migration.
+-- Run the separate, ungitted script `supabase/admin_grants.sql.local` (gitignored)
+-- to grant admin to specific emails. Example template:
+--   UPDATE profiles SET is_admin = true WHERE email = 'your-admin@example.com';
+-- This keeps personal emails out of the public repository.
 
 -- ═══════════════════════════════════════════════════════════════
 -- 2. Enable RLS on all user-facing tables

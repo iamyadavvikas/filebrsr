@@ -1,0 +1,3 @@
+# Local-only admin grant SQL files
+admin_grants.sql.local
+*.local.sql
