@@ -1,14 +1,12 @@
-version: "3.8"
+# NOTE: this compose is "pull-only" — images are built in CI and pushed to ECR.
+# Required env vars when running on the box (loaded from ~/filebrsr/.env):
+#   ECR_REGISTRY   e.g. 123456789012.dkr.ecr.ap-south-1.amazonaws.com
+#   TAG            git short SHA, set by deploy.sh from ~/filebrsr/.current_tag
+# Plus all runtime secrets (SUPABASE_*, GEMINI_API_KEY, etc.)
 
 services:
   frontend:
-    build:
-      context: ./frontend
-      args:
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-        NEXT_PUBLIC_API_URL: ""
-        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY}
+    image: ${ECR_REGISTRY}/filebrsr-frontend:${TAG}
     environment:
       - BACKEND_URL=http://backend:8000
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
@@ -20,14 +18,19 @@ services:
     depends_on:
       - backend
     restart: always
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
           memory: 1024M
 
   backend:
-    build:
-      context: ./backend
+    image: ${ECR_REGISTRY}/filebrsr-backend:${TAG}
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
@@ -44,14 +47,19 @@ services:
     ports:
       - "8000:8000"
     restart: always
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     deploy:
       resources:
         limits:
           memory: 1536M
 
   worker:
-    build:
-      context: ./backend
+    image: ${ECR_REGISTRY}/filebrsr-backend:${TAG}
     command: python -m app.worker
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
