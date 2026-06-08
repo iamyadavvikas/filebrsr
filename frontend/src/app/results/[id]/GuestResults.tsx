@@ -130,7 +130,7 @@ export function GuestResults() {
   const [isFounder, setIsFounder] = useState(false);
   const router = useRouter();
 
-  const FOUNDER_EMAILS = ["ydvikasiitkgp@gmail.com"];
+  const FOUNDER_EMAILS = ["vikaskashi896@gmail.com"];
 
   useEffect(() => {
     // Check if current user is a founder

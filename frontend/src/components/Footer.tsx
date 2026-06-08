@@ -41,7 +41,6 @@ export default function Footer() {
             <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Company</h4>
             <ul className="space-y-2.5">
               {[
-                { label: "About Us", href: "/about" },
                 { label: "Contact", href: "/contact" },
                 { label: "Terms of Use", href: "/terms" },
                 { label: "Privacy Policy", href: "/privacy" },

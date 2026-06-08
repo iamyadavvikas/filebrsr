@@ -249,12 +249,26 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
 
   async function handleDownloadExcel() {
     try {
+      const token = await getAuthToken();
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
       const res = await fetch(
-        `${backendUrl}/api/platform/data-entry/${financialYear}/download-excel?user_id=${userId}`,
-        { headers: { Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""}` } }
+        `${backendUrl}/api/platform/data-entry/${financialYear}/download-excel`,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (!res.ok) throw new Error("Download failed");
+      if (!res.ok) {
+        let detail = `Download failed (HTTP ${res.status})`;
+        try {
+          const body = await res.json();
+          if (body?.detail) detail = body.detail;
+        } catch {
+          // response wasn't JSON; keep generic message
+        }
+        if (res.status === 404) {
+          detail = `No saved entries yet for FY ${financialYear}. Fill in at least one field and click Save before exporting.`;
+        }
+        alert(detail);
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -266,6 +280,7 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Download failed:", err);
+      alert("Download failed. Check your network and try again.");
     }
   }
 

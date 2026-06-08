@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Founder emails get unlimited access
-  const FOUNDER_EMAILS = ["ydvikasiitkgp@gmail.com", "ydvikas.iitkgp@gmail.com", "vkyadav.iitkgp@gmail.com", "vikaskashi896@gmail.com", "yvikas.free@gmail.com"];
+  const FOUNDER_EMAILS = ["vikaskashi896@gmail.com"];
   const isFounder = user && FOUNDER_EMAILS.includes(user.email || "");
 
   // Plan-based extraction quota enforcement

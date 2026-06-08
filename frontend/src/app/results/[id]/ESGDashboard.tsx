@@ -205,7 +205,7 @@ export function ESGDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const router = useRouter();
 
-  const FOUNDER_EMAILS = ["ydvikasiitkgp@gmail.com", "ydvikas.iitkgp@gmail.com", "vkyadav.iitkgp@gmail.com", "vikaskashi896@gmail.com"];
+  const FOUNDER_EMAILS = ["vikaskashi896@gmail.com"];
 
   useEffect(() => {
     const checkFounder = async () => {
