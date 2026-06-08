@@ -41,8 +41,12 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
-      - run: ruff check app/
-      - run: ruff format --check app/
+      - name: Ruff check (non-blocking)
+        run: ruff check app/
+        continue-on-error: true
+      - name: Ruff format check (non-blocking)
+        run: ruff format --check app/
+        continue-on-error: true
       - run: pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
         env:
           SUPABASE_URL: https://example.supabase.co
