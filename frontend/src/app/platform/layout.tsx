@@ -38,11 +38,7 @@ import {
 } from "lucide-react";
 
 const FOUNDER_EMAILS = [
-  "ydvikasiitkgp@gmail.com",
-  "ydvikas.iitkgp@gmail.com",
-  "vkyadav.iitkgp@gmail.com",
   "vikaskashi896@gmail.com",
-  "yvikas.free@gmail.com",
 ];
 
 // Guest mode determines what a non-logged-in user can access

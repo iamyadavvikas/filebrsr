@@ -134,7 +134,14 @@ interface Scope2Entry {
   state: string;
 }
 
-export default function CarbonClient() {
+interface CarbonClientProps {
+  plan?: string;
+}
+
+const SCOPE3_ENABLED_PLANS = new Set(["growth", "scale", "enterprise"]);
+
+export default function CarbonClient({ plan = "free" }: CarbonClientProps) {
+  const hasScope3 = SCOPE3_ENABLED_PLANS.has((plan || "free").toLowerCase());
   const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [emissionFactorOrg, setEmissionFactorOrg] = useState("cea_2024");
   const [scope1Entries, setScope1Entries] = useState<EmissionEntry[]>([
@@ -468,15 +475,14 @@ export default function CarbonClient() {
           </div>
         </div>
 
-        {/* Scope 3 — Gated for free plan */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 relative">
-          {/* Lock overlay for free users */}
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-[1px] rounded-xl z-10 flex flex-col items-center justify-center">
+        {/* Scope 3 — gated by plan */}
+        {!hasScope3 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-10 flex flex-col items-center justify-center text-center">
             <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-3">
               <Lock className="w-6 h-6 text-gray-500" />
             </div>
             <h4 className="text-lg font-bold text-gray-900 mb-1">Scope 3 — Growth Plan</h4>
-            <p className="text-sm text-gray-500 text-center max-w-xs mb-4">
+            <p className="text-sm text-gray-500 max-w-xs mb-4">
               Full value chain emissions tracking (28 categories) is available on Growth plan and above.
             </p>
             <a
@@ -487,7 +493,8 @@ export default function CarbonClient() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </a>
           </div>
-
+        ) : (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
               <CloudRain className="w-4 h-4 text-blue-600" />
@@ -548,6 +555,7 @@ export default function CarbonClient() {
             </button>
           </div>
         </div>
+        )}
 
         {/* Revenue for Intensity */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
