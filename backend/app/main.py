@@ -31,6 +31,7 @@ from app.extraction_enhanced import extract_enhanced
 from app.ai_extraction import extract_with_ai
 from app.agent_extraction import extract_with_agent
 from app.pdf_parser import parse_pdf
+from app.normalise import normalise_extracted
 from app.brsr_framework import analyze_gaps, BRSR_FRAMEWORK, get_mandatory_fields, get_core_fields
 from app.brsr_datapoints import BRSR_DATAPOINTS, get_datapoints_stats, analyze_gaps_v2, get_esrs_mapped_datapoints
 from app.nifty50_benchmarks import (
@@ -227,6 +228,11 @@ async def extract_brsr(
             merged[section].update(regex_results.get(section, {}))
             merged[section].update(ai_results.get(section, {}))
 
+        # Parallel canonical-numeric view (Cr/Lakh/Mn → INR, % stripped).
+        # Stored as a sibling key so existing consumers reading section_a/b/c
+        # raw strings keep working; new code can read merged["normalised"].
+        merged["normalised"] = normalise_extracted(merged)
+
         # Calculate confidence scores
         confidence = calculate_confidence(regex_results, ai_results)
 
@@ -319,6 +325,7 @@ async def guest_extract_brsr(
             merged[section] = {**enhanced_results.get(section, {})}
             merged[section].update(regex_results.get(section, {}))
             merged[section].update(ai_results.get(section, {}))
+        merged["normalised"] = normalise_extracted(merged)
 
         confidence = calculate_confidence(regex_results, ai_results)
         benchmark = get_benchmark_comparison(merged)
@@ -546,6 +553,7 @@ async def extract_brsr_async(
             merged[section] = {**enhanced_results.get(section, {})}
             merged[section].update(regex_results.get(section, {}))
             merged[section].update(ai_results.get(section, {}))
+        merged["normalised"] = normalise_extracted(merged)
 
         confidence = calculate_confidence(regex_results, ai_results)
         company_name = merged.get("section_a", {}).get("company_name", None)
