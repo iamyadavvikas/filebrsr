@@ -504,6 +504,61 @@ async def get_extraction_status(report_id: str, authorization: str = Header(...)
     return {"status": result.data["status"], "company_name": result.data.get("company_name"), "financial_year": result.data.get("financial_year")}
 
 
+class CorrectionRequest(BaseModel):
+    """User-submitted fix to a single extracted BRSR field."""
+
+    report_id: str
+    user_id: str
+    section: str  # "section_a" | "section_b" | "section_c"
+    field_path: str  # e.g. "turnover", "ghg_scope1"
+    original_value: str | None = None
+    corrected_value: str
+    source_page: int | None = None
+
+
+@app.post("/api/correction")
+async def submit_correction(req: CorrectionRequest, authorization: str = Header(...)):
+    """
+    Capture a single user correction. Writes to extraction_corrections
+    (migration v10). The Next.js layer authenticates the user and
+    verifies report ownership before calling us; we accept user_id from
+    the body and trust the shared-bearer pattern the rest of /api/*
+    already uses.
+    """
+    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
+    if authorization != expected_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if req.section not in {"section_a", "section_b", "section_c"}:
+        raise HTTPException(status_code=400, detail="Invalid section")
+    if not req.field_path or not req.field_path.strip():
+        raise HTTPException(status_code=400, detail="field_path required")
+    if not req.corrected_value or not req.corrected_value.strip():
+        raise HTTPException(status_code=400, detail="corrected_value required")
+
+    supabase = get_supabase_admin()
+    try:
+        result = supabase.table("extraction_corrections").insert({
+            "report_id": req.report_id,
+            "user_id": req.user_id,
+            "section": req.section,
+            "field_path": req.field_path.strip(),
+            "original_value": req.original_value,
+            "corrected_value": req.corrected_value.strip(),
+            "source_page": req.source_page,
+        }).execute()
+    except Exception as e:
+        logger.error("Failed to insert correction: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to save correction") from e
+
+    correction_id = result.data[0]["id"] if result.data else None
+    logger.info(
+        "Correction saved: report=%s field=%s.%s user=%s id=%s",
+        req.report_id, req.section, req.field_path, req.user_id, correction_id,
+    )
+    return {"status": "ok", "correction_id": correction_id}
+
+
 @app.post("/api/extract-async")
 async def extract_brsr_async(
     req: ExtractAsyncRequest,
