@@ -1,8 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import pdfplumber
-import io
 import time
 import logging
 import sentry_sdk
@@ -32,6 +30,7 @@ from app.extraction import extract_with_regex, calculate_confidence
 from app.extraction_enhanced import extract_enhanced
 from app.ai_extraction import extract_with_ai
 from app.agent_extraction import extract_with_agent
+from app.pdf_parser import parse_pdf
 from app.brsr_framework import analyze_gaps, BRSR_FRAMEWORK, get_mandatory_fields, get_core_fields
 from app.brsr_datapoints import BRSR_DATAPOINTS, get_datapoints_stats, analyze_gaps_v2, get_esrs_mapped_datapoints
 from app.nifty50_benchmarks import (
@@ -181,13 +180,15 @@ async def extract_brsr(
         if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large")
 
-        # Extract text from PDF
-        text = ""
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+        # Parse PDF: extract text AND tables (rendered as markdown). BRSR
+        # filings are mostly tabular, so text-only extraction loses ~70% of
+        # the structured data. parse_pdf preserves table layout.
+        doc = parse_pdf(content)
+        text = doc.to_text()
+        logger.info(
+            "PDF parsed: pages=%d tables=%d chars=%d empty_pages=%d",
+            doc.num_pages, doc.num_tables, doc.total_chars, len(doc.empty_pages),
+        )
 
         if not text.strip():
             supabase.table("reports").update({"status": "failed"}).eq(
@@ -290,12 +291,8 @@ async def guest_extract_brsr(
         if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large")
 
-        text = ""
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+        # Table-aware PDF parse (see /api/extract for rationale).
+        text = parse_pdf(content).to_text()
 
         if not text.strip():
             return {"status": "failed", "error": "No text could be extracted from PDF"}
@@ -525,15 +522,8 @@ async def extract_brsr_async(
         if len(file_bytes) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large")
 
-        # Extract text from PDF (limit to first 80 pages for performance on free tier)
-        text = ""
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-            for i, page in enumerate(pdf.pages):
-                if i >= 80:
-                    break
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+        # Table-aware PDF parse, capped at 80 pages for free-tier LLM quota.
+        text = parse_pdf(file_bytes, max_pages=80).to_text()
 
         if not text.strip():
             supabase.table("reports").update({"status": "failed"}).eq(
