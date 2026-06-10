@@ -488,13 +488,12 @@ begin
   ) returning id into v_org_id;
 
   insert into public.fiscal_periods (org_id, fy_label, period_start, period_end, status)
-  values
-    (v_org_id, 'FY2023-24', '2023-04-01', '2024-03-31', 'submitted'),
-    (v_org_id, 'FY2024-25', '2024-04-01', '2025-03-31', 'in_review')
-  returning id into v_fy25_id;
+  values (v_org_id, 'FY2023-24', '2023-04-01', '2024-03-31', 'submitted')
+  returning id into v_fy24_id;
 
-  select id into v_fy24_id from public.fiscal_periods
-    where org_id = v_org_id and fy_label = 'FY2023-24';
+  insert into public.fiscal_periods (org_id, fy_label, period_start, period_end, status)
+  values (v_org_id, 'FY2024-25', '2024-04-01', '2025-03-31', 'in_review')
+  returning id into v_fy25_id;
 
   -- Seed two of the nine assured Core KPIs for FY2024-25
   insert into public.brsr_core_kpis (
