@@ -18,7 +18,6 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [user, setUser] = useState<NavUser | null>(userProp || null);
-  const [authLoaded, setAuthLoaded] = useState(!!userProp);
   const profileRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
@@ -26,20 +25,22 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
   useEffect(() => {
     if (userProp) {
       setUser(userProp);
-      setAuthLoaded(true);
       return;
     }
     const loadUser = async () => {
-      const supabase = createClient();
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
-        setUser({
-          email: authUser.email ?? "",
-          name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || "",
-          plan: "Free",
-        });
+      try {
+        const supabase = createClient();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          setUser({
+            email: authUser.email ?? "",
+            name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || "",
+            plan: "Free",
+          });
+        }
+      } catch {
+        // Silently ignore — Log In button stays visible by default
       }
-      setAuthLoaded(true);
     };
     loadUser();
   }, [userProp]);
@@ -191,7 +192,7 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                   </div>
                 )}
               </div>
-            ) : authLoaded ? (
+            ) : (
               <>
               <Link
                 href="/demo"
@@ -208,7 +209,7 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                 Log In
               </Link>
               </>
-            ) : null}
+            )}
           </div>
 
           {/* Mobile toggle */}
@@ -272,7 +273,7 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                   Sign Out
                 </button>
               </>
-            ) : authLoaded ? (
+            ) : (
               <div className="mt-2 space-y-2">
                 <Link
                   href="/demo"
@@ -291,7 +292,7 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                   Log In
                 </Link>
               </div>
-            ) : null}
+            )}
           </div>
         )}
       </div>
