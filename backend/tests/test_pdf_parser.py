@@ -1,18 +1,15 @@
 """Tests for the table-aware PDF parser."""
 from __future__ import annotations
 
-import io
-
 import pytest
 
 from app.pdf_parser import (
-    Chunk,
-    Document,
+    _is_heading,
     _render_table_as_markdown,
+    _split_text_by_headings,
     parse_pdf,
     text_with_tables,
 )
-
 
 # ─── Markdown rendering (pure) ─────────────────────────────────────
 
@@ -152,3 +149,118 @@ def test_text_with_tables_convenience(monkeypatch):
     out = text_with_tables(b"fake")
     assert "narrative" in out
     assert "| k | v |" in out
+
+
+# ─── Heading detection (Phase 2.2) ─────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "SECTION A: GENERAL DISCLOSURES",
+        "Section B - Management & Process",
+        "PRINCIPLE 1: Businesses should conduct...",
+        "Principle 6",
+        "Essential Indicators",
+        "Leadership Indicator",
+        "I. Details of the listed entity",
+        "II. Products/Services",
+        "EMPLOYEES AND WORKERS",
+        "HUMAN RESOURCES & DEVELOPMENT",
+    ],
+)
+def test_is_heading_recognises_brsr_patterns(line):
+    assert _is_heading(line) is True
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "",
+        "The company believes in sustainable growth.",
+        "Total revenue for the year was Rs. 450 crore.",
+        "a. Sub-item",
+        # Long all-caps blocks are usually copy-pasted from headers — caller
+        # decides; we cap at 120 chars to avoid those.
+        "X" * 200,
+    ],
+)
+def test_is_heading_rejects_non_headings(line):
+    assert _is_heading(line) is False
+
+
+def test_split_text_by_headings_basic():
+    text = (
+        "preamble text\n"
+        "SECTION A: GENERAL DISCLOSURES\n"
+        "body of section A\n"
+        "more body\n"
+        "PRINCIPLE 1: Ethics\n"
+        "ethics body"
+    )
+    sections = _split_text_by_headings(text)
+    assert len(sections) == 3
+    assert sections[0] == (None, "preamble text")
+    assert sections[1][0] == "SECTION A: GENERAL DISCLOSURES"
+    assert "body of section A" in sections[1][1]
+    assert sections[2][0] == "PRINCIPLE 1: Ethics"
+    assert sections[2][1] == "ethics body"
+
+
+def test_split_text_by_headings_no_preamble():
+    text = "SECTION A\nbody"
+    sections = _split_text_by_headings(text)
+    # No preamble — first entry should be the heading itself
+    assert sections[0][0] == "SECTION A"
+
+
+# ─── parse_pdf with headings + chunk IDs ──────────────────────────
+
+
+def test_parse_pdf_splits_text_by_headings(monkeypatch):
+    text = (
+        "intro paragraph\n"
+        "SECTION A: GENERAL DISCLOSURES\n"
+        "details about the entity\n"
+        "PRINCIPLE 1\n"
+        "ethics content"
+    )
+    _patch_pdfplumber(monkeypatch, [_FakePage(text, [])])
+    doc = parse_pdf(b"fake")
+    text_chunks = [c for c in doc.chunks if c.kind == "text"]
+    assert len(text_chunks) == 3
+    assert text_chunks[0].heading is None
+    assert text_chunks[1].heading == "SECTION A: GENERAL DISCLOSURES"
+    assert text_chunks[2].heading == "PRINCIPLE 1"
+
+
+def test_parse_pdf_assigns_chunk_ids(monkeypatch):
+    table = [["k", "v"], ["a", "1"]]
+    _patch_pdfplumber(monkeypatch, [_FakePage("body", [table])])
+    doc = parse_pdf(b"fake")
+    ids = [c.chunk_id for c in doc.chunks]
+    # Table first (kind == "table"), then text
+    assert "p1-t0" in ids
+    assert "p1-c0" in ids
+
+
+def test_parse_pdf_chunk_ids_unique_across_pages(monkeypatch):
+    _patch_pdfplumber(
+        monkeypatch,
+        [_FakePage("page one body", []), _FakePage("page two body", [])],
+    )
+    doc = parse_pdf(b"fake")
+    ids = [c.chunk_id for c in doc.chunks]
+    assert len(ids) == len(set(ids))
+    assert {"p1-c0", "p2-c0"} == set(ids)
+
+
+def test_parse_pdf_heading_chunk_content_includes_heading(monkeypatch):
+    text = "PRINCIPLE 6\nenvironment disclosures here"
+    _patch_pdfplumber(monkeypatch, [_FakePage(text, [])])
+    doc = parse_pdf(b"fake")
+    text_chunks = [c for c in doc.chunks if c.kind == "text"]
+    # The heading line should be preserved at the top of its chunk so the LLM
+    # sees the context even when this single chunk is sent in isolation.
+    assert text_chunks[0].content.startswith("PRINCIPLE 6")
+    assert "environment disclosures here" in text_chunks[0].content

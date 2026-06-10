@@ -1,9 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header, Request
+import logging
+import time
+
+import sentry_sdk
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import time
-import logging
-import sentry_sdk
 from supabase import create_client
 
 from app.config import get_settings
@@ -26,32 +27,36 @@ if _settings.SENTRY_DSN:
         environment=_settings.ENVIRONMENT,
     )
     logger.info("Sentry initialized for %s", _settings.ENVIRONMENT)
-from app.extraction import extract_with_regex, calculate_confidence
-from app.extraction_enhanced import extract_enhanced
-from app.ai_extraction import extract_with_ai
 from app.agent_extraction import extract_with_agent
-from app.pdf_parser import parse_pdf
-from app.normalise import normalise_extracted
-from app.brsr_framework import analyze_gaps, BRSR_FRAMEWORK, get_mandatory_fields, get_core_fields
-from app.brsr_datapoints import BRSR_DATAPOINTS, get_datapoints_stats, analyze_gaps_v2, get_esrs_mapped_datapoints
-from app.nifty50_benchmarks import (
-    SECTOR_BENCHMARKS, detect_sector, get_benchmark_comparison,
-    NIFTY50_DISCLOSURE_PATTERNS, BENCHMARK_METADATA,
-)
+from app.ai_extraction import extract_with_ai
 from app.billing import router as billing_router
-from app.pdf_generator import generate_compliance_pdf
-from app.router_v2 import router as v2_router
-from app.router_platform import router as platform_router
-from app.router_advanced import router as advanced_router
-from app.router_org import router as org_router
-from app.router_moat import router as moat_router
-from app.router_market import router as market_router
+from app.brsr_datapoints import BRSR_DATAPOINTS, analyze_gaps_v2, get_datapoints_stats, get_esrs_mapped_datapoints
+from app.brsr_framework import BRSR_FRAMEWORK, get_core_fields, get_mandatory_fields
+from app.citations import attach_citations
 from app.excel_import import router as excel_import_router
+from app.extraction import calculate_confidence, extract_with_regex
+from app.extraction_enhanced import extract_enhanced
+from app.nifty50_benchmarks import (
+    BENCHMARK_METADATA,
+    NIFTY50_DISCLOSURE_PATTERNS,
+    SECTOR_BENCHMARKS,
+    get_benchmark_comparison,
+)
+from app.normalise import normalise_extracted
+from app.ocr import ocr_document
+from app.pdf_generator import generate_compliance_pdf
+from app.pdf_parser import parse_pdf
+from app.router_advanced import router as advanced_router
 from app.router_cron import router as cron_router
+from app.router_market import router as market_router
+from app.router_moat import router as moat_router
+from app.router_org import router as org_router
+from app.router_platform import router as platform_router
+from app.router_trends import router as trends_router
+from app.router_v2 import router as v2_router
+from app.sebi_pdf_filing import router as sebi_pdf_router
 from app.xbrl_export import router as xbrl_router
 from app.xbrl_filing import router as xbrl_filing_router
-from app.sebi_pdf_filing import router as sebi_pdf_router
-from app.router_trends import router as trends_router
 
 app = FastAPI(title="FileBRSR Platform API", version="4.0.0")
 
@@ -185,6 +190,9 @@ async def extract_brsr(
         # filings are mostly tabular, so text-only extraction loses ~70% of
         # the structured data. parse_pdf preserves table layout.
         doc = parse_pdf(content)
+        # OCR fallback for pages pdfplumber returned blank (scanned reports).
+        # No-op if no empty pages or no Gemini key; capped at 20 pages.
+        await ocr_document(doc, content, api_key=settings.GEMINI_API_KEY)
         text = doc.to_text()
         logger.info(
             "PDF parsed: pages=%d tables=%d chars=%d empty_pages=%d",
@@ -232,6 +240,11 @@ async def extract_brsr(
         # Stored as a sibling key so existing consumers reading section_a/b/c
         # raw strings keep working; new code can read merged["normalised"].
         merged["normalised"] = normalise_extracted(merged)
+
+        # Source citations: for every extracted field, point at the chunk
+        # (page + chunk_id + snippet) it came from. Deterministic string
+        # search, no extra LLM call. Frontend renders "View source p.47".
+        merged["citations"] = attach_citations(merged, doc)
 
         # Calculate confidence scores
         confidence = calculate_confidence(regex_results, ai_results)
@@ -298,7 +311,9 @@ async def guest_extract_brsr(
             raise HTTPException(status_code=400, detail="File too large")
 
         # Table-aware PDF parse (see /api/extract for rationale).
-        text = parse_pdf(content).to_text()
+        doc = parse_pdf(content)
+        await ocr_document(doc, content, api_key=settings.GEMINI_API_KEY)
+        text = doc.to_text()
 
         if not text.strip():
             return {"status": "failed", "error": "No text could be extracted from PDF"}
@@ -326,6 +341,7 @@ async def guest_extract_brsr(
             merged[section].update(regex_results.get(section, {}))
             merged[section].update(ai_results.get(section, {}))
         merged["normalised"] = normalise_extracted(merged)
+        merged["citations"] = attach_citations(merged, doc)
 
         confidence = calculate_confidence(regex_results, ai_results)
         benchmark = get_benchmark_comparison(merged)
@@ -585,7 +601,9 @@ async def extract_brsr_async(
             raise HTTPException(status_code=400, detail="File too large")
 
         # Table-aware PDF parse, capped at 80 pages for free-tier LLM quota.
-        text = parse_pdf(file_bytes, max_pages=80).to_text()
+        doc = parse_pdf(file_bytes, max_pages=80)
+        await ocr_document(doc, file_bytes, api_key=settings.GEMINI_API_KEY)
+        text = doc.to_text()
 
         if not text.strip():
             supabase.table("reports").update({"status": "failed"}).eq(
@@ -609,6 +627,7 @@ async def extract_brsr_async(
             merged[section].update(regex_results.get(section, {}))
             merged[section].update(ai_results.get(section, {}))
         merged["normalised"] = normalise_extracted(merged)
+        merged["citations"] = attach_citations(merged, doc)
 
         confidence = calculate_confidence(regex_results, ai_results)
         company_name = merged.get("section_a", {}).get("company_name", None)
@@ -661,10 +680,10 @@ class PDFReportRequest(BaseModel):
 async def generate_pdf_report(req: PDFReportRequest):
     """Generate a branded PDF compliance report."""
     from fastapi.responses import Response
-    
+
     gap_analysis = analyze_gaps_v2(req.extracted_data)
     benchmark = get_benchmark_comparison(req.extracted_data, req.sector)
-    
+
     pdf_bytes = generate_compliance_pdf(
         extracted_data=req.extracted_data,
         gap_analysis=gap_analysis,
@@ -672,7 +691,7 @@ async def generate_pdf_report(req: PDFReportRequest):
         company_name=req.company_name,
         financial_year=req.financial_year,
     )
-    
+
     filename = f"BRSR_Report_{req.company_name.replace(' ', '_')}_{req.financial_year}.pdf"
     return Response(
         content=pdf_bytes,
@@ -692,6 +711,7 @@ class SEBIFilingRequest(BaseModel):
 async def generate_sebi_filing(req: SEBIFilingRequest, authorization: str = Header(...)):
     """Generate SEBI BRSR Annexure II format PDF — the actual stock exchange filing."""
     from fastapi.responses import Response
+
     from app.sebi_pdf_generator import generate_sebi_brsr_filing
 
     expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
