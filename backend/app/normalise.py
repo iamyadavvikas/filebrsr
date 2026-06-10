@@ -10,7 +10,8 @@ range sanity).
 This module is deliberately **non-destructive**: it does not mutate the
 raw extracted strings. Instead, `normalise_extracted(merged)` returns a
 parallel `normalised` dict with the same {section: {field: ...}} shape,
-where each value is `{"raw": <original>, "value": <float>, "unit": <str>}`.
+where each value is `{"raw": <original>, "value": <float>, "unit": <str>,
+"value_inr": <float|None>}`.
 
 Downstream code that needs canonical numbers reads `merged["normalised"]`;
 everything that already expects raw strings keeps working unchanged.
@@ -24,11 +25,20 @@ Recognised:
   - Percentages: trailing % or " pct" / " percent"
   - Negatives: leading minus or parenthesised "(1234)"
 
+Foreign currency values get a parallel `value_inr` populated from a
+static FX table (see FX_RATES). Override at boot via env vars
+`FX_USD_INR`, `FX_EUR_INR`, `FX_GBP_INR`. The defaults are intentionally
+round numbers — BRSR filings report at year-end or average rates anyway,
+so spot-rate precision is meaningless. For cross-currency aggregation
+that *must* be exact, callers should use their own FX source and ignore
+`value_inr`.
+
 Anything not parseable falls through as `None` and is omitted from the
 normalised dict (caller can still see the raw value in the original).
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -74,6 +84,41 @@ _PARENS_NEG_RE = re.compile(r"^\s*\(\s*(.+?)\s*\)\s*$")
 _NUMERIC_RE = re.compile(r"(?<![A-Za-z0-9])-?\d+(?:,\d{2,3})*(?:\.\d+)?")
 
 
+# ─── FX table ──────────────────────────────────────────────────────
+# INR per 1 unit of foreign currency. Round defaults appropriate for
+# year-end / average reporting; override via env vars at boot for finer
+# control. Setting a rate to 0 or a non-positive value disables
+# conversion for that currency (value_inr will be None).
+def _fx_env(code: str, default: float) -> float:
+    raw = os.environ.get(f"FX_{code}_INR")
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+FX_RATES: dict[str, float] = {
+    "INR": 1.0,
+    "USD": _fx_env("USD", 83.0),
+    "EUR": _fx_env("EUR", 90.0),
+    "GBP": _fx_env("GBP", 105.0),
+}
+
+
+def convert_to_inr(value: float, currency: str) -> float | None:
+    """
+    Convert `value` from `currency` to INR using the static FX_RATES table.
+    Returns None if the currency is unknown or has a non-positive rate
+    (i.e. conversion intentionally disabled).
+    """
+    rate = FX_RATES.get(currency.upper())
+    if rate is None or rate <= 0:
+        return None
+    return value * rate
+
+
 @dataclass
 class Normalised:
     """Canonical numeric form of a raw extracted value."""
@@ -81,9 +126,15 @@ class Normalised:
     raw: Any
     value: float
     unit: str  # "INR", "USD", "%", "" (bare number), or unit token from raw
+    value_inr: float | None = None  # populated for any recognised currency
 
     def to_dict(self) -> dict[str, Any]:
-        return {"raw": self.raw, "value": self.value, "unit": self.unit}
+        return {
+            "raw": self.raw,
+            "value": self.value,
+            "unit": self.unit,
+            "value_inr": self.value_inr,
+        }
 
 
 def _detect_currency(text: str) -> str:
@@ -118,7 +169,13 @@ def normalise_value(raw: Any, field: str | None = None) -> Normalised | None:
         unit = "%" if field and field.endswith(_PCT_SUFFIX) else (
             "INR" if field in _MONETARY_FIELDS else ""
         )
-        return Normalised(raw=raw, value=float(raw), unit=unit)
+        value = float(raw)
+        return Normalised(
+            raw=raw,
+            value=value,
+            unit=unit,
+            value_inr=convert_to_inr(value, unit) if unit in FX_RATES else None,
+        )
     if not isinstance(raw, str):
         return None
 
@@ -182,7 +239,8 @@ def normalise_value(raw: Any, field: str | None = None) -> Normalised | None:
         tail = re.sub(r"[^\w/²³µ°]+", " ", tail).strip()
         unit = tail.split()[0] if tail else ""
 
-    return Normalised(raw=raw, value=value, unit=unit)
+    value_inr = convert_to_inr(value, unit) if unit in FX_RATES else None
+    return Normalised(raw=raw, value=value, unit=unit, value_inr=value_inr)
 
 
 def normalise_extracted(extracted: dict[str, Any]) -> dict[str, dict[str, dict[str, Any]]]:
@@ -190,7 +248,7 @@ def normalise_extracted(extracted: dict[str, Any]) -> dict[str, dict[str, dict[s
     Walk an extracted-data dict and return the parallel normalised view.
 
     Input shape: `{"section_a": {field: raw, ...}, "section_b": {...}, "section_c": {...}}`
-    Output shape: `{"section_a": {field: {"raw": ..., "value": ..., "unit": ...}}, ...}`
+    Output shape: `{"section_a": {field: {"raw": ..., "value": ..., "unit": ..., "value_inr": ...}}, ...}`
 
     Fields whose raw value is not numerically parseable are omitted
     entirely from the output (so callers can `if field in normalised[section]`

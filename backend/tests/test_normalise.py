@@ -1,6 +1,8 @@
 """Tests for unit/number normalisation."""
 from __future__ import annotations
 
+import importlib
+
 import pytest
 
 from app.normalise import Normalised, normalise_extracted, normalise_value
@@ -224,3 +226,99 @@ def test_normalise_extracted_handles_non_dict_sections():
     out = normalise_extracted(merged)
     assert "section_a" in out
     assert "garbage" not in out
+
+
+# ─── FX conversion (value_inr) ─────────────────────────────────────
+
+
+def test_inr_value_inr_equals_value():
+    n = normalise_value("₹1,234 Cr")
+    assert n is not None
+    assert n.value_inr == n.value  # INR @ 1.0
+
+
+def test_usd_converted_to_inr_with_default_rate():
+    n = normalise_value("$1 Mn")
+    assert n is not None
+    assert n.unit == "USD"
+    assert n.value == 1e6
+    assert n.value_inr == pytest.approx(1e6 * 83.0)
+
+
+def test_eur_converted_to_inr():
+    n = normalise_value("€500", field=None)
+    assert n is not None
+    assert n.unit == "EUR"
+    assert n.value_inr == pytest.approx(500 * 90.0)
+
+
+def test_gbp_converted_to_inr():
+    n = normalise_value("£100", field=None)
+    assert n is not None
+    assert n.unit == "GBP"
+    assert n.value_inr == pytest.approx(100 * 105.0)
+
+
+def test_bare_number_has_no_value_inr():
+    # No currency, no monetary field hint → no INR conversion attempted.
+    n = normalise_value("1234")
+    assert n is not None
+    assert n.value_inr is None
+
+
+def test_percent_has_no_value_inr():
+    n = normalise_value("45%")
+    assert n is not None
+    assert n.value_inr is None
+
+
+def test_energy_unit_has_no_value_inr():
+    n = normalise_value("1234 GJ")
+    assert n is not None
+    assert n.value_inr is None
+
+
+def test_monetary_field_bare_number_converts_at_inr_rate():
+    # turnover="1234" → unit defaults to INR → value_inr == value
+    n = normalise_value("1234", field="turnover")
+    assert n is not None
+    assert n.unit == "INR"
+    assert n.value_inr == 1234.0
+
+
+def test_fx_env_override(monkeypatch):
+    # Reload the module after setting env vars so FX_RATES picks them up.
+    monkeypatch.setenv("FX_USD_INR", "90.5")
+    import app.normalise as nm
+    importlib.reload(nm)
+    try:
+        n = nm.normalise_value("$1000")
+        assert n is not None
+        assert n.value_inr == pytest.approx(1000 * 90.5)
+    finally:
+        # Restore default rates for any later tests in this run.
+        monkeypatch.delenv("FX_USD_INR", raising=False)
+        importlib.reload(nm)
+
+
+def test_convert_to_inr_returns_none_for_unknown_currency():
+    from app.normalise import convert_to_inr
+    assert convert_to_inr(100.0, "JPY") is None
+
+
+def test_to_dict_includes_value_inr():
+    n = normalise_value("$1 Mn")
+    assert n is not None
+    d = n.to_dict()
+    assert set(d.keys()) == {"raw", "value", "unit", "value_inr"}
+    assert d["value_inr"] == pytest.approx(1e6 * 83.0)
+
+
+def test_normalise_extracted_propagates_value_inr():
+    merged = {
+        "section_a": {"turnover": "$1 Mn"},
+        "section_b": {},
+        "section_c": {},
+    }
+    out = normalise_extracted(merged)
+    assert out["section_a"]["turnover"]["value_inr"] == pytest.approx(1e6 * 83.0)
