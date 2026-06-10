@@ -34,6 +34,7 @@ from app.brsr_datapoints import BRSR_DATAPOINTS, analyze_gaps_v2, get_datapoints
 from app.brsr_framework import BRSR_FRAMEWORK, get_core_fields, get_mandatory_fields
 from app.citations import attach_citations
 from app.excel_import import router as excel_import_router
+from app.extract_retrieval import extract_with_retrieval
 from app.extraction import calculate_confidence, extract_with_regex
 from app.extraction_enhanced import extract_enhanced
 from app.nifty50_benchmarks import (
@@ -46,6 +47,7 @@ from app.normalise import normalise_extracted
 from app.ocr import ocr_document
 from app.pdf_generator import generate_compliance_pdf
 from app.pdf_parser import parse_pdf
+from app.retrieval import build_in_memory_index
 from app.router_advanced import router as advanced_router
 from app.router_cron import router as cron_router
 from app.router_market import router as market_router
@@ -105,6 +107,40 @@ def _check_guest_rate_limit(request: Request) -> None:
             _GUEST_EXTRACT_LOG[k] = [t for t in _GUEST_EXTRACT_LOG[k] if t > cutoff]
             if not _GUEST_EXTRACT_LOG[k]:
                 del _GUEST_EXTRACT_LOG[k]
+
+
+# ─── Phase 3.2 retrieval-extraction helper ────────────────────────────────
+
+
+async def _run_retrieval_extraction(doc):
+    """
+    Build an in-memory chunk index and run per-datapoint extraction.
+    Returns a section-keyed dict (datapoint-id keys, e.g. "A.I.1").
+    Always returns the empty shape on any failure or when disabled so
+    callers can blindly merge it under `merged["retrieved"]`.
+    """
+    empty = {"section_a": {}, "section_b": {}, "section_c": {}}
+    if not settings.ENABLE_RETRIEVAL_EXTRACTION:
+        return empty
+    if not settings.GEMINI_API_KEY:
+        return empty
+    try:
+        from app.extract_retrieval import select_retrievable_datapoints
+        index = await build_in_memory_index(doc, api_key=settings.GEMINI_API_KEY)
+        datapoints = select_retrievable_datapoints(
+            max_count=settings.RETRIEVAL_MAX_DATAPOINTS,
+        )
+        return await extract_with_retrieval(
+            index=index,
+            datapoints=datapoints,
+            api_key=settings.GEMINI_API_KEY,
+            batch_size=settings.RETRIEVAL_BATCH_SIZE,
+            top_k=settings.RETRIEVAL_TOP_K,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("retrieval extraction failed: %s", exc)
+        return empty
+
 
 # Register routers
 app.include_router(billing_router)
@@ -246,6 +282,10 @@ async def extract_brsr(
         # search, no extra LLM call. Frontend renders "View source p.47".
         merged["citations"] = attach_citations(merged, doc)
 
+        # Phase 3.2 retrieval extraction (opt-in via settings, id-keyed,
+        # additive — does not overwrite the fuzzy-keyed AI wins above).
+        merged["retrieved"] = await _run_retrieval_extraction(doc)
+
         # Calculate confidence scores
         confidence = calculate_confidence(regex_results, ai_results)
 
@@ -342,6 +382,7 @@ async def guest_extract_brsr(
             merged[section].update(ai_results.get(section, {}))
         merged["normalised"] = normalise_extracted(merged)
         merged["citations"] = attach_citations(merged, doc)
+        merged["retrieved"] = await _run_retrieval_extraction(doc)
 
         confidence = calculate_confidence(regex_results, ai_results)
         benchmark = get_benchmark_comparison(merged)
@@ -628,6 +669,7 @@ async def extract_brsr_async(
             merged[section].update(ai_results.get(section, {}))
         merged["normalised"] = normalise_extracted(merged)
         merged["citations"] = attach_citations(merged, doc)
+        merged["retrieved"] = await _run_retrieval_extraction(doc)
 
         confidence = calculate_confidence(regex_results, ai_results)
         company_name = merged.get("section_a", {}).get("company_name", None)
