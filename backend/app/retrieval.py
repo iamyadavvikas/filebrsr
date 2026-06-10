@@ -194,9 +194,27 @@ class SupabaseChunkIndex:
             model=self.model,
             task_type="RETRIEVAL_DOCUMENT",
         )
+        return self._insert_rows(doc.chunks, vectors)
 
+    async def persist_from_index(self, index: "InMemoryChunkIndex") -> int:
+        """
+        Cheaper sibling of persist(): reuses the embeddings already computed
+        by build_in_memory_index() so we don't pay for Gemini embed twice
+        in the same request. Returns the number of rows written.
+        """
+        if not index.chunks:
+            return 0
+        # Defensive: align lengths if the index was built incrementally.
+        vectors = list(index.embeddings)
+        while len(vectors) < len(index.chunks):
+            vectors.append([0.0] * len(vectors[0]) if vectors else [])
+        return self._insert_rows(index.chunks, vectors[: len(index.chunks)])
+
+    def _insert_rows(
+        self, chunks: list[Chunk], vectors: list[list[float]],
+    ) -> int:
         rows = []
-        for chunk, vec in zip(doc.chunks, vectors):
+        for chunk, vec in zip(chunks, vectors):
             rows.append({
                 "report_id": self.report_id,
                 "user_id": self.user_id,
@@ -214,7 +232,7 @@ class SupabaseChunkIndex:
             self.supabase.table("extraction_chunks").insert(rows).execute()
         except Exception as exc:  # noqa: BLE001
             logger.warning(
-                "SupabaseChunkIndex.persist failed for report=%s: %s",
+                "SupabaseChunkIndex insert failed for report=%s: %s",
                 self.report_id, exc,
             )
             return 0

@@ -305,3 +305,74 @@ async def test_supabase_persist_swallows_insert_errors():
                       new=AsyncMock(return_value=[_unit_vec(EMBED_DIM, 0)])):
         n = await idx.persist(doc)
     assert n == 0
+
+
+# ─── SupabaseChunkIndex.persist_from_index ────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_persist_from_index_reuses_embeddings_no_gemini_call():
+    """persist_from_index() must NOT re-embed — it should reuse the vectors
+    already on the InMemoryChunkIndex."""
+    chunks = [_chunk(1, "alpha", chunk_id="p1-c0"),
+              _chunk(2, "beta", chunk_id="p2-c0")]
+    vecs = [_unit_vec(EMBED_DIM, 0), _unit_vec(EMBED_DIM, 1)]
+    in_mem = ret.InMemoryChunkIndex(
+        chunks=chunks, embeddings=vecs, api_key="k",
+    )
+    supabase = MagicMock()
+    idx = ret.SupabaseChunkIndex(
+        supabase=supabase, user_id="u1", report_id="r1", api_key="k",
+    )
+
+    with patch.object(ret, "embed_texts",
+                      new=AsyncMock(side_effect=AssertionError("must not embed"))):
+        n = await idx.persist_from_index(in_mem)
+
+    assert n == 2
+    rows = supabase.table.return_value.insert.call_args[0][0]
+    assert rows[0]["chunk_id"] == "p1-c0"
+    assert rows[1]["chunk_id"] == "p2-c0"
+    # Embeddings carried through, not re-computed
+    assert rows[0]["embedding"][0] == pytest.approx(1.0)
+
+
+@pytest.mark.asyncio
+async def test_persist_from_index_empty_index_is_noop():
+    supabase = MagicMock()
+    idx = ret.SupabaseChunkIndex(
+        supabase=supabase, user_id="u1", report_id="r1", api_key="k",
+    )
+    in_mem = ret.InMemoryChunkIndex(chunks=[], embeddings=[], api_key="k")
+    assert await idx.persist_from_index(in_mem) == 0
+    supabase.table.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_persist_from_index_stores_null_for_zero_vectors():
+    chunks = [_chunk(1, "alpha", chunk_id="p1-c0")]
+    in_mem = ret.InMemoryChunkIndex(
+        chunks=chunks, embeddings=[[0.0] * EMBED_DIM], api_key="",
+    )
+    supabase = MagicMock()
+    idx = ret.SupabaseChunkIndex(
+        supabase=supabase, user_id="u1", report_id="r1", api_key="",
+    )
+    await idx.persist_from_index(in_mem)
+    rows = supabase.table.return_value.insert.call_args[0][0]
+    assert rows[0]["embedding"] is None
+
+
+@pytest.mark.asyncio
+async def test_persist_from_index_swallows_insert_errors():
+    chunks = [_chunk(1, "alpha", chunk_id="p1-c0")]
+    in_mem = ret.InMemoryChunkIndex(
+        chunks=chunks, embeddings=[_unit_vec(EMBED_DIM, 0)], api_key="k",
+    )
+    supabase = MagicMock()
+    supabase.table.return_value.insert.return_value.execute.side_effect = \
+        RuntimeError("connection refused")
+    idx = ret.SupabaseChunkIndex(
+        supabase=supabase, user_id="u1", report_id="r1", api_key="k",
+    )
+    assert await idx.persist_from_index(in_mem) == 0

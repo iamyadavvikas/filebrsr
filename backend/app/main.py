@@ -47,7 +47,7 @@ from app.normalise import normalise_extracted
 from app.ocr import ocr_document
 from app.pdf_generator import generate_compliance_pdf
 from app.pdf_parser import parse_pdf
-from app.retrieval import build_in_memory_index
+from app.retrieval import SupabaseChunkIndex, build_in_memory_index
 from app.router_advanced import router as advanced_router
 from app.router_cron import router as cron_router
 from app.router_market import router as market_router
@@ -112,12 +112,23 @@ def _check_guest_rate_limit(request: Request) -> None:
 # ─── Phase 3.2 retrieval-extraction helper ────────────────────────────────
 
 
-async def _run_retrieval_extraction(doc):
+async def _run_retrieval_extraction(
+    doc,
+    *,
+    user_id: str | None = None,
+    report_id: str | None = None,
+    supabase_client=None,
+):
     """
     Build an in-memory chunk index and run per-datapoint extraction.
     Returns a section-keyed dict (datapoint-id keys, e.g. "A.I.1").
     Always returns the empty shape on any failure or when disabled so
     callers can blindly merge it under `merged["retrieved"]`.
+
+    If `user_id`, `report_id` and `supabase_client` are all provided AND
+    `report_id != "guest"`, the embedded chunks are also persisted to
+    public.extraction_chunks (v12). This is best-effort — persistence
+    failures never fail the extraction.
     """
     empty = {"section_a": {}, "section_b": {}, "section_c": {}}
     if not settings.ENABLE_RETRIEVAL_EXTRACTION:
@@ -127,6 +138,31 @@ async def _run_retrieval_extraction(doc):
     try:
         from app.extract_retrieval import select_retrievable_datapoints
         index = await build_in_memory_index(doc, api_key=settings.GEMINI_API_KEY)
+
+        # Best-effort persistence — reuses the embeddings we just computed
+        # so there's no extra Gemini cost. Skips guest and missing-ctx cases.
+        if (
+            user_id
+            and report_id
+            and report_id != "guest"
+            and supabase_client is not None
+        ):
+            try:
+                store = SupabaseChunkIndex(
+                    supabase=supabase_client,
+                    user_id=user_id,
+                    report_id=report_id,
+                    api_key=settings.GEMINI_API_KEY,
+                )
+                n = await store.persist_from_index(index)
+                logger.info(
+                    "Persisted %d chunks to extraction_chunks (report=%s)",
+                    n, report_id,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("chunk persist failed for report=%s: %s",
+                               report_id, exc)
+
         datapoints = select_retrievable_datapoints(
             max_count=settings.RETRIEVAL_MAX_DATAPOINTS,
         )
@@ -284,7 +320,10 @@ async def extract_brsr(
 
         # Phase 3.2 retrieval extraction (opt-in via settings, id-keyed,
         # additive — does not overwrite the fuzzy-keyed AI wins above).
-        merged["retrieved"] = await _run_retrieval_extraction(doc)
+        # When report_id is real, chunks are also persisted to v12 table.
+        merged["retrieved"] = await _run_retrieval_extraction(
+            doc, user_id=user_id, report_id=report_id, supabase_client=supabase,
+        )
 
         # Calculate confidence scores
         confidence = calculate_confidence(regex_results, ai_results)
@@ -669,7 +708,20 @@ async def extract_brsr_async(
             merged[section].update(ai_results.get(section, {}))
         merged["normalised"] = normalise_extracted(merged)
         merged["citations"] = attach_citations(merged, doc)
-        merged["retrieved"] = await _run_retrieval_extraction(doc)
+        # Look up user_id once so persistence can attribute the rows.
+        worker_user_id = None
+        try:
+            row = supabase.table("reports").select("user_id").eq(
+                "id", req.report_id,
+            ).single().execute()
+            worker_user_id = (row.data or {}).get("user_id")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("failed to resolve user_id for report=%s: %s",
+                           req.report_id, exc)
+        merged["retrieved"] = await _run_retrieval_extraction(
+            doc, user_id=worker_user_id, report_id=req.report_id,
+            supabase_client=supabase,
+        )
 
         confidence = calculate_confidence(regex_results, ai_results)
         company_name = merged.get("section_a", {}).get("company_name", None)
