@@ -63,7 +63,9 @@ export default function PlatformOverview({ userId, initialReports, userProfile }
 
   useEffect(() => {
     fetchOverview();
-    if (!initialReports || initialReports.length === 0) {
+    // Guests have no reports and "guest" is not a valid uuid for the
+    // reports.user_id column, so only refetch for authenticated users.
+    if (userId !== "guest" && (!initialReports || initialReports.length === 0)) {
       fetchReports();
     }
   }, [financialYear]);
@@ -108,6 +110,7 @@ export default function PlatformOverview({ userId, initialReports, userProfile }
   }
 
   async function fetchReports() {
+    if (userId === "guest") return;
     try {
       const supabase = createClient();
       const { data, error } = await supabase
@@ -117,7 +120,13 @@ export default function PlatformOverview({ userId, initialReports, userProfile }
         .order("created_at", { ascending: false })
         .limit(20);
       if (error) {
-        console.error("fetchReports error:", error);
+        // PostgrestError fields are non-enumerable, so spread them explicitly.
+        console.error("fetchReports error:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
       }
       if (data) {
         setReports(data);
