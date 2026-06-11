@@ -8,7 +8,7 @@ export default async function TrackingPage() {
   } = await supabase.auth.getUser();
 
   // Fetch user reports only when logged in
-  let reports: { id: string; extracted_data: unknown; company_name: string | null; financial_year: string | null; created_at: string; status: string }[] = [];
+  let reports: { id: string; extracted_data: Record<string, unknown> | null; company_name: string | null; financial_year: string | null; created_at: string; status: string }[] = [];
   if (user) {
     const { data } = await supabase
       .from("reports")
@@ -16,7 +16,10 @@ export default async function TrackingPage() {
       .eq("user_id", user.id)
       .eq("status", "completed")
       .order("created_at", { ascending: true });
-    reports = data || [];
+    reports = (data || []).map((r) => ({
+      ...r,
+      extracted_data: (r.extracted_data as Record<string, unknown> | null) ?? null,
+    }));
   }
 
   return <TrackingClient reports={reports} />;

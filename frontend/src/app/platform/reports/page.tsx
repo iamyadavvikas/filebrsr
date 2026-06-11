@@ -8,7 +8,7 @@ export default async function ReportsPage() {
   } = await supabase.auth.getUser();
 
   // Fetch reports server-side using admin client (bypasses RLS) — only when logged in
-  let reports: { id: string; file_name: string; status: string; created_at: string; company_name: string | null; financial_year: string | null }[] = [];
+  let reports: { id: string; file_name: string; status: string; created_at: string; company_name?: string; financial_year?: string }[] = [];
   if (user) {
     const admin = createAdminClient();
     const { data } = await admin
@@ -17,7 +17,11 @@ export default async function ReportsPage() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20);
-    reports = data || [];
+    reports = (data || []).map((r) => ({
+      ...r,
+      company_name: r.company_name ?? undefined,
+      financial_year: r.financial_year ?? undefined,
+    }));
   }
 
   return <ReportsClient initialReports={reports} />;
