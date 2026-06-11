@@ -4,10 +4,8 @@ import { useState, useEffect } from "react";
 import {
   Calendar as CalendarIcon,
   AlertTriangle,
-  CheckCircle2,
   Clock,
   Bell,
-  ExternalLink,
   Plus,
 } from "lucide-react";
 

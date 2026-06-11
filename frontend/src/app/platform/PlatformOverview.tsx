@@ -7,7 +7,6 @@ import {
   Calculator,
   Target,
   Calendar,
-  TrendingUp,
   AlertTriangle,
   CheckCircle2,
   Clock,
@@ -49,7 +48,7 @@ interface ExtractionReport {
 
 export default function PlatformOverview({ userId, initialReports, userProfile }: OverviewProps) {
   const [financialYear, setFinancialYear] = useState("FY2025-26");
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [reports, setReports] = useState<ExtractionReport[]>(initialReports);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -102,7 +101,7 @@ export default function PlatformOverview({ userId, initialReports, userProfile }
           totalEntries: totalFilled,
         }));
       }
-    } catch (e) {
+    } catch {
       // Will show default stats
     }
     setLoading(false);

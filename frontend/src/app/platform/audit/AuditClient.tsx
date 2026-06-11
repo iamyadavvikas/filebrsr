@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Shield, Clock, User, FileText, Filter, ChevronDown, ChevronRight, History, Lock, AlertTriangle, CheckCircle2, Search } from "lucide-react";
+import { Shield, Clock, User, Filter, ChevronDown, ChevronRight, History, Lock, Search } from "lucide-react";
 
 interface AuditEntry {
   id: string;

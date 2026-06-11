@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Send, Users, BarChart3, Loader2, MessageSquare, ExternalLink } from "lucide-react";
+import { Plus, Send, Users, Loader2, MessageSquare, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Survey {

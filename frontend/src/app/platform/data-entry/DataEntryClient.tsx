@@ -6,19 +6,16 @@ import { useAnalytics } from "@/lib/analytics";
 import {
   Save,
   CheckCircle2,
-  AlertCircle,
   ChevronRight,
   Search,
-  Filter,
   Upload,
   Sparkles,
-  X,
   Download,
   RotateCcw,
   ChevronDown,
   FileText,
 } from "lucide-react";
-import { SECTIONS, TOTAL_DATAPOINTS, MANDATORY_DATAPOINTS, CORE_DATAPOINTS, LEADERSHIP_DATAPOINTS } from "./brsr-fields";
+import { SECTIONS, MANDATORY_DATAPOINTS, CORE_DATAPOINTS } from "./brsr-fields";
 
 interface DataEntryClientProps {
   userId: string;
@@ -114,7 +111,7 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
         setSavedFields(savedSet);
         setAiFilledFields(aiSet);
       }
-    } catch (e) {
+    } catch {
       // Silently handle
     }
   }
@@ -132,7 +129,7 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
         .order("created_at", { ascending: false })
         .limit(10);
       if (data) setReports(data);
-    } catch (e) {}
+    } catch {}
     setShowImportModal(true);
   }
 
@@ -187,7 +184,7 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
       });
 
       if (res.ok) {
-        const data = await res.json();
+        await res.json();
         const newSaved = new Set(savedFields);
         entries.forEach((e) => newSaved.add(e.datapoint_id));
         setSavedFields(newSaved);

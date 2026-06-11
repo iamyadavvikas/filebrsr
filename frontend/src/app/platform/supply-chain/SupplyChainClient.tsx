@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Plus, AlertTriangle, CheckCircle, Clock, X, Send, Copy, ExternalLink, RefreshCw, Award, Upload } from "lucide-react";
+import { Search, Plus, AlertTriangle, CheckCircle, X, Send, Copy, ExternalLink, RefreshCw, Award, Upload } from "lucide-react";
 
 interface Supplier {
   id: string;
@@ -559,7 +559,7 @@ function CsvUploadModal({ onClose, onUploaded }: { onClose: () => void; onUpload
       }
       setResult({ added, errors });
       if (added > 0) onUploaded();
-    } catch (e) {
+    } catch {
       setResult({ added: 0, errors: ["Failed to parse CSV file"] });
     } finally {
       setUploading(false);

@@ -6,8 +6,6 @@ import {
   Plus,
   Trash2,
   Zap,
-  Fuel,
-  Car,
   Factory,
   CloudRain,
   TrendingDown,

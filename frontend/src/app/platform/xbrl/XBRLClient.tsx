@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download, AlertTriangle, CheckCircle, FileText, Loader2, ShieldCheck } from "lucide-react";
+import { Download, AlertTriangle, FileText, Loader2, ShieldCheck } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://filebrsr.com";
@@ -29,7 +29,7 @@ interface Props {
   financialYear: string | null;
 }
 
-export default function XBRLClient({ companyName, financialYear }: Props) {
+export default function XBRLClient({ financialYear }: Props) {
   const [fy, setFy] = useState(financialYear || "FY2025-26");
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [loading, setLoading] = useState(false);

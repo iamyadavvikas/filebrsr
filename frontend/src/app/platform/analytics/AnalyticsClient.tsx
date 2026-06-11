@@ -2,18 +2,14 @@
 
 import { useState, useEffect } from "react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from "recharts";
 import {
   Users, FileText, TrendingUp, DollarSign, CheckCircle, AlertTriangle,
-  Loader2, RefreshCw, Clock, UserPlus, ArrowUpRight, ArrowDownRight, Activity,
+  Loader2, RefreshCw, UserPlus, ArrowUpRight, ArrowDownRight, Activity,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-
-interface Props {
-  userId: string;
-}
 
 interface AnalyticsSummary {
   total_users: number;
@@ -55,7 +51,7 @@ interface AnalyticsData {
 
 const COLORS = ["#059669", "#3B82F6", "#F59E0B", "#8B5CF6", "#EC4899"];
 
-export default function AnalyticsClient({ userId }: Props) {
+export default function AnalyticsClient() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [days, setDays] = useState(30);

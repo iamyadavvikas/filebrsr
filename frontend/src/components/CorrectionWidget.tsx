@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Edit3, Check, X, AlertTriangle, Sparkles } from "lucide-react";
+import { Edit3, Check, AlertTriangle, Sparkles } from "lucide-react";
 
 interface CorrectionWidgetProps {
   datapoint_id: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { TrendingUp, AlertTriangle, CheckCircle, Target } from "lucide-react";
+import { TrendingUp, AlertTriangle, Target } from "lucide-react";
 
 interface RatingAgency {
   id: string;

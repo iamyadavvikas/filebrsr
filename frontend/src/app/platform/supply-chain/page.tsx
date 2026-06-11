@@ -3,7 +3,7 @@ import SupplyChainClient from "./SupplyChainClient";
 
 export default async function SupplyChainPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  await supabase.auth.getUser();
   // Allow guest access (no redirect)
   return <SupplyChainClient />;
 }

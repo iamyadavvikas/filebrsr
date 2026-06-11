@@ -343,25 +343,10 @@ export default function UploadExtractClient({ userId, initialReports }: { userId
 
 function PastExtractions({ userId, initialReports }: { userId: string; initialReports: PastReport[] }) {
   const [reports, setReports] = useState<PastReport[]>(initialReports);
-  const [loaded, setLoaded] = useState(true);
+  const [loaded] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
-
-  async function fetchReports() {
-    try {
-      const { createClient } = await import("@/lib/supabase/client");
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("reports")
-        .select("id, file_name, status, created_at, company_name, financial_year")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (data) setReports(data);
-    } catch {}
-    setLoaded(true);
-  }
 
   async function deleteReport(id: string) {
     if (!confirm("Delete this extraction? This cannot be undone.")) return;

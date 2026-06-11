@@ -20,5 +20,5 @@ export default async function AnalyticsPage() {
 
   if (!profile?.is_admin) redirect("/platform");
 
-  return <AnalyticsClient userId={user.id} />;
+  return <AnalyticsClient />;
 }

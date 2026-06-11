@@ -143,7 +143,7 @@ export default function ExtractionResultClient({ reportId, fileName, status, cre
   // Section stats for chart
   const sectionStats = useMemo(() => {
     const stats: Record<string, { found: number; total: number }> = {};
-    for (const [sKey, section] of Object.entries(SECTIONS)) {
+    for (const [, section] of Object.entries(SECTIONS)) {
       let total = 0;
       let found = 0;
       for (const sub of section.subsections) {

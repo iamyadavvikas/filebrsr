@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BarChart3, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Clock, Shield, Users, FileText, Download, ChevronRight } from "lucide-react";
-
+import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Clock, Shield, Download } from "lucide-react";
 interface DashboardData {
   financial_year: string;
   compliance_score: number;

@@ -7,16 +7,10 @@ import {
   XCircle,
   AlertTriangle,
   FileText,
-  TrendingUp,
-  Shield,
-  Leaf,
-  Users,
   Building2,
   ChevronDown,
   ChevronRight,
-  Download,
   ArrowRight,
-  BarChart3,
   Target,
 } from "lucide-react";
 

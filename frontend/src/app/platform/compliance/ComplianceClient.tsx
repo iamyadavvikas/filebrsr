@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, XCircle, Clock, AlertTriangle, FileText, ExternalLink } from "lucide-react";
+import { CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
 
 interface Regulation {
   id: string;
