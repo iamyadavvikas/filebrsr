@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, Clock, XCircle, AlertTriangle, User, ArrowRight } from "lucide-react";
+import { CheckCircle, Clock, XCircle, AlertTriangle, ArrowRight } from "lucide-react";
 
 interface WorkflowInstance {
   id: string;

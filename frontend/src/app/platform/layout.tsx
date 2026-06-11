@@ -12,7 +12,6 @@ import {
   Calculator,
   Target,
   Calendar,
-  FileText,
   TrendingUp,
   BarChart3,
   Activity,
@@ -121,11 +120,11 @@ export default function PlatformLayout({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userId, setUserId] = useState<string | undefined>();
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [, setUserEmail] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isFounder, setIsFounder] = useState(false);
+  const [, setIsFounder] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [, setAuthChecked] = useState(false);
   const [guestMode, setGuestMode] = useState<GuestMode>("trial");
 
   useEffect(() => {

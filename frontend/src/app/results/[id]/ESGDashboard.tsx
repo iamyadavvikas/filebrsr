@@ -7,17 +7,16 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   PieChart, Pie, Cell, Legend,
-  AreaChart, Area,
 } from "recharts";
 import {
   ArrowLeft, Download, FileText, TrendingUp, Shield, Leaf, Users,
   Building2, Scale, Globe, Heart, ShoppingBag, Landmark,
-  ChevronRight, Filter, Search, AlertTriangle, CheckCircle2,
+  ChevronRight, Search, AlertTriangle, CheckCircle2,
   XCircle, BarChart3, PieChart as PieChartIcon, Target, Layers,
   FileSpreadsheet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { BRSR_DATAPOINTS, SECTION_LABELS, SUBSECTION_LABELS, FIELD_TO_DATAPOINT_MAP, type BRSRDatapoint } from "@/lib/brsr-datapoints";
+import { BRSR_DATAPOINTS, SECTION_LABELS, SUBSECTION_LABELS, FIELD_TO_DATAPOINT_MAP } from "@/lib/brsr-datapoints";
 import { EditableField } from "@/components/EditableField";
 import type { Citation } from "@/components/CitationChip";
 import type { Section } from "@/lib/corrections";
@@ -214,7 +213,7 @@ export function ESGDashboard({ reportId }: { reportId?: string } = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen] = useState(true);
   const router = useRouter();
 
   const FOUNDER_EMAILS = ["vikaskashi896@gmail.com"];
@@ -630,7 +629,7 @@ export function ESGDashboard({ reportId }: { reportId?: string } = {}) {
 // Overview Panel
 // ══════════════════════════════════════════════════════════════════
 function OverviewPanel({
-  data, gaps, stats, benchmark, sectionChartData, principleChartData, dataTypeChart, compliancePieData, complianceScore, coreScore, setActiveTab,
+  gaps, stats, benchmark, sectionChartData, principleChartData, dataTypeChart, compliancePieData, complianceScore, coreScore, setActiveTab,
 }: {
   data: ExtractedData;
   gaps: GapAnalysis | null;
@@ -899,7 +898,7 @@ function SectionPanel({
 // Gap Analysis Panel — Interactive Drill-Down
 // ══════════════════════════════════════════════════════════════════
 function GapsPanel({
-  gaps, recommendations, filterPriority, searchQuery, extractedData,
+  gaps, recommendations, searchQuery, extractedData,
 }: {
   gaps: GapAnalysis | null;
   recommendations: Array<{ field_id: string; label: string; priority: string; reason: string; data_type?: string; esrs_ref?: string }>;
@@ -922,7 +921,6 @@ function GapsPanel({
 
   // Always compute manifest from client-side data (falls back to backend if available)
   const manifest = buildClientManifest(extractedData, gaps?.datapoints_manifest);
-  const subsectionScores = gaps?.subsection_scores || {};
 
   // Compute section-level scores from manifest
   const computedSectionScores: Record<string, { total: number; found: number; score: number }> = {};
@@ -1086,7 +1084,6 @@ function GapsPanel({
                   {isExpanded && (
                     <div className="border-t border-gray-100 bg-gray-50/30">
                       {Object.entries(subsections).map(([subKey, datapoints]) => {
-                        const subScore = subsectionScores[subKey];
                         const subExpanded = expandedSubsection === subKey;
                         const foundCount = datapoints.filter(d => d.status === "found").length;
                         const totalCount = datapoints.length;
@@ -1422,7 +1419,7 @@ function BenchmarkPanel({ benchmark }: { benchmark: BenchmarkData | null }) {
 // Principles Panel — Interactive Drill-Down per Principle
 // ══════════════════════════════════════════════════════════════════
 function PrinciplesPanel({
-  stats, gaps, principleChartData, extractedData, selectedPrinciple, onSelectPrinciple,
+  gaps, principleChartData, extractedData, selectedPrinciple, onSelectPrinciple,
 }: {
   stats: DatapointsStats | null;
   gaps: GapAnalysis | null;

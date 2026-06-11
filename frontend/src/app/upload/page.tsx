@@ -23,7 +23,7 @@ export default function UploadPage() {
   const [success, setSuccess] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const [user, setUser] = useState<{ email: string } | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [, setAuthChecked] = useState(false);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();

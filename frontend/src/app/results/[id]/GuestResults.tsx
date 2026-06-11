@@ -84,7 +84,7 @@ function RadialGauge({ value, label, subtitle, size = 140 }: { value: number; la
 }
 
 // Principle bar chart
-function PrincipleChart({ stats, gaps }: { stats: DatapointsStats; gaps: GapAnalysis }) {
+function PrincipleChart({ stats }: { stats: DatapointsStats; gaps: GapAnalysis }) {
   const principles = [
     { key: "principle_1", short: "P1", name: "Ethics" },
     { key: "principle_2", short: "P2", name: "Products" },

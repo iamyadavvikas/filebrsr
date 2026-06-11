@@ -10,6 +10,23 @@ interface Props {
   userEmail: string;
 }
 
+interface OrgData {
+  name?: string | null;
+}
+
+interface OrgMember {
+  id: string;
+  user_id: string;
+  role: string;
+  profiles?: { full_name?: string | null; email?: string | null } | null;
+}
+
+interface PendingInvite {
+  id: string;
+  email: string;
+  role: string;
+}
+
 export default function SettingsClient({ userId, userEmail }: Props) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -24,9 +41,9 @@ export default function SettingsClient({ userId, userEmail }: Props) {
   const [assuranceProvider, setAssuranceProvider] = useState("");
 
   // Team state
-  const [orgData, setOrgData] = useState<any>(null);
-  const [members, setMembers] = useState<any[]>([]);
-  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [orgData, setOrgData] = useState<OrgData | null>(null);
+  const [members, setMembers] = useState<OrgMember[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
   const [inviting, setInviting] = useState(false);
@@ -429,8 +446,8 @@ export default function SettingsClient({ userId, userEmail }: Props) {
               </div>
             ) : (
               <>
-                {members.map((m: any) => {
-                  const profile = m.profiles || {};
+                {members.map((m) => {
+                  const profile: { full_name?: string | null; email?: string | null } = m.profiles ?? {};
                   return (
                     <div key={m.id} className="flex items-center justify-between px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -473,7 +490,7 @@ export default function SettingsClient({ userId, userEmail }: Props) {
                     </div>
                   );
                 })}
-                {pendingInvites.map((inv: any) => (
+                {pendingInvites.map((inv) => (
                   <div key={inv.id} className="flex items-center justify-between px-4 py-3 bg-amber-50/50">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 font-semibold text-sm">

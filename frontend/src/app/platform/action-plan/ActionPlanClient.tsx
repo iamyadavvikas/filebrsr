@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import {
-  Target,
   Sparkles,
-  AlertTriangle,
-  CheckCircle2,
   Clock,
   TrendingUp,
   IndianRupee,

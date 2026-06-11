@@ -21,7 +21,16 @@ const PROGRESS_STEPS = [
   { label: "Analyze", desc: "Gap analysis" },
 ];
 
-export default function UploadExtractClient({ userId, initialReports }: { userId: string; initialReports: any[] }) {
+interface PastReport {
+  id: string;
+  file_name: string;
+  status: string;
+  created_at: string;
+  company_name?: string | null;
+  financial_year?: string | null;
+}
+
+export default function UploadExtractClient({ userId, initialReports }: { userId: string; initialReports: PastReport[] }) {
   const { track } = useAnalytics();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -332,27 +341,12 @@ export default function UploadExtractClient({ userId, initialReports }: { userId
   );
 }
 
-function PastExtractions({ userId, initialReports }: { userId: string; initialReports: any[] }) {
-  const [reports, setReports] = useState<any[]>(initialReports);
-  const [loaded, setLoaded] = useState(true);
+function PastExtractions({ userId, initialReports }: { userId: string; initialReports: PastReport[] }) {
+  const [reports, setReports] = useState<PastReport[]>(initialReports);
+  const [loaded] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
-
-  async function fetchReports() {
-    try {
-      const { createClient } = await import("@/lib/supabase/client");
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("reports")
-        .select("id, file_name, status, created_at, company_name, financial_year")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (data) setReports(data);
-    } catch {}
-    setLoaded(true);
-  }
 
   async function deleteReport(id: string) {
     if (!confirm("Delete this extraction? This cannot be undone.")) return;

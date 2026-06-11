@@ -2,24 +2,58 @@
 
 import { useState, useEffect } from "react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, AreaChart, Area,
 } from "recharts";
 import {
   Users, FileText, TrendingUp, DollarSign, CheckCircle, AlertTriangle,
-  Loader2, RefreshCw, Clock, UserPlus, ArrowUpRight, ArrowDownRight, Activity,
+  Loader2, RefreshCw, UserPlus, ArrowUpRight, ArrowDownRight, Activity,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-interface Props {
-  userId: string;
+interface AnalyticsSummary {
+  total_users: number;
+  new_signups: number;
+  total_extractions: number;
+  extractions_period: number;
+  extraction_success_rate: number;
+  total_data_entries: number;
+  data_entries_period: number;
+  total_revenue_inr: number;
+  period_revenue_inr: number;
+}
+
+interface RecentUser {
+  id: string;
+  full_name?: string | null;
+  email?: string | null;
+  company_name?: string | null;
+  plan?: string | null;
+  created_at: string;
+}
+
+interface RecentExtraction {
+  id: string;
+  company_name?: string | null;
+  file_name: string;
+  financial_year?: string | null;
+  status: string;
+  created_at: string;
+}
+
+interface AnalyticsData {
+  summary: AnalyticsSummary;
+  plan_distribution?: Record<string, number>;
+  trends?: { daily_signups?: Record<string, number>; daily_extractions?: Record<string, number> };
+  recent_users?: RecentUser[];
+  recent_extractions?: RecentExtraction[];
 }
 
 const COLORS = ["#059669", "#3B82F6", "#F59E0B", "#8B5CF6", "#EC4899"];
 
-export default function AnalyticsClient({ userId }: Props) {
+export default function AnalyticsClient() {
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<AnalyticsData | null>(null);
   const [days, setDays] = useState(30);
   const [error, setError] = useState("");
 
@@ -42,8 +76,8 @@ export default function AnalyticsClient({ userId }: Props) {
       if (!res.ok) throw new Error("Failed to load analytics");
       const json = await res.json();
       setData(json);
-    } catch (e: any) {
-      setError(e.message || "Failed to load");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load");
     }
     setLoading(false);
   }
@@ -223,7 +257,7 @@ export default function AnalyticsClient({ userId }: Props) {
             {(data.recent_users || []).length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-4">No users yet</p>
             ) : (
-              (data.recent_users || []).map((u: any) => (
+              (data.recent_users || []).map((u) => (
                 <div key={u.id} className="flex items-center justify-between py-2 border-b border-gray-50">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-semibold text-xs">
@@ -253,7 +287,7 @@ export default function AnalyticsClient({ userId }: Props) {
             {(data.recent_extractions || []).length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-4">No extractions yet</p>
             ) : (
-              (data.recent_extractions || []).map((r: any) => (
+              (data.recent_extractions || []).map((r) => (
                 <div key={r.id} className="flex items-center justify-between py-2 border-b border-gray-50">
                   <div>
                     <p className="text-sm font-medium text-gray-800 truncate max-w-[200px]">
