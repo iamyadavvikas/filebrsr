@@ -60,6 +60,35 @@ jobs:
           SUPABASE_SERVICE_KEY: test-service-key
           ALLOWED_ORIGINS: http://localhost:3000
 
+  # PR dry-run: prove both Docker images build before merge. No push, no
+  # deploy — this is the "plan" equivalent for our build-and-deploy pipeline.
+  # Runs only on pull_request; the real build+push happens in `deploy` on main.
+  docker-build:
+    needs: [frontend, backend]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy-key-for-build
+            NEXT_PUBLIC_API_URL=
+
+      - name: Build backend image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+
   deploy:
     needs: [frontend, backend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
