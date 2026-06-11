@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Pencil, X, Loader2 } from "lucide-react";
 import { submitCorrection, type Section } from "@/lib/corrections";
+import { CitationChip, type Citation } from "@/components/CitationChip";
 
 interface Props {
   reportId: string;
@@ -13,6 +14,9 @@ interface Props {
   isMissing?: boolean;
   /** Optional: PDF page number the value came from, for traceability */
   sourcePage?: number | null;
+  /** Optional: full source citation (page + snippet + match kind). When
+   * present, shows a "p.X" chip with a snippet popover beside the value. */
+  citation?: Citation | null;
   /** Called with the new value on a successful save so parent state can update */
   onSaved?: (newValue: string) => void;
 }
@@ -36,6 +40,7 @@ export function EditableField({
   value,
   isMissing = false,
   sourcePage = null,
+  citation = null,
   onSaved,
 }: Props) {
   const [editing, setEditing] = useState(false);
@@ -43,6 +48,10 @@ export function EditableField({
   const [displayed, setDisplayed] = useState(value);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Prefer the explicit sourcePage prop (legacy) but fall back to the
+  // citation object's page so callers can pass just `citation`.
+  const effectiveSourcePage = sourcePage ?? citation?.source_page ?? null;
 
   const startEditing = () => {
     setDraft(displayed === "Not disclosed" ? "" : displayed);
@@ -70,7 +79,7 @@ export function EditableField({
       fieldPath,
       originalValue: displayed,
       correctedValue: trimmed,
-      sourcePage,
+      sourcePage: effectiveSourcePage,
     });
     if (result.ok) {
       setDisplayed(trimmed);
@@ -139,6 +148,9 @@ export function EditableField({
       >
         {displayed || "Not disclosed"}
       </p>
+      {citation && displayed && displayed !== "Not disclosed" && (
+        <CitationChip citation={citation} />
+      )}
       <button
         type="button"
         onClick={startEditing}
