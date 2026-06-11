@@ -29,17 +29,41 @@ Public API::
 
 from __future__ import annotations
 
-from app.tally.classifier import Classification, classify_hsn, reset_cache
+from app.tally.classifier import (
+    Classification,
+    classify_hsn,
+    classify_with_llm_fallback,
+    reset_cache,
+)
 from app.tally.ingest import IngestSummary, ingest_tally_xml
+from app.tally.llm_classifier import (
+    DisabledClassifier,
+    LLMClassification,
+    LLMClassifier,
+    MockClassifier,
+    OpenAIMiniClassifier,
+    SarvamMClassifier,
+    get_llm_classifier,
+    reset_classifier_cache,
+)
 from app.tally.parser import TallyLineItem, fiscal_year_for, parse_tally_xml
 
 __all__ = [
     "Classification",
+    "DisabledClassifier",
     "IngestSummary",
+    "LLMClassification",
+    "LLMClassifier",
+    "MockClassifier",
+    "OpenAIMiniClassifier",
+    "SarvamMClassifier",
     "TallyLineItem",
     "classify_hsn",
+    "classify_with_llm_fallback",
     "fiscal_year_for",
+    "get_llm_classifier",
     "ingest_tally_xml",
     "parse_tally_xml",
     "reset_cache",
+    "reset_classifier_cache",
 ]

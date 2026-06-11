@@ -144,3 +144,51 @@ def classify_hsn(hsn: str | None) -> Classification:
                 confidence=confidence,
             )
     return _UNMAPPED
+
+
+def classify_with_llm_fallback(
+    hsn: str | None,
+    *,
+    narration: str | None = None,
+    vendor_name: str | None = None,
+    ledger_name: str | None = None,
+) -> Classification:
+    """Like :func:`classify_hsn`, but on an ``unmapped`` result consult the
+    configured LLM backend (Sarvam / OpenAI / mock / disabled).
+
+    The LLM result is always stamped ``confidence == "medium"`` — never
+    ``"high"``. ``"high"`` stays reserved for deterministic JSON-seed
+    matches, so analysts can filter on confidence to separate auditable
+    from model-derived rows.
+
+    If the LLM backend is disabled or returns ``None``, the original
+    ``_UNMAPPED`` result is returned unchanged.
+    """
+    # Lazy import: keeps classifier.py importable in environments where
+    # llm_classifier's own optional deps haven't been touched yet.
+    base = classify_hsn(hsn)
+    if base.confidence != "unmapped":
+        return base
+
+    from app.tally.llm_classifier import get_llm_classifier  # noqa: PLC0415
+
+    classifier = get_llm_classifier()
+    llm_result = classifier.classify(
+        narration=narration,
+        vendor_name=vendor_name,
+        ledger_name=ledger_name,
+        hsn_code=hsn,
+    )
+    if llm_result is None:
+        return base
+
+    _, version = _load_lookup()
+    return Classification(
+        scope=llm_result.scope,
+        scope3_category=llm_result.scope3_category,
+        emission_basis=llm_result.emission_basis,
+        description=llm_result.description,
+        matched_prefix=llm_result.suggested_hsn_prefix,
+        version=f"{version}+llm:{classifier.name}",
+        confidence="medium",
+    )

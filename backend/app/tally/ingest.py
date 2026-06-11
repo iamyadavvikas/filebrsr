@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from app.tally.classifier import classify_hsn
+from app.tally.classifier import classify_with_llm_fallback
 from app.tally.parser import TallyLineItem, fiscal_year_for, parse_tally_xml
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,12 @@ def _row_for(
     line: TallyLineItem, *, user_id: str, file_sha256: str,
 ) -> dict[str, Any]:
     """Build the dict that maps 1:1 to a row in ``raw_records``."""
-    classification = classify_hsn(line.hsn_code)
+    classification = classify_with_llm_fallback(
+        line.hsn_code,
+        narration=line.narration,
+        vendor_name=line.party_name,
+        ledger_name=line.ledger_name,
+    )
     return {
         "user_id": user_id,
         "source_system": "tally",
