@@ -1,0 +1,90 @@
+{
+  "metadata": {
+    "source": "CEA CO2 Baseline Database v20 (June 2025)",
+    "version": "CEA-2025-06",
+    "vintage": ["2024-04-01", "2025-03-31"],
+    "citation_url": "https://cea.nic.in/cdm-co2-baseline-database/",
+    "published_on": "2025-06-01",
+    "notes": "PLACEHOLDER EDITION. All values below are carried over from CEA v19 (FY2022-23 weighted average = 0.716 tCO2/MWh) and tagged _placeholder=true until the v20 'User Guide to the CO2 Baseline Database' PDF is consulted. Replace each value with the v20 simple weighted operating margin (for GHG-Protocol Scope 2 location-based reporting) and clear the _placeholder flag. The schema, loader, and back-compat shim are wired against the structure below and require no code changes when real numbers land."
+  },
+  "factors": [
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": null,
+      "state": null,
+      "regional_specificity": "national",
+      "unit": "tCO2/MWh",
+      "value": 0.716,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "CEA v20 (June 2025) Table 1 — all-India simple weighted CO2 emission rate"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": "NR",
+      "state": null,
+      "regional_specificity": "regional",
+      "unit": "tCO2/MWh",
+      "value": 0.716,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "CEA v20 (June 2025) — Northern Region weighted CO2 emission rate"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": "ER",
+      "state": null,
+      "regional_specificity": "regional",
+      "unit": "tCO2/MWh",
+      "value": 0.716,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "CEA v20 (June 2025) — Eastern Region weighted CO2 emission rate"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": "WR",
+      "state": null,
+      "regional_specificity": "regional",
+      "unit": "tCO2/MWh",
+      "value": 0.716,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "CEA v20 (June 2025) — Western Region weighted CO2 emission rate"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": "SR",
+      "state": null,
+      "regional_specificity": "regional",
+      "unit": "tCO2/MWh",
+      "value": 0.716,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "CEA v20 (June 2025) — Southern Region weighted CO2 emission rate"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": "NER",
+      "state": null,
+      "regional_specificity": "regional",
+      "unit": "tCO2/MWh",
+      "value": 0.716,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "CEA v20 (June 2025) — North-Eastern Region weighted CO2 emission rate"
+    }
+  ]
+}
