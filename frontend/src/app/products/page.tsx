@@ -73,7 +73,7 @@ const products = [
       "Multi-framework mapping (GRI, CDP, TCFD, SASB)",
       "Board-ready ESG dashboards",
     ],
-    cta: "Try BRSR Platform (5-min free trial)",
+    cta: "Try BRSR Platform",
   },
 ];
 
@@ -83,17 +83,26 @@ export default function ProductsPage() {
       <Navbar />
       <main className="flex-1">
         {/* Hero */}
-        <section className="relative overflow-hidden" style={{ background: "linear-gradient(160deg, #0A1628 0%, #0F2847 40%, #1B4D3E 100%)" }}>
-          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
+        <section className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #ECFDF5 0%, #EFF6FF 48%, #F5F3FF 100%)" }}>
+          <div className="blob-wrap" style={{ top: "-110px", left: "-70px" }}>
+            <div className="blob" style={{ width: 360, height: 360, background: "radial-gradient(circle at 30% 30%, #34D399, #10B981)" }} />
+          </div>
+          <div className="blob-wrap" style={{ top: "5%", right: "-90px" }}>
+            <div className="blob" style={{ width: 300, height: 300, background: "radial-gradient(circle at 30% 30%, #38BDF8, #6366F1)", animationDelay: "-5s" }} />
+          </div>
+          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(15,23,42,0.04) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
           <div className="relative max-w-5xl mx-auto px-4 sm:px-8 py-20 md:py-28 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-4">Products & Services</p>
-            <h1 className="text-white text-3xl md:text-5xl font-extrabold mb-5" style={{ letterSpacing: -1.5 }}>
+            <div className="inline-flex items-center gap-2 mb-6 backdrop-blur-sm fade-up" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", background: "rgba(255,255,255,0.7)", color: "#059669", padding: "8px 18px", borderRadius: 24, border: "1px solid rgba(16,185,129,0.25)", boxShadow: "0 4px 16px rgba(16,185,129,0.08)", animationFillMode: "both" }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", display: "inline-block", animation: "pulse 2s infinite" }} />
+              Products &amp; Services
+            </div>
+            <h1 className="fade-up" style={{ color: "#0F172A", fontSize: "clamp(34px, 5vw, 56px)", fontWeight: 800, lineHeight: 1.08, marginBottom: 20, letterSpacing: -1.5, animationDelay: "80ms", animationFillMode: "both" }}>
               Everything you need for
-              <span className="block" style={{ background: "linear-gradient(120deg, #E8B931, #F59E0B)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              <span className="gradient-text" style={{ display: "block", backgroundImage: "linear-gradient(110deg, #10B981 0%, #06B6D4 45%, #6366F1 100%)" }}>
                 ESG compliance in India
               </span>
             </h1>
-            <p className="text-white/60 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+            <p className="fade-up" style={{ fontSize: 18, color: "#475569", maxWidth: 640, lineHeight: 1.7, margin: "0 auto", animationDelay: "160ms", animationFillMode: "both" }}>
               From free ESG assessments to full BRSR filing automation. Start free — upgrade when you&apos;re ready.
             </p>
           </div>
@@ -107,16 +116,11 @@ export default function ProductsPage() {
               return (
                 <div
                   key={product.id}
-                  className="relative bg-white rounded-2xl border border-gray-200 p-8 hover:shadow-xl transition-shadow group"
+                  className="relative bg-white rounded-2xl border border-gray-200 p-8 hover:shadow-xl transition-shadow group card-hover"
                 >
                   {product.free && (
                     <span className="absolute top-4 right-4 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full">
                       Free
-                    </span>
-                  )}
-                  {!product.free && (
-                    <span className="absolute top-4 right-4 text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full">
-                      5-min free trial
                     </span>
                   )}
 

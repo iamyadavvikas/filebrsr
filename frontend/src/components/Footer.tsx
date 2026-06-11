@@ -10,8 +10,8 @@ export default function Footer() {
           <div className="md:col-span-1">
             <div className="flex items-center gap-2 mb-3">
               <Image src="/logo-icon.svg" alt="FileBRSR" width={28} height={28} />
-              <span className="font-extrabold" style={{ fontSize: 18, color: "var(--primary)" }}>
-                file<span style={{ color: "var(--accent)" }}>BRSR</span>
+              <span className="font-extrabold gradient-text" style={{ fontSize: 18, backgroundImage: "linear-gradient(110deg, #10B981 0%, #06B6D4 45%, #6366F1 100%)" }}>
+                fileBRSR
               </span>
             </div>
             <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7 }}>

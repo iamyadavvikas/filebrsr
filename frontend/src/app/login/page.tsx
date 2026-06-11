@@ -26,24 +26,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden" style={{ background: "linear-gradient(135deg, #ECFDF5 0%, #EFF6FF 48%, #F5F3FF 100%)" }}>
+      <div className="blob-wrap" style={{ top: "-100px", left: "-80px" }}>
+        <div className="blob" style={{ width: 320, height: 320, background: "radial-gradient(circle at 30% 30%, #34D399, #10B981)" }} />
+      </div>
+      <div className="blob-wrap" style={{ bottom: "-100px", right: "-80px" }}>
+        <div className="blob" style={{ width: 280, height: 280, background: "radial-gradient(circle at 30% 30%, #38BDF8, #6366F1)", animationDelay: "-5s" }} />
+      </div>
+      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "radial-gradient(rgba(15,23,42,0.04) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+      <div className="w-full max-w-md relative">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5">
             <img src="/logo-icon.svg" alt="FileBRSR" width={36} height={36} />
-            <span className="font-extrabold" style={{ fontSize: 20, color: "#1B4D3E", letterSpacing: -0.5 }}>
-              File<span style={{ color: "#E8B931" }}>BRSR</span>
+            <span className="font-extrabold gradient-text" style={{ fontSize: 20, letterSpacing: -0.5, backgroundImage: "linear-gradient(110deg, #10B981 0%, #06B6D4 45%, #6366F1 100%)" }}>
+              FileBRSR
             </span>
           </Link>
-          <h1 className="mt-6 text-2xl font-bold text-foreground">
+          <h1 className="mt-6 text-2xl font-bold" style={{ color: "#0F172A" }}>
             Welcome back
           </h1>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-2 text-sm" style={{ color: "#475569" }}>
             Sign in with your Google account to continue
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-border p-8">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/60 p-8">
           {error && (
             <div className="p-3 mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
               {error}
@@ -54,7 +61,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleGoogleLogin}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 py-3 border border-border rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium text-sm"
+            className="w-full flex items-center justify-center gap-3 py-3 border border-gray-300 rounded-lg bg-white text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-50 font-medium text-sm"
           >
             {googleLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -69,17 +76,17 @@ export default function LoginPage() {
             Continue with Google
           </button>
 
-          <p className="mt-4 text-center text-xs text-muted">
+          <p className="mt-4 text-center text-xs" style={{ color: "#64748B" }}>
             By signing in, you agree to our Terms of Service and Privacy Policy.
           </p>
         </div>
 
-        <p className="mt-6 text-center text-sm text-muted">
+        <p className="mt-6 text-center text-sm" style={{ color: "#475569" }}>
           Don&apos;t have an account?{" "}
           <Link
             href="/signup"
-            className="text-primary font-medium hover:underline"
-            style={{ color: "#1B4D3E" }}
+            className="font-medium hover:underline"
+            style={{ color: "#059669" }}
           >
             Sign up free
           </Link>

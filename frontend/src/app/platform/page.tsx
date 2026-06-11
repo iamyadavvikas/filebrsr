@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import PlatformOverview from "./PlatformOverview";
 
@@ -8,7 +7,10 @@ export default async function PlatformPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/platform/data-entry");
+  // Guests can view the Overview in trial mode (no redirect to data-entry)
+  if (!user) {
+    return <PlatformOverview userId="guest" initialReports={[]} userProfile={null} />;
+  }
 
   // Fetch reports server-side using admin client (bypasses RLS)
   const admin = createAdminClient();

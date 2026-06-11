@@ -76,7 +76,7 @@ const plans = [
     ],
     cta: "Subscribe",
     popular: true,
-    ctaBg: "#1B4D3E", ctaColor: "white", ctaBorder: "none",
+    ctaBg: "linear-gradient(120deg, #10B981, #06B6D4)", ctaColor: "white", ctaBorder: "none",
   },
   {
     key: "scale",
@@ -117,7 +117,7 @@ const plans = [
     ],
     cta: "Contact Sales",
     popular: false,
-    ctaBg: "#E8B931", ctaColor: "#1B4D3E", ctaBorder: "none",
+    ctaBg: "linear-gradient(120deg, #06B6D4, #6366F1)", ctaColor: "white", ctaBorder: "none",
   },
 ];
 
@@ -234,23 +234,34 @@ export default function PricingPage() {
       <Navbar />
       <main className="flex-1">
         {/* Header */}
-        <section style={{ padding: "72px 28px 48px", background: "var(--highlight-bg)" }}>
-          <div className="max-w-[960px] mx-auto text-center">
-            <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 8 }}>
+        <section className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #ECFDF5 0%, #EFF6FF 48%, #F5F3FF 100%)" }}>
+          <div className="blob-wrap" style={{ top: "-110px", left: "-70px" }}>
+            <div className="blob" style={{ width: 340, height: 340, background: "radial-gradient(circle at 30% 30%, #34D399, #10B981)" }} />
+          </div>
+          <div className="blob-wrap" style={{ top: "0", right: "-90px" }}>
+            <div className="blob" style={{ width: 280, height: 280, background: "radial-gradient(circle at 30% 30%, #38BDF8, #6366F1)", animationDelay: "-5s" }} />
+          </div>
+          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(15,23,42,0.04) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+          <div className="relative max-w-[960px] mx-auto px-7 pt-20 pb-12 md:pt-24 text-center">
+            <div className="inline-flex items-center gap-2 mb-6 backdrop-blur-sm fade-up" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", background: "rgba(255,255,255,0.7)", color: "#059669", padding: "8px 18px", borderRadius: 24, border: "1px solid rgba(16,185,129,0.25)", boxShadow: "0 4px 16px rgba(16,185,129,0.08)", animationFillMode: "both" }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", display: "inline-block", animation: "pulse 2s infinite" }} />
               Pricing
-            </p>
-            <h1 style={{ fontSize: 38, fontWeight: 800, marginBottom: 12, letterSpacing: -1, color: "var(--foreground)" }}>
-              Replace ₹15L consultants with one tool
+            </div>
+            <h1 className="fade-up" style={{ fontSize: "clamp(32px, 4.5vw, 48px)", fontWeight: 800, marginBottom: 16, letterSpacing: -1.5, color: "#0F172A", lineHeight: 1.1, animationDelay: "80ms", animationFillMode: "both" }}>
+              Replace ₹15L consultants
+              <span className="gradient-text" style={{ display: "block", backgroundImage: "linear-gradient(110deg, #10B981 0%, #06B6D4 45%, #6366F1 100%)" }}>
+                with one platform
+              </span>
             </h1>
-            <p style={{ fontSize: 16, maxWidth: 520, margin: "0 auto 8px", lineHeight: 1.6, color: "var(--muted)" }}>
+            <p className="fade-up" style={{ fontSize: 17, maxWidth: 540, margin: "0 auto 8px", lineHeight: 1.7, color: "#475569", animationDelay: "160ms", animationFillMode: "both" }}>
               Companies pay ₹5-15 lakhs annually for manual BRSR compilation. FileBRSR does it in seconds.
             </p>
-            <div className="flex justify-center gap-6 mt-6" style={{ fontSize: 13, color: "var(--muted)" }}>
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-6 fade-up" style={{ fontSize: 13, color: "#64748B", animationDelay: "240ms", animationFillMode: "both" }}>
               <span>✓ No credit card for free tier</span>
               <span>✓ Cancel anytime</span>
               <span>✓ GST invoice included</span>
             </div>
-            <p className="mt-4 text-center" style={{ fontSize: 12, color: "var(--muted)", opacity: 0.7 }}>
+            <p className="mt-4 text-center fade-up" style={{ fontSize: 12, color: "#64748B", opacity: 0.7, animationDelay: "300ms", animationFillMode: "both" }}>
               Used by compliance teams preparing FY2025-26 and FY2026-27 BRSR filings
             </p>
           </div>
@@ -263,13 +274,13 @@ export default function PricingPage() {
               {plans.map((p) => (
                 <div
                   key={p.key}
-                  className="relative flex flex-col"
+                  className="relative flex flex-col card-hover"
                   style={{
                     borderRadius: 20,
-                    border: p.popular ? "2px solid var(--primary)" : "1px solid var(--border)",
+                    border: p.popular ? "2px solid #10B981" : "1px solid var(--border)",
                     padding: "28px 24px",
                     background: "var(--card)",
-                    boxShadow: p.popular ? "0 12px 40px rgba(27,77,62,0.12)" : "0 2px 8px rgba(0,0,0,0.04)",
+                    boxShadow: p.popular ? "0 16px 44px rgba(16,185,129,0.18)" : "0 2px 8px rgba(0,0,0,0.04)",
                   }}
                 >
                   {p.popular && (
@@ -277,9 +288,10 @@ export default function PricingPage() {
                       className="absolute"
                       style={{
                         top: -13, left: "50%", transform: "translateX(-50%)",
-                        background: "#1B4D3E", color: "white",
+                        background: "linear-gradient(120deg, #10B981, #06B6D4)", color: "white",
                         fontSize: 11, fontWeight: 700, padding: "5px 16px",
                         borderRadius: 20, letterSpacing: 0.5,
+                        boxShadow: "0 6px 18px rgba(16,185,129,0.3)",
                       }}
                     >
                       Most Popular
@@ -359,22 +371,23 @@ export default function PricingPage() {
         </section>
 
         {/* BRSR Deadline CTA */}
-        <section className="text-center" style={{ padding: "56px 28px", background: "linear-gradient(135deg, #1B4D3E, #2D7A5F)" }}>
-          <div className="max-w-[600px] mx-auto text-white">
-            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", opacity: 0.7, marginBottom: 12 }}>
+        <section className="relative overflow-hidden text-center" style={{ padding: "56px 28px", background: "linear-gradient(135deg, #10B981 0%, #06B6D4 50%, #6366F1 100%)" }}>
+          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+          <div className="relative max-w-[600px] mx-auto text-white">
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", opacity: 0.85, marginBottom: 12 }}>
               Compliance Deadline
             </div>
             <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 12 }}>
               BRSR Core + Assurance mandatory from FY 2026-27
             </h2>
-            <p style={{ fontSize: 15, opacity: 0.8, lineHeight: 1.65, marginBottom: 28 }}>
+            <p style={{ fontSize: 15, opacity: 0.9, lineHeight: 1.65, marginBottom: 28 }}>
               SEBI mandates BRSR Core with third-party assurance for the top 250 companies. 
               All 1,000 listed companies by 2027-28. Start your compliance journey today.
             </p>
             <Link
               href="/upload"
               className="inline-block"
-              style={{ fontSize: 15, fontWeight: 700, padding: "14px 36px", borderRadius: 14, background: "#E8B931", color: "#1B4D3E" }}
+              style={{ fontSize: 15, fontWeight: 700, padding: "14px 36px", borderRadius: 14, background: "white", color: "#0891B2", boxShadow: "0 10px 30px rgba(8,145,178,0.25)" }}
             >
               Start Compliance Check →
             </Link>
