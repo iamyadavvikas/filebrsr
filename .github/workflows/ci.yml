@@ -50,7 +50,11 @@ jobs:
       - run: pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
         env:
           SUPABASE_URL: https://example.supabase.co
-          SUPABASE_SERVICE_KEY: test-key
+          # Must match the default in tests/conftest.py — the correction
+          # endpoint compares the request bearer to settings.SUPABASE_SERVICE_KEY,
+          # and conftest only sets this with os.environ.setdefault() so a
+          # different CI value silently breaks TestCorrectionEndpoint with 401s.
+          SUPABASE_SERVICE_KEY: test-service-key
           ALLOWED_ORIGINS: http://localhost:3000
 
   deploy:
