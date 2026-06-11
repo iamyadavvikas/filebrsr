@@ -27,27 +27,18 @@ if _settings.SENTRY_DSN:
         environment=_settings.ENVIRONMENT,
     )
     logger.info("Sentry initialized for %s", _settings.ENVIRONMENT)
-from app.agent_extraction import extract_with_agent
-from app.ai_extraction import extract_with_ai
 from app.billing import router as billing_router
 from app.brsr_datapoints import BRSR_DATAPOINTS, analyze_gaps_v2, get_datapoints_stats, get_esrs_mapped_datapoints
 from app.brsr_framework import BRSR_FRAMEWORK, get_core_fields, get_mandatory_fields
-from app.citations import attach_citations
 from app.excel_import import router as excel_import_router
-from app.extract_retrieval import extract_with_retrieval
-from app.extraction import calculate_confidence, extract_with_regex
-from app.extraction_enhanced import extract_enhanced
+from app.extraction_pipeline import run_full_extraction
 from app.nifty50_benchmarks import (
     BENCHMARK_METADATA,
     NIFTY50_DISCLOSURE_PATTERNS,
     SECTOR_BENCHMARKS,
     get_benchmark_comparison,
 )
-from app.normalise import normalise_extracted
-from app.ocr import ocr_document
 from app.pdf_generator import generate_compliance_pdf
-from app.pdf_parser import parse_pdf
-from app.retrieval import SupabaseChunkIndex, build_in_memory_index
 from app.router_advanced import router as advanced_router
 from app.router_cron import router as cron_router
 from app.router_market import router as market_router
@@ -107,75 +98,6 @@ def _check_guest_rate_limit(request: Request) -> None:
             _GUEST_EXTRACT_LOG[k] = [t for t in _GUEST_EXTRACT_LOG[k] if t > cutoff]
             if not _GUEST_EXTRACT_LOG[k]:
                 del _GUEST_EXTRACT_LOG[k]
-
-
-# ─── Phase 3.2 retrieval-extraction helper ────────────────────────────────
-
-
-async def _run_retrieval_extraction(
-    doc,
-    *,
-    user_id: str | None = None,
-    report_id: str | None = None,
-    supabase_client=None,
-):
-    """
-    Build an in-memory chunk index and run per-datapoint extraction.
-    Returns a section-keyed dict (datapoint-id keys, e.g. "A.I.1").
-    Always returns the empty shape on any failure or when disabled so
-    callers can blindly merge it under `merged["retrieved"]`.
-
-    If `user_id`, `report_id` and `supabase_client` are all provided AND
-    `report_id != "guest"`, the embedded chunks are also persisted to
-    public.extraction_chunks (v12). This is best-effort — persistence
-    failures never fail the extraction.
-    """
-    empty = {"section_a": {}, "section_b": {}, "section_c": {}}
-    if not settings.ENABLE_RETRIEVAL_EXTRACTION:
-        return empty
-    if not settings.GEMINI_API_KEY:
-        return empty
-    try:
-        from app.extract_retrieval import select_retrievable_datapoints
-        index = await build_in_memory_index(doc, api_key=settings.GEMINI_API_KEY)
-
-        # Best-effort persistence — reuses the embeddings we just computed
-        # so there's no extra Gemini cost. Skips guest and missing-ctx cases.
-        if (
-            user_id
-            and report_id
-            and report_id != "guest"
-            and supabase_client is not None
-        ):
-            try:
-                store = SupabaseChunkIndex(
-                    supabase=supabase_client,
-                    user_id=user_id,
-                    report_id=report_id,
-                    api_key=settings.GEMINI_API_KEY,
-                )
-                n = await store.persist_from_index(index)
-                logger.info(
-                    "Persisted %d chunks to extraction_chunks (report=%s)",
-                    n, report_id,
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("chunk persist failed for report=%s: %s",
-                               report_id, exc)
-
-        datapoints = select_retrievable_datapoints(
-            max_count=settings.RETRIEVAL_MAX_DATAPOINTS,
-        )
-        return await extract_with_retrieval(
-            index=index,
-            datapoints=datapoints,
-            api_key=settings.GEMINI_API_KEY,
-            batch_size=settings.RETRIEVAL_BATCH_SIZE,
-            top_k=settings.RETRIEVAL_TOP_K,
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("retrieval extraction failed: %s", exc)
-        return empty
 
 
 # Register routers
@@ -258,81 +180,30 @@ async def extract_brsr(
         if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large")
 
-        # Parse PDF: extract text AND tables (rendered as markdown). BRSR
-        # filings are mostly tabular, so text-only extraction loses ~70% of
-        # the structured data. parse_pdf preserves table layout.
-        doc = parse_pdf(content)
-        # OCR fallback for pages pdfplumber returned blank (scanned reports).
-        # No-op if no empty pages or no Gemini key; capped at 20 pages.
-        await ocr_document(doc, content, api_key=settings.GEMINI_API_KEY)
-        text = doc.to_text()
-        logger.info(
-            "PDF parsed: pages=%d tables=%d chars=%d empty_pages=%d",
-            doc.num_pages, doc.num_tables, doc.total_chars, len(doc.empty_pages),
+        # Run the unified pipeline (Phase 5.1). Handles parse + OCR +
+        # regex/enhanced/ai/agent merge + normalise + citations + retrieval.
+        result = await run_full_extraction(
+            file_bytes=content,
+            settings=settings,
+            report_id=report_id,
+            user_id=user_id,
+            supabase_client=supabase,
         )
 
-        if not text.strip():
-            supabase.table("reports").update({"status": "failed"}).eq(
-                "id", report_id
-            ).execute()
-            return {"status": "failed", "error": "No text could be extracted from PDF"}
+        if result["status"] != "completed":
+            if report_id != "guest":
+                supabase.table("reports").update({"status": "failed"}).eq(
+                    "id", report_id,
+                ).execute()
+            return {"status": "failed", "error": result["error"]}
 
-        # Dual extraction: regex + AI agent + enhanced
-        regex_results = extract_with_regex(text)
-        enhanced_results = extract_enhanced(text)
+        merged = result["extracted_data"]
+        confidence = result["confidence_scores"]
+        company_name = result["company_name"]
+        financial_year = result["financial_year"]
 
-        # Use multi-pass agent (primary) with single-shot fallback
-        try:
-            ai_results = await extract_with_agent(text, settings.GROQ_API_KEY)
-            agent_fields = sum(len(v) for v in ai_results.values() if isinstance(v, dict))
-            print(f"Agent extraction: {agent_fields} fields")
-            # If agent got very few fields, try single-shot as supplement
-            if agent_fields < 10:
-                print("Agent got few fields, supplementing with single-shot...")
-                single_shot = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
-                for section in ["section_a", "section_b", "section_c"]:
-                    for k, v in single_shot.get(section, {}).items():
-                        if k not in ai_results.get(section, {}):
-                            ai_results.setdefault(section, {})[k] = v
-        except Exception as ai_err:
-            print(f"Agent extraction failed, falling back to single-shot: {ai_err}")
-            try:
-                ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
-            except Exception:
-                ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
-
-        # Merge results: enhanced base → regex fills → AI takes precedence
-        merged = {"section_a": {}, "section_b": {}, "section_c": {}}
-        for section in ["section_a", "section_b", "section_c"]:
-            merged[section] = {**enhanced_results.get(section, {})}
-            merged[section].update(regex_results.get(section, {}))
-            merged[section].update(ai_results.get(section, {}))
-
-        # Parallel canonical-numeric view (Cr/Lakh/Mn → INR, % stripped).
-        # Stored as a sibling key so existing consumers reading section_a/b/c
-        # raw strings keep working; new code can read merged["normalised"].
-        merged["normalised"] = normalise_extracted(merged)
-
-        # Source citations: for every extracted field, point at the chunk
-        # (page + chunk_id + snippet) it came from. Deterministic string
-        # search, no extra LLM call. Frontend renders "View source p.47".
-        merged["citations"] = attach_citations(merged, doc)
-
-        # Phase 3.2 retrieval extraction (opt-in via settings, id-keyed,
-        # additive — does not overwrite the fuzzy-keyed AI wins above).
-        # When report_id is real, chunks are also persisted to v12 table.
-        merged["retrieved"] = await _run_retrieval_extraction(
-            doc, user_id=user_id, report_id=report_id, supabase_client=supabase,
-        )
-
-        # Calculate confidence scores
-        confidence = calculate_confidence(regex_results, ai_results)
-
-        # Extract company name and FY if available
-        company_name = merged.get("section_a", {}).get("company_name", None)
-        financial_year = merged.get("section_a", {}).get("financial_year", None)
-
-        # Benchmark comparison against NIFTY 50 peers
+        # Benchmark + gap analysis are response-only concerns (not part of
+        # the pipeline's core contract — they don't need OCR/retrieval).
         benchmark = get_benchmark_comparison(merged)
         gap_analysis = analyze_gaps_v2(merged)
         datapoints_stats = get_datapoints_stats()
@@ -389,41 +260,18 @@ async def guest_extract_brsr(
         if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large")
 
-        # Table-aware PDF parse (see /api/extract for rationale).
-        doc = parse_pdf(content)
-        await ocr_document(doc, content, api_key=settings.GEMINI_API_KEY)
-        text = doc.to_text()
+        # Unified pipeline — guest path: report_id="guest" disables chunk
+        # persistence so anonymous uploads never touch extraction_chunks.
+        result = await run_full_extraction(
+            file_bytes=content,
+            settings=settings,
+            report_id="guest",
+        )
+        if result["status"] != "completed":
+            return {"status": "failed", "error": result["error"]}
 
-        if not text.strip():
-            return {"status": "failed", "error": "No text could be extracted from PDF"}
-
-        regex_results = extract_with_regex(text)
-        enhanced_results = extract_enhanced(text)
-        try:
-            ai_results = await extract_with_agent(text, settings.GROQ_API_KEY)
-            agent_fields = sum(len(v) for v in ai_results.values() if isinstance(v, dict))
-            if agent_fields < 10:
-                single_shot = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
-                for section in ["section_a", "section_b", "section_c"]:
-                    for k, v in single_shot.get(section, {}).items():
-                        if k not in ai_results.get(section, {}):
-                            ai_results.setdefault(section, {})[k] = v
-        except Exception:
-            try:
-                ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
-            except Exception:
-                ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
-
-        merged = {"section_a": {}, "section_b": {}, "section_c": {}}
-        for section in ["section_a", "section_b", "section_c"]:
-            merged[section] = {**enhanced_results.get(section, {})}
-            merged[section].update(regex_results.get(section, {}))
-            merged[section].update(ai_results.get(section, {}))
-        merged["normalised"] = normalise_extracted(merged)
-        merged["citations"] = attach_citations(merged, doc)
-        merged["retrieved"] = await _run_retrieval_extraction(doc)
-
-        confidence = calculate_confidence(regex_results, ai_results)
+        merged = result["extracted_data"]
+        confidence = result["confidence_scores"]
         benchmark = get_benchmark_comparison(merged)
 
         return {
@@ -680,35 +528,8 @@ async def extract_brsr_async(
         if len(file_bytes) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large")
 
-        # Table-aware PDF parse, capped at 80 pages for free-tier LLM quota.
-        doc = parse_pdf(file_bytes, max_pages=80)
-        await ocr_document(doc, file_bytes, api_key=settings.GEMINI_API_KEY)
-        text = doc.to_text()
-
-        if not text.strip():
-            supabase.table("reports").update({"status": "failed"}).eq(
-                "id", req.report_id
-            ).execute()
-            return {"status": "failed", "error": "No text could be extracted from PDF"}
-
-        # Triple extraction: regex + enhanced + AI
-        regex_results = extract_with_regex(text)
-        enhanced_results = extract_enhanced(text)
-        try:
-            ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
-        except Exception as ai_err:
-            print(f"AI extraction failed (using regex only): {ai_err}")
-            ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
-
-        # Merge: enhanced base → regex fills → AI takes precedence
-        merged = {"section_a": {}, "section_b": {}, "section_c": {}}
-        for section in ["section_a", "section_b", "section_c"]:
-            merged[section] = {**enhanced_results.get(section, {})}
-            merged[section].update(regex_results.get(section, {}))
-            merged[section].update(ai_results.get(section, {}))
-        merged["normalised"] = normalise_extracted(merged)
-        merged["citations"] = attach_citations(merged, doc)
-        # Look up user_id once so persistence can attribute the rows.
+        # Look up user_id once so retrieval-chunk persistence can attribute
+        # the rows (best-effort; doesn't fail the extraction if it can't).
         worker_user_id = None
         try:
             row = supabase.table("reports").select("user_id").eq(
@@ -718,14 +539,28 @@ async def extract_brsr_async(
         except Exception as exc:  # noqa: BLE001
             logger.warning("failed to resolve user_id for report=%s: %s",
                            req.report_id, exc)
-        merged["retrieved"] = await _run_retrieval_extraction(
-            doc, user_id=worker_user_id, report_id=req.report_id,
+
+        # Unified pipeline (Phase 5.1). 80-page cap preserved for free-tier
+        # LLM quota on huge filings.
+        result = await run_full_extraction(
+            file_bytes=file_bytes,
+            settings=settings,
+            report_id=req.report_id,
+            user_id=worker_user_id,
             supabase_client=supabase,
+            max_pages=80,
         )
 
-        confidence = calculate_confidence(regex_results, ai_results)
-        company_name = merged.get("section_a", {}).get("company_name", None)
-        financial_year = merged.get("section_a", {}).get("financial_year", None)
+        if result["status"] != "completed":
+            supabase.table("reports").update({"status": "failed"}).eq(
+                "id", req.report_id,
+            ).execute()
+            return {"status": "failed", "error": result["error"]}
+
+        merged = result["extracted_data"]
+        confidence = result["confidence_scores"]
+        company_name = result["company_name"]
+        financial_year = result["financial_year"]
 
         # Update report in DB
         supabase.table("reports").update(
