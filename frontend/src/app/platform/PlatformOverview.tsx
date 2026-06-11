@@ -32,7 +32,7 @@ interface UserProfile {
 
 interface OverviewProps {
   userId: string;
-  initialReports: any[];
+  initialReports: ExtractionReport[];
   userProfile: UserProfile | null;
 }
 
@@ -43,12 +43,14 @@ interface ExtractionReport {
   created_at: string;
   completion_pct?: number;
   total_extracted?: number;
+  company_name?: string | null;
+  financial_year?: string | null;
 }
 
 export default function PlatformOverview({ userId, initialReports, userProfile }: OverviewProps) {
   const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState<ExtractionReport[]>(initialReports as ExtractionReport[]);
+  const [reports, setReports] = useState<ExtractionReport[]>(initialReports);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
@@ -78,19 +80,22 @@ export default function PlatformOverview({ userId, initialReports, userProfile }
       );
       if (res.ok) {
         const data = await res.json();
-        const sections = data.sections || {};
+        const sections = (data.sections || {}) as Record<
+          string,
+          { filled?: number; mandatory?: number; mandatory_filled?: number }
+        >;
         const totalFilled = Object.values(sections).reduce(
-          (sum: number, s: any) => sum + (s?.filled || 0),
+          (sum: number, s) => sum + (s?.filled || 0),
           0
-        ) as number;
+        );
         const totalMandatory = Object.values(sections).reduce(
-          (sum: number, s: any) => sum + (s?.mandatory || 0),
+          (sum: number, s) => sum + (s?.mandatory || 0),
           0
-        ) as number;
+        );
         const mandatoryFilled = Object.values(sections).reduce(
-          (sum: number, s: any) => sum + (s?.mandatory_filled || 0),
+          (sum: number, s) => sum + (s?.mandatory_filled || 0),
           0
-        ) as number;
+        );
         setStats((prev) => ({
           ...prev,
           completion: totalMandatory > 0 ? Math.round((mandatoryFilled / totalMandatory) * 100) : 0,
@@ -329,10 +334,10 @@ export default function PlatformOverview({ userId, initialReports, userProfile }
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
-                        {(report as any).company_name || report.file_name || "BRSR Report"}
+                        {report.company_name || report.file_name || "BRSR Report"}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {(report as any).financial_year ? `${(report as any).financial_year} · ` : ""}
+                        {report.financial_year ? `${report.financial_year} · ` : ""}
                         {new Date(report.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       </p>
                     </div>

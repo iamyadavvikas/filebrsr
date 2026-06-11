@@ -8,7 +8,7 @@ export default async function UploadExtractPage() {
   } = await supabase.auth.getUser();
 
   // Fetch reports server-side using admin client (bypasses RLS) — only when logged in
-  let reports: unknown[] = [];
+  let reports: { id: string; file_name: string; status: string; created_at: string; company_name: string | null; financial_year: string | null }[] = [];
   if (user) {
     const admin = createAdminClient();
     const { data } = await admin

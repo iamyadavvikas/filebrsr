@@ -64,8 +64,8 @@ export default function BoardClient({ userId }: { userId: string }) {
         const text = await res.text();
         setError(`Failed to load (${res.status}): ${text.slice(0, 200)}`);
       }
-    } catch (err: any) {
-      setError(`Network error: ${err.message}`);
+    } catch (err) {
+      setError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setLoading(false);
     }

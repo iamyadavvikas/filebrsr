@@ -671,10 +671,10 @@ export default function DataEntryClient({ userId }: DataEntryClientProps) {
                     <span className="text-xs text-gray-400 font-mono">{field.id}</span>
                     {field.label}
                     {field.required && <span className="text-red-400">*</span>}
-                    {(field as any).core && (
+                    {(field as { core?: boolean }).core && (
                       <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">CORE</span>
                     )}
-                    {(field as any).leadership && (
+                    {(field as { leadership?: boolean }).leadership && (
                       <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">VOLUNTARY</span>
                     )}
                     {savedFields.has(field.id) && (

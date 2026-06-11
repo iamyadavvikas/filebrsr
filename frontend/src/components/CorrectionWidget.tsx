@@ -5,12 +5,12 @@ import { Edit3, Check, X, AlertTriangle, Sparkles } from "lucide-react";
 
 interface CorrectionWidgetProps {
   datapoint_id: string;
-  ai_extracted_value: any;
+  ai_extracted_value: unknown;
   ai_confidence?: number;
   ai_model?: string;
   report_id?: string;
   userId: string;
-  onCorrected?: (correctedValue: any) => void;
+  onCorrected?: (correctedValue: unknown) => void;
 }
 
 const CORRECTION_TYPES = [

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 
 // Analytics context for tracking events throughout the app
 interface AnalyticsContextType {
-  track: (eventName: string, category: EventCategory, properties?: Record<string, any>) => void;
+  track: (eventName: string, category: EventCategory, properties?: Record<string, unknown>) => void;
 }
 
 type EventCategory = "auth" | "extraction" | "data_entry" | "report" | "billing" | "navigation" | "team" | "export";
@@ -35,7 +35,7 @@ export function AnalyticsProvider({ children, userId }: { children: React.ReactN
   const lastPathRef = useRef<string | null>(null);
 
   const track = useCallback(
-    (eventName: string, category: EventCategory, properties?: Record<string, any>) => {
+    (eventName: string, category: EventCategory, properties?: Record<string, unknown>) => {
       // Fire and forget — don't block UI
       const supabase = createClient();
       supabase

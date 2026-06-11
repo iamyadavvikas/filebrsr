@@ -21,7 +21,16 @@ const PROGRESS_STEPS = [
   { label: "Analyze", desc: "Gap analysis" },
 ];
 
-export default function UploadExtractClient({ userId, initialReports }: { userId: string; initialReports: any[] }) {
+interface PastReport {
+  id: string;
+  file_name: string;
+  status: string;
+  created_at: string;
+  company_name?: string | null;
+  financial_year?: string | null;
+}
+
+export default function UploadExtractClient({ userId, initialReports }: { userId: string; initialReports: PastReport[] }) {
   const { track } = useAnalytics();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -332,8 +341,8 @@ export default function UploadExtractClient({ userId, initialReports }: { userId
   );
 }
 
-function PastExtractions({ userId, initialReports }: { userId: string; initialReports: any[] }) {
-  const [reports, setReports] = useState<any[]>(initialReports);
+function PastExtractions({ userId, initialReports }: { userId: string; initialReports: PastReport[] }) {
+  const [reports, setReports] = useState<PastReport[]>(initialReports);
   const [loaded, setLoaded] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());

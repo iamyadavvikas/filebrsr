@@ -133,6 +133,20 @@ interface Scope2Entry {
   state: string;
 }
 
+interface CarbonResults {
+  scope_1: { total_tco2e: number };
+  scope_2: { total_tco2e: number };
+  scope_3: { total_tco2e: number };
+  total_emissions_tco2e: number;
+  ghg_intensity?: { intensity: number } | null;
+  brsr_mapping: {
+    "C.P6.GHG.1": number;
+    "C.P6.GHG.2": number;
+    "C.P6.GHG.3": number;
+    total_scope_1_2: number;
+  };
+}
+
 export default function CarbonClient() {
   const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [emissionFactorOrg, setEmissionFactorOrg] = useState("cea_2024");
@@ -146,7 +160,7 @@ export default function CarbonClient() {
     { id: "1", type: "business_travel_air_domestic", quantity: 0 },
   ]);
   const [revenueCrores, setRevenueCrores] = useState<number>(0);
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<CarbonResults | null>(null);
   const [calculating, setCalculating] = useState(false);
   const [calcError, setCalcError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -169,10 +183,10 @@ export default function CarbonClient() {
         .eq("financial_year", financialYear)
         .like("datapoint_id", "CARBON_%");
       if (data && data.length > 0) {
-        const carbonData = data.reduce((acc: any, d: any) => {
+        const carbonData = data.reduce((acc: Record<string, string>, d) => {
           acc[d.datapoint_id] = d.value;
           return acc;
-        }, {});
+        }, {} as Record<string, string>);
         if (carbonData.CARBON_SCOPE1) {
           try { setScope1Entries(JSON.parse(carbonData.CARBON_SCOPE1)); } catch {}
         }
@@ -246,8 +260,8 @@ export default function CarbonClient() {
         const text = await res.text();
         setCalcError(`Calculation failed (${res.status}): ${text.slice(0, 200)}`);
       }
-    } catch (err: any) {
-      setCalcError(`Network error: ${err.message}`);
+    } catch (err) {
+      setCalcError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
     }
     setCalculating(false);
   }

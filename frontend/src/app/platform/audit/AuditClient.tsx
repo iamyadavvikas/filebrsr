@@ -11,8 +11,8 @@ interface AuditEntry {
   entity_id: string | null;
   datapoint_id: string | null;
   financial_year: string | null;
-  old_value: any;
-  new_value: any;
+  old_value: unknown;
+  new_value: unknown;
   change_reason: string | null;
   created_at: string;
 }
@@ -112,7 +112,7 @@ export default function AuditClient({ userId }: { userId: string }) {
     });
   }
 
-  function formatValue(val: any): string {
+  function formatValue(val: unknown): string {
     if (val === null || val === undefined) return "—";
     if (typeof val === "object") return JSON.stringify(val, null, 2);
     return String(val);
@@ -296,7 +296,7 @@ export default function AuditClient({ userId }: { userId: string }) {
                         <span className="text-sm text-gray-700">{entry.financial_year}</span>
                       </div>
                     )}
-                    {entry.old_value && (
+                    {entry.old_value != null && (
                       <div className="flex items-start gap-2">
                         <span className="text-xs font-medium text-gray-500 w-16 shrink-0">Before:</span>
                         <pre className="text-xs bg-red-50 text-red-700 px-2 py-1 rounded overflow-auto max-w-lg">
@@ -304,7 +304,7 @@ export default function AuditClient({ userId }: { userId: string }) {
                         </pre>
                       </div>
                     )}
-                    {entry.new_value && (
+                    {entry.new_value != null && (
                       <div className="flex items-start gap-2">
                         <span className="text-xs font-medium text-gray-500 w-16 shrink-0">After:</span>
                         <pre className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded overflow-auto max-w-lg">

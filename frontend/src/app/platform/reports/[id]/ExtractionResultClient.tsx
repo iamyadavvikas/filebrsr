@@ -85,7 +85,7 @@ interface Props {
   fileName: string;
   status: string;
   createdAt: string;
-  extractedData: Record<string, any> | null;
+  extractedData: Record<string, unknown> | null;
 }
 
 const CHART_COLORS = ["#059669", "#F59E0B"];
@@ -103,11 +103,11 @@ export default function ExtractionResultClient({ reportId, fileName, status, cre
     const map = new Map<string, string>();
 
     // Flatten extracted data
-    const flatData: Record<string, any> = {};
+    const flatData: Record<string, unknown> = {};
     for (const [sectionKey, sectionVal] of Object.entries(extractedData)) {
       if (typeof sectionVal !== "object" || !sectionVal) continue;
       if (sectionKey === "gap_analysis" || sectionKey === "datapoints_stats" || sectionKey === "benchmark") continue;
-      for (const [k, v] of Object.entries(sectionVal as Record<string, any>)) {
+      for (const [k, v] of Object.entries(sectionVal as Record<string, unknown>)) {
         if (v !== null && v !== undefined && v !== "" && v !== "N/A") {
           flatData[k] = v;
         }
