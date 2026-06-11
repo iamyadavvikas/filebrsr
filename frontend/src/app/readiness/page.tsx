@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -204,26 +205,37 @@ export default function ReadinessPage() {
       <>
         <Navbar />
         <main className="flex-1">
-          <section className="relative overflow-hidden" style={{ background: "linear-gradient(160deg, #0A1628 0%, #0F2847 40%, #1B4D3E 100%)", padding: "120px 28px 80px" }}>
-            <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
-            <div className="relative max-w-3xl mx-auto text-center">
-              <div className="inline-flex items-center gap-2 mb-6" style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", background: "rgba(232,185,49,0.12)", color: "#E8B931", padding: "7px 16px", borderRadius: 24, border: "1px solid rgba(232,185,49,0.25)" }}>
-                FREE ASSESSMENT · 2 MINUTES
+          <section className="relative overflow-hidden" style={{ background: "linear-gradient(135deg, #ECFDF5 0%, #EFF6FF 48%, #F5F3FF 100%)" }}>
+            <div className="blob-wrap" style={{ top: "-110px", left: "-70px" }}>
+              <div className="blob" style={{ width: 360, height: 360, background: "radial-gradient(circle at 30% 30%, #34D399, #10B981)" }} />
+            </div>
+            <div className="blob-wrap" style={{ top: "5%", right: "-90px" }}>
+              <div className="blob" style={{ width: 300, height: 300, background: "radial-gradient(circle at 30% 30%, #38BDF8, #6366F1)", animationDelay: "-5s" }} />
+            </div>
+            <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(15,23,42,0.04) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+            <div className="relative max-w-3xl mx-auto px-4 sm:px-8 py-20 md:py-28 text-center">
+              <div className="inline-flex items-center gap-2 mb-6 backdrop-blur-sm fade-up" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", background: "rgba(255,255,255,0.7)", color: "#059669", padding: "8px 18px", borderRadius: 24, border: "1px solid rgba(16,185,129,0.25)", boxShadow: "0 4px 16px rgba(16,185,129,0.08)", animationFillMode: "both" }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", display: "inline-block", animation: "pulse 2s infinite" }} />
+                Free Assessment · 2 Minutes
               </div>
-              <h1 className="text-white" style={{ fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 800, lineHeight: 1.1, marginBottom: 20, letterSpacing: -1.5 }}>
-                Is your company ready<br />for BRSR FY2026-27?
+              <h1 className="fade-up" style={{ color: "#0F172A", fontSize: "clamp(34px, 5vw, 56px)", fontWeight: 800, lineHeight: 1.08, marginBottom: 20, letterSpacing: -1.5, animationDelay: "80ms", animationFillMode: "both" }}>
+                Is your company ready
+                <span className="gradient-text" style={{ display: "block", backgroundImage: "linear-gradient(110deg, #10B981 0%, #06B6D4 45%, #6366F1 100%)" }}>
+                  for BRSR FY2026-27?
+                </span>
               </h1>
-              <p style={{ fontSize: 17, color: "rgba(255,255,255,0.6)", maxWidth: 600, margin: "0 auto 40px", lineHeight: 1.7 }}>
+              <p className="fade-up" style={{ fontSize: 18, color: "#475569", maxWidth: 600, margin: "0 auto 40px", lineHeight: 1.7, animationDelay: "160ms", animationFillMode: "both" }}>
                 10 questions. Instant readiness score. Covers BRSR filing, supply chain ESG assessment,
                 and carbon market readiness. Get a personalized gap report.
               </p>
               <button
                 onClick={() => setStep(1)}
-                style={{ fontSize: 16, fontWeight: 700, padding: "18px 48px", borderRadius: 12, background: "#E8B931", color: "#1B4D3E", cursor: "pointer", border: "none" }}
+                className="fade-up inline-flex items-center gap-2"
+                style={{ fontSize: 16, fontWeight: 700, padding: "18px 48px", borderRadius: 12, background: "linear-gradient(110deg, #10B981 0%, #059669 100%)", color: "#fff", cursor: "pointer", border: "none", boxShadow: "0 10px 30px rgba(16,185,129,0.25)", animationDelay: "240ms", animationFillMode: "both" }}
               >
-                Start Assessment →
+                Start Assessment <ArrowRight className="w-4 h-4" />
               </button>
-              <p className="mt-6 text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+              <p className="mt-6 text-xs fade-up" style={{ color: "#64748B", animationDelay: "320ms", animationFillMode: "both" }}>
                 No signup required. Takes 2 minutes.
               </p>
             </div>
