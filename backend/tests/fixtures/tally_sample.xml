@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hand-crafted Tally voucher export covering the cases the parser must
+  handle. Six vouchers:
+    1. Purchase with inventory + HSN 2710 (Diesel HSD) + CGST/SGST   → high-confidence Scope 1
+    2. Purchase of electricity HSN 2716                              → high-confidence Scope 2
+    3. Purchase of IT consulting service SAC 9983 + IGST (interstate)→ high-confidence Scope 3
+    4. Expense voucher with no inventory block (ledger-only)         → unmapped (no HSN)
+    5. Sales invoice                                                 → still ingested (we don't filter type)
+    6. Purchase with HSN 99999999                                    → unmapped
+  Dates spread across two fiscal years to exercise fiscal_year_for().
+-->
+<ENVELOPE>
+  <BODY>
+    <DATA>
+
+      <TALLYMESSAGE>
+        <VOUCHER VCHTYPE="Purchase">
+          <DATE>20250415</DATE>
+          <GUID>tally-vch-0001</GUID>
+          <VOUCHERNUMBER>PUR/2025/0001</VOUCHERNUMBER>
+          <PARTYLEDGERNAME>Reliance Industries Ltd</PARTYLEDGERNAME>
+          <PARTYGSTIN>27AAACR5055K1Z7</PARTYGSTIN>
+          <NARRATION>Diesel purchase for DG sets - April top-up</NARRATION>
+          <ALLINVENTORYENTRIES.LIST>
+            <STOCKITEMNAME>Diesel HSD</STOCKITEMNAME>
+            <HSNCODE>27101920</HSNCODE>
+            <ACTUALQTY>1000.00 Ltr</ACTUALQTY>
+            <AMOUNT>85000.00</AMOUNT>
+          </ALLINVENTORYENTRIES.LIST>
+          <LEDGERENTRIES.LIST>
+            <LEDGERNAME>CGST @ 9%</LEDGERNAME>
+            <AMOUNT>7650.00</AMOUNT>
+          </LEDGERENTRIES.LIST>
+          <LEDGERENTRIES.LIST>
+            <LEDGERNAME>SGST @ 9%</LEDGERNAME>
+            <AMOUNT>7650.00</AMOUNT>
+          </LEDGERENTRIES.LIST>
+          <LEDGERENTRIES.LIST>
+            <LEDGERNAME>Sundry Creditors</LEDGERNAME>
+            <AMOUNT>-100300.00</AMOUNT>
+          </LEDGERENTRIES.LIST>
+        </VOUCHER>
+      </TALLYMESSAGE>
+
+      <TALLYMESSAGE>
+        <VOUCHER VCHTYPE="Purchase">
+          <DATE>20250420</DATE>
+          <GUID>tally-vch-0002</GUID>
+          <VOUCHERNUMBER>PUR/2025/0002</VOUCHERNUMBER>
+          <PARTYLEDGERNAME>BESCOM</PARTYLEDGERNAME>
+          <NARRATION>Electricity bill - April</NARRATION>
+          <ALLINVENTORYENTRIES.LIST>
+            <STOCKITEMNAME>Electricity Units</STOCKITEMNAME>
+            <HSNCODE>27160000</HSNCODE>
+            <ACTUALQTY>12500 KWH</ACTUALQTY>
+            <AMOUNT>112500.00</AMOUNT>
+          </ALLINVENTORYENTRIES.LIST>
+        </VOUCHER>
+      </TALLYMESSAGE>
+
+      <TALLYMESSAGE>
+        <VOUCHER VCHTYPE="Purchase">
+          <DATE>20250510</DATE>
+          <GUID>tally-vch-0003</GUID>
+          <VOUCHERNUMBER>PUR/2025/0003</VOUCHERNUMBER>
+          <PARTYLEDGERNAME>Acme Consulting LLP</PARTYLEDGERNAME>
+          <PARTYGSTIN>29ABCDE1234F1Z5</PARTYGSTIN>
+          <NARRATION>Software development services - Q1</NARRATION>
+          <ALLINVENTORYENTRIES.LIST>
+            <STOCKITEMNAME>Custom software development</STOCKITEMNAME>
+            <HSNCODE>998314</HSNCODE>
+            <AMOUNT>500000.00</AMOUNT>
+          </ALLINVENTORYENTRIES.LIST>
+          <LEDGERENTRIES.LIST>
+            <LEDGERNAME>IGST @ 18%</LEDGERNAME>
+            <AMOUNT>90000.00</AMOUNT>
+          </LEDGERENTRIES.LIST>
+          <LEDGERENTRIES.LIST>
+            <LEDGERNAME>Sundry Creditors</LEDGERNAME>
+            <AMOUNT>-590000.00</AMOUNT>
+          </LEDGERENTRIES.LIST>
+        </VOUCHER>
+      </TALLYMESSAGE>
+
+      <TALLYMESSAGE>
+        <VOUCHER VCHTYPE="Payment">
+          <DATE>20250601</DATE>
+          <GUID>tally-vch-0004</GUID>
+          <VOUCHERNUMBER>PMT/2025/0001</VOUCHERNUMBER>
+          <NARRATION>Office cleaning - May (no HSN, ledger-only)</NARRATION>
+          <LEDGERENTRIES.LIST>
+            <LEDGERNAME>Housekeeping Expenses</LEDGERNAME>
+            <AMOUNT>15000.00</AMOUNT>
+          </LEDGERENTRIES.LIST>
+          <LEDGERENTRIES.LIST>
+            <LEDGERNAME>HDFC Bank Current A/c</LEDGERNAME>
+            <AMOUNT>-15000.00</AMOUNT>
+          </LEDGERENTRIES.LIST>
+        </VOUCHER>
+      </TALLYMESSAGE>
+
+      <TALLYMESSAGE>
+        <VOUCHER VCHTYPE="Sales">
+          <DATE>20260105</DATE>
+          <GUID>tally-vch-0005</GUID>
+          <VOUCHERNUMBER>SAL/2026/0001</VOUCHERNUMBER>
+          <PARTYLEDGERNAME>Future Group</PARTYLEDGERNAME>
+          <NARRATION>Finished goods sale</NARRATION>
+          <ALLINVENTORYENTRIES.LIST>
+            <STOCKITEMNAME>Widget Model A</STOCKITEMNAME>
+            <HSNCODE>84818090</HSNCODE>
+            <ACTUALQTY>50 Nos</ACTUALQTY>
+            <AMOUNT>250000.00</AMOUNT>
+          </ALLINVENTORYENTRIES.LIST>
+        </VOUCHER>
+      </TALLYMESSAGE>
+
+      <TALLYMESSAGE>
+        <VOUCHER VCHTYPE="Purchase">
+          <DATE>20260201</DATE>
+          <GUID>tally-vch-0006</GUID>
+          <VOUCHERNUMBER>PUR/2026/0001</VOUCHERNUMBER>
+          <PARTYLEDGERNAME>Mystery Vendor</PARTYLEDGERNAME>
+          <NARRATION>Unknown line — should be unmapped</NARRATION>
+          <ALLINVENTORYENTRIES.LIST>
+            <STOCKITEMNAME>Mystery Item</STOCKITEMNAME>
+            <HSNCODE>99999999</HSNCODE>
+            <AMOUNT>1000.00</AMOUNT>
+          </ALLINVENTORYENTRIES.LIST>
+        </VOUCHER>
+      </TALLYMESSAGE>
+
+    </DATA>
+  </BODY>
+</ENVELOPE>

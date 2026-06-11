@@ -45,6 +45,7 @@ from app.router_market import router as market_router
 from app.router_moat import router as moat_router
 from app.router_org import router as org_router
 from app.router_platform import router as platform_router
+from app.router_tally import router as tally_router
 from app.router_trends import router as trends_router
 from app.router_v2 import router as v2_router
 from app.sebi_pdf_filing import router as sebi_pdf_router
@@ -114,6 +115,7 @@ app.include_router(xbrl_router)
 app.include_router(xbrl_filing_router)
 app.include_router(sebi_pdf_router)
 app.include_router(trends_router)
+app.include_router(tally_router)
 
 app.add_middleware(
     CORSMiddleware,

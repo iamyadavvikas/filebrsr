@@ -1,0 +1,40 @@
+{
+  "metadata": {
+    "version": "hsn_scope3_v1",
+    "source": "GST Council HSN/SAC schedules + GHG Protocol Scope 3 Standard Annex A",
+    "published_on": "2025-06-01",
+    "notes": "Seed mapping for Slice 0 of the Tally connector. Covers the ~25 codes that account for the bulk of emissions-relevant line items in Indian SME ledgers (fuels, transport, travel, refrigerants, paper, IT services, waste). HSN codes match on prefix — a ledger HSN of '27101920' (Diesel HSD) matches the '2710' entry below. Novel HSNs that don't match any prefix get classification_confidence='unmapped' and route to a human queue. Replace with a fuller schedule (~500 codes) before going to GA; expand by walking the CBIC HSN master."
+  },
+  "entries": [
+    {"hsn_prefix": "2701", "description": "Coal — anthracite/bituminous/lignite (briquettes & fuels)", "scope": 1, "scope3_category": null, "emission_basis": "quantity"},
+    {"hsn_prefix": "2702", "description": "Lignite, agglomerated or not", "scope": 1, "scope3_category": null, "emission_basis": "quantity"},
+    {"hsn_prefix": "2704", "description": "Coke and semi-coke of coal/lignite/peat", "scope": 1, "scope3_category": null, "emission_basis": "quantity"},
+    {"hsn_prefix": "2710", "description": "Petroleum oils — diesel (HSD), petrol (MS), furnace oil, naphtha, kerosene", "scope": 1, "scope3_category": null, "emission_basis": "quantity"},
+    {"hsn_prefix": "2711", "description": "Petroleum gases — LPG, LNG, CNG, propane, butane", "scope": 1, "scope3_category": null, "emission_basis": "quantity"},
+    {"hsn_prefix": "2716", "description": "Electrical energy (purchased electricity)", "scope": 2, "scope3_category": null, "emission_basis": "quantity"},
+
+    {"hsn_prefix": "2903", "description": "Halogenated hydrocarbons — refrigerants (HFCs, HCFCs)", "scope": 1, "scope3_category": null, "emission_basis": "quantity"},
+
+    {"hsn_prefix": "4707", "description": "Recovered paper / paperboard waste", "scope": 3, "scope3_category": "5_waste_in_operations", "emission_basis": "spend"},
+    {"hsn_prefix": "4818", "description": "Paper toilet/tissue/towels, office paper consumables", "scope": 3, "scope3_category": "1_purchased_goods_services", "emission_basis": "spend"},
+
+    {"hsn_prefix": "8517", "description": "Telephones / telecom equipment / data networking gear", "scope": 3, "scope3_category": "2_capital_goods", "emission_basis": "spend"},
+    {"hsn_prefix": "8443", "description": "Printers, photocopiers, multi-function office machines", "scope": 3, "scope3_category": "2_capital_goods", "emission_basis": "spend"},
+    {"hsn_prefix": "8471", "description": "Computers, laptops, servers, storage", "scope": 3, "scope3_category": "2_capital_goods", "emission_basis": "spend"},
+
+    {"hsn_prefix": "8703", "description": "Motor cars and passenger vehicles (capex)", "scope": 3, "scope3_category": "2_capital_goods", "emission_basis": "spend"},
+    {"hsn_prefix": "8704", "description": "Goods transport vehicles (capex)", "scope": 3, "scope3_category": "2_capital_goods", "emission_basis": "spend"},
+
+    {"hsn_prefix": "9963", "description": "Accommodation, food & beverage services (hotels — business travel)", "scope": 3, "scope3_category": "6_business_travel", "emission_basis": "spend"},
+    {"hsn_prefix": "9964", "description": "Passenger transport services (air, rail, road) — business travel", "scope": 3, "scope3_category": "6_business_travel", "emission_basis": "spend"},
+    {"hsn_prefix": "9965", "description": "Goods transport services — road / rail / air / pipeline freight", "scope": 3, "scope3_category": "4_upstream_transport", "emission_basis": "spend"},
+    {"hsn_prefix": "9966", "description": "Rental services of transport vehicles", "scope": 3, "scope3_category": "4_upstream_transport", "emission_basis": "spend"},
+    {"hsn_prefix": "9967", "description": "Supporting services in transport (handling, warehousing)", "scope": 3, "scope3_category": "4_upstream_transport", "emission_basis": "spend"},
+    {"hsn_prefix": "9971", "description": "Financial & insurance services", "scope": 3, "scope3_category": "1_purchased_goods_services", "emission_basis": "spend"},
+    {"hsn_prefix": "9983", "description": "Other professional/technical/business services (IT, consulting, software)", "scope": 3, "scope3_category": "1_purchased_goods_services", "emission_basis": "spend"},
+    {"hsn_prefix": "9985", "description": "Support services (facilities, security, cleaning)", "scope": 3, "scope3_category": "1_purchased_goods_services", "emission_basis": "spend"},
+    {"hsn_prefix": "9986", "description": "Support services to agriculture / mining (out of scope for most filers)", "scope": 3, "scope3_category": "1_purchased_goods_services", "emission_basis": "spend"},
+    {"hsn_prefix": "9987", "description": "Maintenance, repair & installation services", "scope": 3, "scope3_category": "1_purchased_goods_services", "emission_basis": "spend"},
+    {"hsn_prefix": "9994", "description": "Sewage, waste collection, treatment & disposal services", "scope": 3, "scope3_category": "5_waste_in_operations", "emission_basis": "spend"}
+  ]
+}
