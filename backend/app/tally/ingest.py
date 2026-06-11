@@ -90,6 +90,7 @@ def ingest_tally_xml(
     xml_bytes: bytes,
     user_id: str,
     supabase_client: Any | None = None,
+    chunk_size: int = 1000,
 ) -> IngestSummary:
     """Parse + classify a Tally XML export, optionally persisting to
     ``raw_records``.
@@ -107,6 +108,9 @@ def ingest_tally_xml(
         Optional. When ``None``, the function is a pure parse/classify
         dry-run — useful in tests and the curator preview UI. When given,
         the rows are inserted via ``client.table("raw_records").insert(rows)``.
+    chunk_size
+        Rows per insert request. Defaults to 1000 — PostgREST refuses payloads
+        much larger than this, and a 50k-line ledger needs ~50 round-trips.
 
     Returns
     -------
@@ -128,24 +132,27 @@ def ingest_tally_xml(
 
     rows_inserted = 0
     if supabase_client is not None and rows:
-        # supabase-py's insert() takes a list of dicts and returns whatever the
-        # PostgREST response was. We deliberately don't paginate in slice 0;
-        # PostgREST caps at ~1000 rows/request, so a 5k-line ledger will fail
-        # here today. Slice 1 adds chunked inserts.
-        try:
-            response = supabase_client.table("raw_records").insert(rows).execute()
+        # Chunk to stay under PostgREST's row-count cap and to limit blast
+        # radius on partial failures (one bad chunk doesn't lose the rest).
+        for offset in range(0, len(rows), chunk_size):
+            batch = rows[offset:offset + chunk_size]
+            try:
+                response = supabase_client.table("raw_records").insert(batch).execute()
+            except Exception as exc:  # noqa: BLE001 — surface with context
+                logger.error(
+                    "tally ingest: insert failed for user=%s sha256=%s "
+                    "chunk_offset=%d chunk_size=%d: %s",
+                    user_id, file_sha256, offset, len(batch), exc,
+                )
+                raise
             inserted = getattr(response, "data", None) or []
-            rows_inserted = len(inserted)
-        except Exception as exc:  # noqa: BLE001 — surface to caller with context
-            logger.error(
-                "tally ingest: insert failed for user=%s sha256=%s: %s",
-                user_id, file_sha256, exc,
-            )
-            raise
+            rows_inserted += len(inserted)
 
     logger.info(
-        "tally ingest: sha256=%s parsed=%d mapped=%d unmapped=%d inserted=%d",
+        "tally ingest: sha256=%s parsed=%d mapped=%d unmapped=%d inserted=%d "
+        "chunks=%d",
         file_sha256, len(rows), mapped, unmapped, rows_inserted,
+        (len(rows) + chunk_size - 1) // chunk_size if rows else 0,
     )
     return IngestSummary(
         file_sha256=file_sha256,

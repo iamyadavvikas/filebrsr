@@ -6,7 +6,7 @@ import hashlib
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -268,3 +268,190 @@ def test_line_item_is_frozen(sample_xml: bytes):
     assert isinstance(line, TallyLineItem)
     with pytest.raises(Exception):
         line.base_value = Decimal(0)  # type: ignore[misc]
+
+
+# ─── Chunked insert (Slice 1) ────────────────────────────────────────────
+
+
+def _make_synthetic_xml(n_vouchers: int) -> bytes:
+    """Generate a Tally XML with ``n_vouchers`` purchase vouchers, all
+    mapped to HSN 2710 (diesel). Used to exercise chunking without
+    hand-writing thousands of lines."""
+    bits = ['<?xml version="1.0" encoding="UTF-8"?><ENVELOPE><BODY><DATA>']
+    for i in range(n_vouchers):
+        bits.append(
+            f'<TALLYMESSAGE><VOUCHER VCHTYPE="Purchase">'
+            f"<DATE>20250415</DATE>"
+            f"<GUID>synth-{i:06d}</GUID>"
+            f"<VOUCHERNUMBER>PUR/{i:06d}</VOUCHERNUMBER>"
+            f"<PARTYLEDGERNAME>Vendor {i}</PARTYLEDGERNAME>"
+            f"<ALLINVENTORYENTRIES.LIST>"
+            f"<STOCKITEMNAME>Diesel HSD</STOCKITEMNAME>"
+            f"<HSNCODE>27101920</HSNCODE>"
+            f"<AMOUNT>{1000 + i}.00</AMOUNT>"
+            f"</ALLINVENTORYENTRIES.LIST>"
+            f"</VOUCHER></TALLYMESSAGE>"
+        )
+    bits.append("</DATA></BODY></ENVELOPE>")
+    return "".join(bits).encode("utf-8")
+
+
+def test_ingest_chunks_large_payloads():
+    """2500 rows with chunk_size=1000 → 3 insert calls (1000, 1000, 500)."""
+    xml = _make_synthetic_xml(2500)
+    client = MagicMock()
+    # Each chunk's response.data = same length as the input batch
+    def _fake_execute_factory():
+        call = {"n": 0}
+        def _execute():
+            # supabase-py: insert(rows).execute() returns response with .data
+            r = MagicMock()
+            r.data = [{"id": i} for i in range(call["n"])]
+            return r
+        return _execute, call
+
+    # Capture chunk sizes by inspecting insert.call_args_list afterwards
+    responses = []
+
+    def insert_side_effect(rows):
+        m = MagicMock()
+        responses.append(len(rows))
+        execute_result = MagicMock()
+        execute_result.data = [{"id": i} for i in range(len(rows))]
+        m.execute.return_value = execute_result
+        return m
+
+    client.table.return_value.insert.side_effect = insert_side_effect
+
+    summary = ingest_tally_xml(
+        xml_bytes=xml,
+        user_id="00000000-0000-0000-0000-000000000001",
+        supabase_client=client,
+        chunk_size=1000,
+    )
+    assert summary.lines_parsed == 2500
+    assert summary.rows_inserted == 2500
+    assert responses == [1000, 1000, 500]
+
+
+def test_ingest_chunk_failure_aborts_remaining():
+    """Failure on chunk 2 raises, and inserted-count reflects only chunk 1."""
+    xml = _make_synthetic_xml(2500)
+    client = MagicMock()
+
+    call_count = {"n": 0}
+
+    def insert_side_effect(rows):
+        call_count["n"] += 1
+        m = MagicMock()
+        if call_count["n"] == 2:
+            m.execute.side_effect = RuntimeError("simulated chunk-2 failure")
+        else:
+            result = MagicMock()
+            result.data = [{"id": i} for i in range(len(rows))]
+            m.execute.return_value = result
+        return m
+
+    client.table.return_value.insert.side_effect = insert_side_effect
+
+    with pytest.raises(RuntimeError, match="chunk-2 failure"):
+        ingest_tally_xml(
+            xml_bytes=xml,
+            user_id="u",
+            supabase_client=client,
+            chunk_size=1000,
+        )
+
+
+# ─── HTTP endpoint (Slice 1) ─────────────────────────────────────────────
+
+
+@pytest.fixture
+async def async_client(mock_supabase):
+    """Reusable httpx client wired to the real ASGI app with mocked supabase.
+
+    We patch ``app.main.get_supabase_admin`` because router_tally imports the
+    helper lazily from app.main at request time.
+    """
+    from httpx import ASGITransport, AsyncClient
+
+    from app.main import app
+    with patch("app.main.get_supabase_admin", return_value=mock_supabase):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
+
+
+_AUTH = {"Authorization": "Bearer test-service-key"}
+
+
+@pytest.mark.asyncio
+async def test_endpoint_requires_auth(async_client, sample_xml):
+    files = {"file": ("daybook.xml", sample_xml, "application/xml")}
+    resp = await async_client.post(
+        "/api/tally/ingest", files=files, data={"user_id": "u"},
+    )
+    assert resp.status_code in (401, 422)
+
+
+@pytest.mark.asyncio
+async def test_endpoint_rejects_wrong_bearer(async_client, sample_xml):
+    files = {"file": ("daybook.xml", sample_xml, "application/xml")}
+    resp = await async_client.post(
+        "/api/tally/ingest",
+        headers={"Authorization": "Bearer wrong"},
+        files=files,
+        data={"user_id": "u"},
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_endpoint_happy_path(async_client, mock_supabase, sample_xml):
+    # mock_supabase.table.insert returns MagicMock by default; configure data
+    insert_result = MagicMock()
+    insert_result.data = [{"id": i} for i in range(6)]
+    mock_supabase.table.return_value.insert.return_value.execute.return_value = insert_result
+
+    files = {"file": ("daybook.xml", sample_xml, "application/xml")}
+    resp = await async_client.post(
+        "/api/tally/ingest", headers=_AUTH, files=files,
+        data={"user_id": "00000000-0000-0000-0000-000000000001"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["lines_parsed"] == 6
+    assert body["lines_mapped"] == 3
+    assert body["lines_unmapped"] == 3
+    assert body["rows_inserted"] == 6
+    assert len(body["file_sha256"]) == 64
+
+
+@pytest.mark.asyncio
+async def test_endpoint_rejects_empty_upload(async_client):
+    files = {"file": ("daybook.xml", b"", "application/xml")}
+    resp = await async_client.post(
+        "/api/tally/ingest", headers=_AUTH, files=files, data={"user_id": "u"},
+    )
+    assert resp.status_code == 400
+    assert "empty" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_endpoint_rejects_invalid_xml(async_client):
+    files = {"file": ("daybook.xml", b"<<not xml>>", "application/xml")}
+    resp = await async_client.post(
+        "/api/tally/ingest", headers=_AUTH, files=files, data={"user_id": "u"},
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_endpoint_returns_500_on_db_failure(async_client, mock_supabase, sample_xml):
+    mock_supabase.table.return_value.insert.return_value.execute.side_effect = RuntimeError("db down")
+    files = {"file": ("daybook.xml", sample_xml, "application/xml")}
+    resp = await async_client.post(
+        "/api/tally/ingest", headers=_AUTH, files=files, data={"user_id": "u"},
+    )
+    assert resp.status_code == 500
