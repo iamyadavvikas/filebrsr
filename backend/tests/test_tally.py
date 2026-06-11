@@ -205,9 +205,11 @@ def test_ingest_row_shape(sample_xml: bytes):
     expected_keys = {
         "user_id", "source_system", "source_file_sha256", "source_voucher_id",
         "source_voucher_number", "voucher_type", "fiscal_year", "posting_date",
-        "vendor_name", "vendor_gstin", "ledger_name", "hsn_code", "description",
+        "vendor_name", "vendor_gstin", "vendor_state_code",
+        "ledger_name", "hsn_code", "description",
         "base_value", "cgst", "sgst", "igst", "cess", "total_value", "quantity",
-        "uom", "scope", "scope3_category", "classification_confidence",
+        "uom", "cost_centre_name", "cost_centre_category",
+        "scope", "scope3_category", "classification_confidence",
         "raw_payload",
     }
     assert set(diesel_row.keys()) == expected_keys

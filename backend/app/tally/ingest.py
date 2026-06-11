@@ -22,7 +22,9 @@ from decimal import Decimal
 from typing import Any
 
 from app.tally.classifier import classify_with_llm_fallback
-from app.tally.parser import TallyLineItem, fiscal_year_for, parse_tally_xml
+from app.tally.cost_centre import AllocatedLine, split_by_cost_centre
+from app.tally.parser import fiscal_year_for, parse_tally_xml
+from app.tally.vendor_master import gstin_to_state_code
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +51,14 @@ def _decimal_to_str(value: Decimal | None) -> str | None:
 
 
 def _row_for(
-    line: TallyLineItem, *, user_id: str, file_sha256: str,
+    allocated: AllocatedLine, *, user_id: str, file_sha256: str,
 ) -> dict[str, Any]:
-    """Build the dict that maps 1:1 to a row in ``raw_records``."""
+    """Build the dict that maps 1:1 to a row in ``raw_records``.
+
+    Accepts an :class:`AllocatedLine` (line + cost-centre context) so the
+    cost-centre split is the only place that decides how many rows a
+    voucher line becomes."""
+    line = allocated.line
     classification = classify_with_llm_fallback(
         line.hsn_code,
         narration=line.narration,
@@ -69,6 +76,7 @@ def _row_for(
         "posting_date": line.posting_date.isoformat(),
         "vendor_name": line.party_name,
         "vendor_gstin": line.party_gstin,
+        "vendor_state_code": gstin_to_state_code(line.party_gstin),
         "ledger_name": line.ledger_name,
         "hsn_code": line.hsn_code,
         "description": line.description,
@@ -80,6 +88,8 @@ def _row_for(
         "total_value": _decimal_to_str(line.total_value),
         "quantity": _decimal_to_str(line.quantity),
         "uom": line.uom,
+        "cost_centre_name": allocated.cost_centre_name,
+        "cost_centre_category": allocated.cost_centre_category,
         "scope": classification.scope,
         "scope3_category": classification.scope3_category,
         "classification_confidence": classification.confidence,
@@ -131,7 +141,14 @@ def ingest_tally_xml(
     file_sha256 = hashlib.sha256(xml_bytes).hexdigest()
     line_items = parse_tally_xml(xml_bytes)
 
-    rows = [_row_for(line, user_id=user_id, file_sha256=file_sha256) for line in line_items]
+    # Each parsed line may fan out into 1..N rows when it carries
+    # multi-centre allocations. Flatten before classification so the
+    # split logic stays isolated from the persistence path.
+    allocated: list[AllocatedLine] = []
+    for line in line_items:
+        allocated.extend(split_by_cost_centre(line))
+
+    rows = [_row_for(a, user_id=user_id, file_sha256=file_sha256) for a in allocated]
     unmapped = sum(1 for r in rows if r["classification_confidence"] == "unmapped")
     mapped = len(rows) - unmapped
 

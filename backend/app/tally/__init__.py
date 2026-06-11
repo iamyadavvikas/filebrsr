@@ -35,6 +35,8 @@ from app.tally.classifier import (
     classify_with_llm_fallback,
     reset_cache,
 )
+from app.tally.cost_centre import AllocatedLine, split_by_cost_centre
+from app.tally.export import canonical_json, sign_batch, verify_batch
 from app.tally.ingest import IngestSummary, ingest_tally_xml
 from app.tally.llm_classifier import (
     DisabledClassifier,
@@ -46,10 +48,23 @@ from app.tally.llm_classifier import (
     get_llm_classifier,
     reset_classifier_cache,
 )
-from app.tally.parser import TallyLineItem, fiscal_year_for, parse_tally_xml
+from app.tally.parser import (
+    CostCentreAllocation,
+    TallyLineItem,
+    fiscal_year_for,
+    parse_tally_xml,
+)
+from app.tally.vendor_master import (
+    INDIAN_STATE_CODES,
+    gstin_to_state_code,
+    state_name_for,
+)
 
 __all__ = [
+    "INDIAN_STATE_CODES",
+    "AllocatedLine",
     "Classification",
+    "CostCentreAllocation",
     "DisabledClassifier",
     "IngestSummary",
     "LLMClassification",
@@ -58,12 +73,18 @@ __all__ = [
     "OpenAIMiniClassifier",
     "SarvamMClassifier",
     "TallyLineItem",
+    "canonical_json",
     "classify_hsn",
     "classify_with_llm_fallback",
     "fiscal_year_for",
     "get_llm_classifier",
+    "gstin_to_state_code",
     "ingest_tally_xml",
     "parse_tally_xml",
     "reset_cache",
     "reset_classifier_cache",
+    "sign_batch",
+    "split_by_cost_centre",
+    "state_name_for",
+    "verify_batch",
 ]

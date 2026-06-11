@@ -55,6 +55,21 @@ _PARTY_LEDGER_HINT = re.compile(
 
 
 @dataclass(frozen=True)
+class CostCentreAllocation:
+    """One Cost Centre allocation under an inventory or ledger entry.
+
+    Tally allows a single line to be split across multiple cost centres
+    (``COSTCENTREALLOCATIONS.LIST``). The ``amount`` is the centre's
+    share of the line's base value. ``category`` is the parent Cost
+    Centre Category — ``None`` when the centre is not categorised.
+    """
+
+    name: str
+    category: str | None
+    amount: Decimal
+
+
+@dataclass(frozen=True)
 class TallyLineItem:
     """One cost-bearing line within a Tally voucher.
 
@@ -89,6 +104,10 @@ class TallyLineItem:
 
     # Full voucher dict for the raw_payload audit column.
     raw_payload: dict[str, Any] = field(repr=False, default_factory=dict)
+
+    # Cost-centre allocations attached to this line (slice 5). Empty tuple
+    # when the line has no allocations (typical for simple cash books).
+    cost_centre_allocations: tuple[CostCentreAllocation, ...] = ()
 
     @property
     def total_value(self) -> Decimal:
@@ -182,6 +201,55 @@ def _classify_ledger_kind(ledger_name: str | None) -> str:
     if _PARTY_LEDGER_HINT.search(ledger_name):
         return "party"
     return "cost"
+
+
+def _extract_cost_centre_allocations(
+    entry: ET.Element,
+) -> tuple[CostCentreAllocation, ...]:
+    """Walk an inventory or ledger entry's ``COSTCENTREALLOCATIONS.LIST``
+    (and ``CATEGORYALLOCATIONS.LIST`` parents) and return the per-centre
+    allocations.
+
+    Tally's grammar nests centres under categories::
+
+        <CATEGORYALLOCATIONS.LIST>
+          <CATEGORY>Department</CATEGORY>
+          <COSTCENTREALLOCATIONS.LIST>
+            <NAME>Mumbai Plant</NAME>
+            <AMOUNT>-60000.00</AMOUNT>
+          </COSTCENTREALLOCATIONS.LIST>
+          <COSTCENTREALLOCATIONS.LIST>
+            <NAME>Delhi Plant</NAME>
+            <AMOUNT>-40000.00</AMOUNT>
+          </COSTCENTREALLOCATIONS.LIST>
+        </CATEGORYALLOCATIONS.LIST>
+
+    Older / simpler exports skip the category wrapper and put the
+    ``COSTCENTREALLOCATIONS.LIST`` directly under the entry. We handle
+    both shapes."""
+    allocations: list[CostCentreAllocation] = []
+
+    # Shape A: nested under CATEGORYALLOCATIONS.LIST
+    for cat_list in _findall_ci(entry, "CATEGORYALLOCATIONS.LIST"):
+        category = _findtext_ci(cat_list, "CATEGORY")
+        for cc in _findall_ci(cat_list, "COSTCENTREALLOCATIONS.LIST"):
+            name = _findtext_ci(cc, "NAME")
+            amount = _to_decimal(_findtext_ci(cc, "AMOUNT"))
+            if name:
+                allocations.append(CostCentreAllocation(
+                    name=name, category=category, amount=amount,
+                ))
+
+    # Shape B: directly under the entry, no category wrapper
+    for cc in _findall_ci(entry, "COSTCENTREALLOCATIONS.LIST"):
+        name = _findtext_ci(cc, "NAME")
+        amount = _to_decimal(_findtext_ci(cc, "AMOUNT"))
+        if name:
+            allocations.append(CostCentreAllocation(
+                name=name, category=None, amount=amount,
+            ))
+
+    return tuple(allocations)
 
 
 def _voucher_to_dict(voucher: ET.Element) -> dict[str, Any]:
@@ -308,12 +376,14 @@ def _parse_one_voucher(voucher: ET.Element) -> list[TallyLineItem]:
             amount = _to_decimal(_findtext_ci(inv, "AMOUNT"))
             if amount == 0:
                 continue
+            allocations = _extract_cost_centre_allocations(inv)
             results.append(_make_line(
                 guid=guid, voucher_number=voucher_number, voucher_type=voucher_type,
                 posting_date=posting_date, party_name=party_name, party_gstin=party_gstin,
                 narration=narration, ledger_name=stock_name, hsn_code=hsn,
                 description=stock_name, base_value=amount, quantity=qty, uom=uom,
                 cgst=cgst, sgst=sgst, igst=igst, cess=cess, raw_payload=raw_payload,
+                cost_centre_allocations=allocations,
             ))
     else:
         for entry in cost_ledger_entries:
@@ -321,12 +391,14 @@ def _parse_one_voucher(voucher: ET.Element) -> list[TallyLineItem]:
             amount = _to_decimal(_findtext_ci(entry, "AMOUNT"))
             if amount == 0:
                 continue
+            allocations = _extract_cost_centre_allocations(entry)
             results.append(_make_line(
                 guid=guid, voucher_number=voucher_number, voucher_type=voucher_type,
                 posting_date=posting_date, party_name=party_name, party_gstin=party_gstin,
                 narration=narration, ledger_name=ledger_name, hsn_code=None,
                 description=ledger_name, base_value=amount, quantity=None, uom=None,
                 cgst=cgst, sgst=sgst, igst=igst, cess=cess, raw_payload=raw_payload,
+                cost_centre_allocations=allocations,
             ))
 
     # If a voucher has multiple cost lines, the aggregated tax buckets
@@ -346,6 +418,7 @@ def _parse_one_voucher(voucher: ET.Element) -> list[TallyLineItem]:
                 base_value=r.base_value, quantity=r.quantity, uom=r.uom,
                 cgst=zero, sgst=zero, igst=zero, cess=zero,
                 raw_payload=r.raw_payload,
+                cost_centre_allocations=r.cost_centre_allocations,
             )
             for r in results[1:]
         ]
@@ -373,6 +446,7 @@ def _make_line(**kw: Any) -> TallyLineItem:
         igst=kw["igst"],
         cess=kw["cess"],
         raw_payload=kw["raw_payload"],
+        cost_centre_allocations=kw.get("cost_centre_allocations", ()),
     )
 
 
