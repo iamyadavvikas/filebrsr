@@ -19,7 +19,10 @@ export default async function PlatformReportPage({ params }: PageProps) {
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+
+  // Guests can't view individual reports (they're user-scoped) — send them to the list page,
+  // which is now itself accessible (empty state) without forcing login.
+  if (!user) redirect("/platform/reports");
 
   const adminDb = getAdminClient();
   const { data: report } = await adminDb

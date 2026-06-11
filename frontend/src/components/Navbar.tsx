@@ -4,9 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
-import { Menu, X, ChevronDown, User, CreditCard, LogOut, Moon, Sun } from "lucide-react";
+import { Menu, X, ChevronDown, User, CreditCard, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { useTheme } from "@/components/ThemeProvider";
 
 interface NavUser {
   email: string;
@@ -72,7 +71,6 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
   const displayName = user?.name || user?.email?.split("@")[0] || "";
   const initials = displayName.slice(0, 1).toUpperCase();
   const planLabel = user?.plan || "Free";
-  const { theme, toggleTheme } = useTheme();
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border" style={{ background: "var(--nav-bg)", backdropFilter: "blur(16px)" }}>
@@ -97,17 +95,8 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
             ))}
           </div>
 
-          {/* Right side: theme toggle + profile */}
+          {/* Right side: profile */}
           <div className="hidden md:flex items-center gap-4 ml-auto">
-
-            {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-border text-muted hover:text-foreground hover:bg-card transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
 
             {/* Profile dropdown */}
             {user ? (
@@ -118,7 +107,7 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                 >
                   <div
                     className="flex items-center justify-center text-white font-bold"
-                    style={{ width: 30, height: 30, borderRadius: "50%", background: "#1B4D3E", fontSize: 12 }}
+                    style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(120deg, #10B981, #06B6D4)", fontSize: 12 }}
                   >
                     {initials}
                   </div>
@@ -193,34 +182,18 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
                 )}
               </div>
             ) : (
-              <>
-              <Link
-                href="/demo"
-                className="text-sm font-semibold transition-colors hover:text-emerald-700"
-                style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid #1B4D3E", color: "#1B4D3E" }}
-              >
-                See Demo
-              </Link>
               <Link
                 href="/login"
-                className="text-white text-sm font-semibold"
-                style={{ padding: "8px 20px", borderRadius: 10, background: "#1B4D3E" }}
+                className="text-white text-sm font-semibold transition-opacity hover:opacity-90"
+                style={{ padding: "8px 20px", borderRadius: 10, background: "linear-gradient(120deg, #10B981, #06B6D4)", boxShadow: "0 6px 18px rgba(16,185,129,0.25)" }}
               >
                 Log In
               </Link>
-              </>
             )}
           </div>
 
           {/* Mobile toggle */}
           <div className="md:hidden flex items-center gap-2 ml-auto">
-            <button
-              onClick={toggleTheme}
-              className="w-9 h-9 flex items-center justify-center rounded-lg border border-border text-muted hover:text-foreground transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
             <button
               className="w-9 h-9 flex items-center justify-center rounded-lg border border-border text-foreground"
               onClick={() => setMobileOpen(!mobileOpen)}
@@ -276,17 +249,9 @@ export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
             ) : (
               <div className="mt-2 space-y-2">
                 <Link
-                  href="/demo"
-                  className="block px-4 py-2 text-sm font-semibold text-center border border-emerald-700 text-emerald-700"
-                  style={{ borderRadius: 10 }}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  See Demo
-                </Link>
-                <Link
                   href="/login"
-                  className="block px-4 py-2 bg-primary text-white text-sm font-semibold text-center"
-                  style={{ borderRadius: 10, background: "#1B4D3E" }}
+                  className="block px-4 py-2 text-white text-sm font-semibold text-center"
+                  style={{ borderRadius: 10, background: "linear-gradient(120deg, #10B981, #06B6D4)" }}
                   onClick={() => setMobileOpen(false)}
                 >
                   Log In

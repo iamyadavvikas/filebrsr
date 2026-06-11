@@ -19,6 +19,19 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     RESEND_API_KEY: str = ""
 
+    # ─── Data residency (principle #6: AWS Mumbai only) ──────────────────
+    # All data-bearing infra must live in ap-south-1. Surfaced here so the
+    # app can assert/log its region and refuse to start misconfigured in prod.
+    DATA_REGION: str = "ap-south-1"
+
+    # ─── Provenance signing (principle #3) ───────────────────────────────
+    # Prod: delegate to AWS KMS (ap-south-1) via PROV_SIGNING_KMS_KEY_ID.
+    # Dev/CI: base64 32-byte Ed25519 seed in PROV_SIGNING_KEY_B64.
+    # Neither set → ephemeral key (non-reproducible; dev only).
+    PROV_SIGNING_KMS_KEY_ID: str = ""
+    PROV_SIGNING_KEY_B64: str = ""
+    PROV_SIGNING_KEY_ID: str = "local-dev"
+
     # Phase 3.2 — opt-in retrieval-based extraction layer. Off by default
     # so existing prod traffic is unaffected. Each filing with this on
     # costs ~8 Gemini Flash calls (free tier 1500 RPD = ~180 filings/day).

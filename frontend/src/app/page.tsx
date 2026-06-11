@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -51,92 +51,6 @@ const painPoints = {
   },
 };
 
-const solutions = [
-  {
-    id: "supply-chain",
-    title: "Supply Chain Assessment",
-    subtitle: "For Enterprises",
-    pain: "How do I assess 500 suppliers' ESG?",
-    icon: "M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6",
-    color: "#059669",
-    steps: [
-      "Enterprise adds suppliers to dashboard (name, industry, contact)",
-      "Clicks \"Invite\" — generates unique assessment link",
-      "Supplier receives link (WhatsApp/email) — no signup needed",
-      "Supplier answers 20 BRSR-aligned questions (5 mins)",
-      "Auto-scored: E (40%) + S (35%) + G (25%) = Overall score",
-      "Enterprise sees real-time dashboard with all supplier scores",
-    ],
-    metrics: [
-      { before: "Months", after: "5 minutes", label: "per supplier" },
-      { before: "₹5–15L consulting", after: "₹50K/year", label: "unlimited assessments" },
-      { before: "No audit trail", after: "Structured data", label: "timestamps & responses" },
-    ],
-  },
-  {
-    id: "badges",
-    title: "ESG Badges & Scorecards",
-    subtitle: "For Suppliers",
-    pain: "I keep filling different forms for different buyers",
-    icon: "M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 01-.982-3.172M9.497 14.25a7.454 7.454 0 00.981-3.172M5.25 4.236c-.996.178-1.768.563-2.25 1.014m16.5-1.014c.996.178 1.768.563 2.25 1.014M12 2.25c3.314 0 6 1.343 6 3s-2.686 3-6 3-6-1.343-6-3 2.686-3 6-3z",
-    color: "#7C3AED",
-    steps: [
-      "Supplier fills ONE assessment on FileBRSR",
-      "Gets a public scorecard URL: filebrsr.com/scorecard/{id}",
-      "Earns Platinum/Gold/Silver/Bronze medal based on percentile",
-      "Shares badge with ALL buyers — fill once, prove everywhere",
-      "Badge becomes competitive advantage for winning new business",
-    ],
-    metrics: [
-      { before: "5–10 forms", after: "1 assessment", label: "prove to all buyers" },
-      { before: "No differentiation", after: "Public badge", label: "competitive advantage" },
-      { before: "Repeated effort", after: "Fill once", label: "share everywhere" },
-    ],
-  },
-  {
-    id: "ai-filing",
-    title: "AI BRSR Filing",
-    subtitle: "For Compliance Teams",
-    pain: "It takes our team 6 weeks to compile BRSR data",
-    icon: "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z",
-    color: "#E8B931",
-    steps: [
-      "Upload any sustainability PDF (annual report, CSR report)",
-      "AI extracts all 140 BRSR indicators in 60 seconds",
-      "Instant gap analysis: \"You're missing 47 disclosures\"",
-      "Section-wise scoring: A (92%), B (75%), C (68%)",
-      "Auto-maps to GRI, CDP, TCFD, SASB",
-      "Export: PDF report, Excel, XBRL-JSON (for BSE/NSE filing)",
-    ],
-    metrics: [
-      { before: "6 weeks", after: "60 seconds", label: "extraction time" },
-      { before: "₹5–15L/year", after: "₹50K/year", label: "annual cost" },
-      { before: "Guesswork", after: "AI + source tracing", label: "auditor can verify" },
-    ],
-  },
-  {
-    id: "carbon-market",
-    title: "Carbon Market & Credits",
-    subtitle: "Coming 2027 — For Net Zero Leaders",
-    pain: "We reduce emissions but can't monetize or prove it",
-    icon: "M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z",
-    color: "#0891B2",
-    steps: [
-      "Platform calculates Scope 1, 2 & 3 emissions from BRSR data (available now)",
-      "Tracks year-over-year reductions with India-specific emission factors (available now)",
-      "[Roadmap] Connects verified reductions to India's Carbon Credit Trading Scheme (CCTS)",
-      "[Roadmap] Facilitates carbon credit generation for SME suppliers",
-      "[Roadmap] Marketplace: buyers purchase credits from verified supply chain reductions",
-      "[Roadmap] Transaction fee model — FileBRSR earns 2% of each trade",
-    ],
-    metrics: [
-      { before: "No monetization", after: "Carbon credits", label: "from your reductions (2027)" },
-      { before: "Manual MRV", after: "Auto-verified", label: "from platform data" },
-      { before: "$0 value", after: "$35B market", label: "India carbon market by 2030" },
-    ],
-  },
-];
-
 const timeline = [
   { year: "FY 2023-24", event: "BRSR mandatory for top 1,000", status: "done" },
   { year: "FY 2024-25", event: "BRSR Core introduced for top 150", status: "done" },
@@ -181,8 +95,150 @@ const faqs = [
    COMPONENT
 ═══════════════════════════════════════════════════════════════ */
 
+function CountUpStat({
+  target,
+  prefix = "",
+  suffix = "",
+  comma = false,
+  color,
+  label,
+  delay = 0,
+}: {
+  target: number;
+  prefix?: string;
+  suffix?: string;
+  comma?: boolean;
+  color: string;
+  label: string;
+  delay?: number;
+}) {
+  const [val, setVal] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+  const started = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting && !started.current) {
+            started.current = true;
+            const duration = 1400;
+            const start = performance.now();
+            const tick = (now: number) => {
+              const p = Math.min((now - start) / duration, 1);
+              const eased = 1 - Math.pow(1 - p, 3);
+              setVal(Math.round(target * eased));
+              if (p < 1) requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          }
+        });
+      },
+      { threshold: 0.4 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [target]);
+
+  const display = comma ? val.toLocaleString() : String(val);
+
+  return (
+    <div
+      ref={ref}
+      className="stat-tile backdrop-blur-sm fade-up"
+      style={{
+        background: "rgba(255,255,255,0.75)",
+        border: "1px solid rgba(226,232,240,0.9)",
+        borderRadius: 16,
+        padding: "18px 12px",
+        boxShadow: "0 4px 14px rgba(15,23,42,0.04)",
+        animationDelay: `${delay}ms`,
+        animationFillMode: "both",
+      }}
+    >
+      <p style={{ fontSize: "clamp(20px, 3vw, 30px)", fontWeight: 800, letterSpacing: -1, color }}>
+        {prefix}
+        {display}
+        {suffix}
+      </p>
+      <p className="text-[10px] md:text-xs mt-1" style={{ color: "#64748B" }}>
+        {label}
+      </p>
+    </div>
+  );
+}
+
+/* Scroll-triggered reveal wrapper — brings the hero's entrance motion to every section */
+function Reveal({
+  children,
+  delay = 0,
+  className = "",
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            setShown(true);
+            obs.disconnect();
+          }
+        }),
+      { threshold: 0.15 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={`reveal ${shown ? "in" : ""} ${className}`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [painTab, setPainTab] = useState<"enterprise" | "supplier" | "filing">("enterprise");
+  const [parallax, setParallax] = useState({ x: 0, y: 0 });
+  const [mockupVisible, setMockupVisible] = useState(false);
+  const heroRef = useRef<HTMLElement>(null);
+  const mockupRef = useRef<HTMLDivElement>(null);
+
+  const handleHeroMouse = (e: React.MouseEvent<HTMLElement>) => {
+    const rect = heroRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    setParallax({
+      x: (e.clientX - rect.left - cx) / cx,
+      y: (e.clientY - rect.top - cy) / cy,
+    });
+  };
+
+  useEffect(() => {
+    const el = mockupRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && setMockupVisible(true)),
+      { threshold: 0.3 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   return (
     <>
@@ -190,97 +246,184 @@ export default function HomePage() {
       <main className="flex-1">
 
         {/* ═══ HERO ═══ */}
-        <section className="relative overflow-hidden" style={{ background: "linear-gradient(160deg, #0A1628 0%, #0F2847 40%, #1B4D3E 100%)" }}>
-          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
-          <div className="absolute inset-0 overflow-hidden">
-            {[...Array(12)].map((_, i) => (
-              <div key={i} className="absolute rounded-full animate-pulse" style={{
-                width: 4 + (i % 3) * 2,
-                height: 4 + (i % 3) * 2,
-                background: `rgba(${i % 2 === 0 ? '45,122,95' : '232,185,49'}, ${0.2 + (i % 4) * 0.1})`,
-                top: `${10 + (i * 7) % 80}%`,
-                left: `${5 + (i * 11) % 90}%`,
-                animationDelay: `${i * 0.3}s`,
-              }} />
-            ))}
+        <section
+          ref={heroRef}
+          onMouseMove={handleHeroMouse}
+          onMouseLeave={() => setParallax({ x: 0, y: 0 })}
+          className="relative overflow-hidden"
+          style={{ background: "linear-gradient(135deg, #ECFDF5 0%, #EFF6FF 48%, #F5F3FF 100%)" }}
+        >
+          {/* Floating vibrant blobs (mouse parallax) */}
+          <div className="blob-wrap" style={{ top: "-120px", left: "-80px", transform: `translate(${parallax.x * 28}px, ${parallax.y * 28}px)` }}>
+            <div className="blob" style={{ width: 420, height: 420, background: "radial-gradient(circle at 30% 30%, #34D399, #10B981)" }} />
           </div>
+          <div className="blob-wrap" style={{ top: "20%", right: "-100px", transform: `translate(${parallax.x * -36}px, ${parallax.y * 22}px)` }}>
+            <div className="blob" style={{ width: 360, height: 360, background: "radial-gradient(circle at 30% 30%, #38BDF8, #6366F1)", animationDelay: "-4s" }} />
+          </div>
+          <div className="blob-wrap" style={{ bottom: "-100px", left: "30%", transform: `translate(${parallax.x * 20}px, ${parallax.y * -30}px)` }}>
+            <div className="blob" style={{ width: 300, height: 300, background: "radial-gradient(circle at 30% 30%, #C084FC, #818CF8)", animationDelay: "-8s" }} />
+          </div>
+          {/* Subtle dot grid */}
+          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(15,23,42,0.04) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
 
           <div className="relative max-w-7xl mx-auto px-4 sm:px-8 pt-16 pb-12 md:pt-24 md:pb-16 lg:pt-32 lg:pb-24">
             <div className="text-center max-w-4xl mx-auto">
               <div
-                className="inline-flex items-center gap-2 mb-6"
-                style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", background: "rgba(232,185,49,0.12)", color: "#E8B931", padding: "7px 16px", borderRadius: 24, border: "1px solid rgba(232,185,49,0.25)" }}
+                className="inline-flex items-center gap-2 mb-6 backdrop-blur-sm fade-up"
+                style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", background: "rgba(255,255,255,0.7)", color: "#059669", padding: "8px 18px", borderRadius: 24, border: "1px solid rgba(16,185,129,0.25)", boxShadow: "0 4px 16px rgba(16,185,129,0.08)", animationDelay: "0ms", animationFillMode: "both" }}
               >
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#E8B931", display: "inline-block", animation: "pulse 2s infinite" }} />
-                SUPPLY CHAIN ESG · BRSR AUTOMATION · CARBON MARKET
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", display: "inline-block", animation: "pulse 2s infinite" }} />
+                Supply Chain ESG · BRSR Automation · Carbon Market
               </div>
 
-              <h1 className="text-white" style={{ fontSize: "clamp(36px, 5vw, 60px)", fontWeight: 800, lineHeight: 1.08, marginBottom: 24, letterSpacing: -2 }}>
+              <h1 className="fade-up" style={{ color: "#0F172A", fontSize: "clamp(36px, 5vw, 62px)", fontWeight: 800, lineHeight: 1.07, marginBottom: 24, letterSpacing: -2, animationDelay: "80ms", animationFillMode: "both" }}>
                 Rate your entire supply chain<br />for ESG risk.{" "}
-                <span style={{ background: "linear-gradient(120deg, #E8B931 0%, #F59E0B 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                <span className="gradient-text" style={{ backgroundImage: "linear-gradient(110deg, #10B981 0%, #06B6D4 45%, #6366F1 100%)" }}>
                   Auto-file BRSR. Track carbon.
                 </span>
               </h1>
 
-              <p style={{ fontSize: 18, fontWeight: 400, color: "rgba(255,255,255,0.6)", maxWidth: 720, lineHeight: 1.75, margin: "0 auto 40px" }}>
+              <p className="fade-up" style={{ fontSize: 18, fontWeight: 400, color: "#475569", maxWidth: 720, lineHeight: 1.75, margin: "0 auto 40px", animationDelay: "160ms", animationFillMode: "both" }}>
                 The only platform where listed companies assess 100K+ suppliers, automate BRSR filing in 60 seconds,
                 and prepare for India&apos;s $35B carbon credit market — all in one place.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center fade-up" style={{ animationDelay: "240ms", animationFillMode: "both" }}>
                 <Link
                   href="/platform/supply-chain"
-                  style={{ fontSize: 15, fontWeight: 700, padding: "16px 36px", borderRadius: 12, background: "#E8B931", color: "#1B4D3E", display: "inline-flex", alignItems: "center", gap: 8 }}
+                  className="btn-accent group relative overflow-hidden"
+                  style={{ fontSize: 15, fontWeight: 700, padding: "16px 36px", borderRadius: 14, background: "linear-gradient(120deg, #10B981, #06B6D4)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 10px 30px rgba(16,185,129,0.32)" }}
                 >
-                  ASSESS YOUR SUPPLIERS FREE
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)" }} />
+                  <span className="relative inline-flex items-center gap-2">
+                    Assess Your Suppliers Free
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  </span>
                 </Link>
                 <Link
                   href="/platform"
-                  style={{ fontSize: 15, fontWeight: 600, padding: "16px 36px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.9)", display: "inline-flex", alignItems: "center", gap: 8 }}
+                  className="card-hover"
+                  style={{ fontSize: 15, fontWeight: 600, padding: "16px 36px", borderRadius: 14, background: "#fff", border: "1px solid #E2E8F0", color: "#0F172A", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 14px rgba(15,23,42,0.05)" }}
                 >
-                  TRY BRSR PLATFORM FREE
+                  Try BRSR Platform Free
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </Link>
               </div>
 
-              <div className="grid grid-cols-3 md:flex md:flex-wrap md:items-center md:justify-center gap-4 md:gap-8 mt-12 md:mt-16">
-                <div className="text-center">
-                  <p className="text-xl md:text-3xl font-bold text-white">1,000+</p>
-                  <p className="text-[10px] md:text-xs text-white/50 mt-1">Listed companies mandated</p>
+              <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mt-6 fade-up" style={{ animationDelay: "300ms", animationFillMode: "both" }}>
+                {["No credit card required", "Free forever tier", "Setup in minutes"].map((t) => (
+                  <span key={t} className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: "#64748B" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                    {t}
+                  </span>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4 mt-12 md:mt-16">
+                {[
+                  { prefix: "", target: 1000, suffix: "+", comma: true, label: "Listed companies mandated", color: "#10B981" },
+                  { prefix: "", target: 100, suffix: "K+", comma: false, label: "Suppliers need assessment", color: "#06B6D4" },
+                  { prefix: "", target: 140, suffix: "+", comma: false, label: "BRSR indicators mapped", color: "#6366F1" },
+                  { prefix: "", target: 60, suffix: "s", comma: false, label: "AI extraction time", color: "#8B5CF6" },
+                  { prefix: "$", target: 35, suffix: "B", comma: false, label: "India carbon market by 2030", color: "#F59E0B" },
+                ].map((stat, i) => (
+                  <CountUpStat
+                    key={stat.label}
+                    prefix={stat.prefix}
+                    target={stat.target}
+                    suffix={stat.suffix}
+                    comma={stat.comma}
+                    color={stat.color}
+                    label={stat.label}
+                    delay={360 + i * 60}
+                  />
+                ))}
+              </div>
+
+              {/* Product preview mockup */}
+              <div ref={mockupRef} className="mt-16 md:mt-20 fade-up" style={{ animationDelay: "640ms", animationFillMode: "both" }}>
+                <div
+                  className="tilt"
+                  style={{ transform: `perspective(1200px) rotateY(${parallax.x * 4}deg) rotateX(${parallax.y * -4}deg)` }}
+                >
+                  <div className="relative max-w-3xl mx-auto float-y">
+                    {/* glow */}
+                    <div className="absolute -inset-4 rounded-3xl" style={{ background: "linear-gradient(120deg, rgba(16,185,129,0.25), rgba(99,102,241,0.25))", filter: "blur(40px)", opacity: 0.6 }} />
+                    <div className="relative rounded-2xl overflow-hidden text-left" style={{ background: "#fff", border: "1px solid rgba(226,232,240,0.9)", boxShadow: "0 30px 60px rgba(15,23,42,0.18)" }}>
+                      {/* window chrome */}
+                      <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: "#F1F5F9", background: "#FAFBFC" }}>
+                        <span className="w-3 h-3 rounded-full" style={{ background: "#FB7185" }} />
+                        <span className="w-3 h-3 rounded-full" style={{ background: "#FBBF24" }} />
+                        <span className="w-3 h-3 rounded-full" style={{ background: "#34D399" }} />
+                        <span className="ml-3 text-xs font-medium" style={{ color: "#94A3B8" }}>Supplier ESG Dashboard</span>
+                        <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>Live</span>
+                      </div>
+
+                      <div className="p-5 md:p-6">
+                        {/* summary row */}
+                        <div className="grid grid-cols-3 gap-3 mb-5">
+                          {[
+                            { k: "Assessed", v: "82,140", c: "#10B981" },
+                            { k: "High risk", v: "1,204", c: "#F43F5E" },
+                            { k: "Avg score", v: "B+", c: "#6366F1" },
+                          ].map((s) => (
+                            <div key={s.k} className="rounded-xl p-3" style={{ background: "#F8FAFC", border: "1px solid #F1F5F9" }}>
+                              <p className="text-[10px] uppercase tracking-wider" style={{ color: "#94A3B8" }}>{s.k}</p>
+                              <p className="text-lg font-extrabold" style={{ color: s.c }}>{s.v}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* supplier rows */}
+                        <div className="space-y-2.5">
+                          {[
+                            { name: "Tata Steel Ltd", score: 86, grade: "A", c: "#10B981" },
+                            { name: "Reliance Polymers", score: 72, grade: "B", c: "#06B6D4" },
+                            { name: "Adani Logistics", score: 54, grade: "C", c: "#F59E0B" },
+                            { name: "Vendor #4821", score: 31, grade: "D", c: "#F43F5E" },
+                          ].map((row, i) => (
+                            <div key={row.name} className="flex items-center gap-3">
+                              <p className="text-sm font-medium w-40 truncate" style={{ color: "#334155" }}>{row.name}</p>
+                              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#EEF2F6" }}>
+                                <div
+                                  className="score-bar-fill h-full rounded-full"
+                                  style={{ width: mockupVisible ? `${row.score}%` : 0, background: `linear-gradient(90deg, ${row.c}, ${row.c}cc)`, transitionDelay: `${i * 120}ms` }}
+                                />
+                              </div>
+                              <span className="text-xs font-bold w-6 text-center" style={{ color: row.c }}>{row.grade}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="hidden md:block w-px h-10 bg-white/10" />
-                <div className="text-center">
-                  <p className="text-xl md:text-3xl font-bold text-white">100K+</p>
-                  <p className="text-[10px] md:text-xs text-white/50 mt-1">Suppliers need assessment</p>
-                </div>
-                <div className="hidden md:block w-px h-10 bg-white/10" />
-                <div className="text-center">
-                  <p className="text-xl md:text-3xl font-bold text-white">140+</p>
-                  <p className="text-[10px] md:text-xs text-white/50 mt-1">BRSR indicators mapped</p>
-                </div>
-                <div className="hidden md:block w-px h-10 bg-white/10" />
-                <div className="text-center">
-                  <p className="text-xl md:text-3xl font-bold text-white">60s</p>
-                  <p className="text-[10px] md:text-xs text-white/50 mt-1">AI extraction time</p>
-                </div>
-                <div className="hidden md:block w-px h-10 bg-white/10" />
-                <div className="text-center">
-                  <p className="text-xl md:text-3xl font-bold text-white">$35B</p>
-                  <p className="text-[10px] md:text-xs text-white/50 mt-1">India carbon market by 2030</p>
-                </div>
+              </div>
+
+              {/* Scroll cue */}
+              <div className="hidden md:flex justify-center mt-14 fade-up" style={{ animationDelay: "820ms", animationFillMode: "both" }}>
+                <span className="inline-flex flex-col items-center gap-1 text-xs font-medium animate-bounce" style={{ color: "#94A3B8" }}>
+                  Scroll to explore
+                  <ChevronDown className="w-4 h-4" />
+                </span>
               </div>
             </div>
           </div>
         </section>
 
         {/* ═══ TRUST BAR ═══ */}
-        <section className="border-b border-border" style={{ padding: "24px 28px", background: "var(--card)" }}>
-          <div className="max-w-5xl mx-auto">
-            <p className="text-center text-xs text-muted mb-4 font-medium uppercase tracking-wider">Aligned with global sustainability frameworks</p>
-            <div className="flex flex-wrap items-center justify-center gap-8 opacity-60">
-              {["SEBI BRSR", "GRI", "CDP", "TCFD", "SASB", "UN SDGs", "ESRS", "ISO 26000"].map((s) => (
-                <span key={s} className="text-sm font-bold text-foreground/70 tracking-wide">{s}</span>
+        <section className="border-b border-border" style={{ padding: "28px 0", background: "var(--card)" }}>
+          <div className="max-w-5xl mx-auto px-7">
+            <p className="text-center text-xs text-muted mb-5 font-medium uppercase tracking-wider">Aligned with global sustainability frameworks</p>
+          </div>
+          <div className="marquee-mask relative" style={{ maskImage: "linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent)" }}>
+            <div className="marquee-track">
+              {[0, 1].map((dup) => (
+                <div key={dup} className="flex items-center gap-10 pr-10" aria-hidden={dup === 1}>
+                  {["SEBI BRSR", "GRI", "CDP", "TCFD", "SASB", "UN SDGs", "ESRS", "ISO 26000", "GHG Protocol", "IFRS S1/S2"].map((s) => (
+                    <span key={s} className="text-sm font-bold tracking-wide whitespace-nowrap" style={{ color: "var(--muted)" }}>{s}</span>
+                  ))}
+                </div>
               ))}
             </div>
           </div>
@@ -289,7 +432,7 @@ export default function HomePage() {
         {/* ═══ THE REGULATION ═══ */}
         <section style={{ padding: "80px 28px" }}>
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-14">
+            <Reveal className="text-center mb-14">
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#DC2626", marginBottom: 10 }}>
                 THE REGULATION
               </p>
@@ -301,34 +444,36 @@ export default function HomePage() {
                 From <strong>FY 2026-27</strong>, the top 250 must also disclose supply chain ESG data with
                 <strong> third-party assurance</strong>.
               </p>
-            </div>
+            </Reveal>
 
-            <div className="bg-card rounded-2xl border border-border p-8 max-w-3xl mx-auto">
-              <p className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">BRSR Section A.V asks:</p>
-              <blockquote className="text-lg font-medium italic border-l-4 border-emerald-500 pl-5" style={{ color: "var(--foreground)", lineHeight: 1.7 }}>
-                &ldquo;Do you assess the ESG performance of your value chain partners? If yes, what % of your value chain has been assessed?&rdquo;
-              </blockquote>
-              <p className="mt-4 text-sm text-muted">
-                Most companies today answer <strong>&ldquo;0%&rdquo;</strong>. That&apos;s no longer acceptable.
-              </p>
-            </div>
+            <Reveal delay={120}>
+              <div className="bg-card rounded-2xl border border-border p-8 max-w-3xl mx-auto card-hover">
+                <p className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">BRSR Section A.V asks:</p>
+                <blockquote className="text-lg font-medium italic border-l-4 border-emerald-500 pl-5" style={{ color: "var(--foreground)", lineHeight: 1.7 }}>
+                  &ldquo;Do you assess the ESG performance of your value chain partners? If yes, what % of your value chain has been assessed?&rdquo;
+                </blockquote>
+                <p className="mt-4 text-sm text-muted">
+                  Most companies today answer <strong>&ldquo;0%&rdquo;</strong>. That&apos;s no longer acceptable.
+                </p>
+              </div>
+            </Reveal>
           </div>
         </section>
 
         {/* ═══ THREE PAIN POINTS ═══ */}
         <section style={{ padding: "80px 28px", background: "var(--surface)" }}>
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-10">
+            <Reveal className="text-center mb-10">
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
                 THE PAIN — THREE LAYERS
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 16 }}>
                 Three stakeholders. Three pain points.
               </h2>
-            </div>
+            </Reveal>
 
             {/* Tab toggle */}
-            <div className="flex justify-center mb-8">
+            <Reveal delay={120} className="flex justify-center mb-8">
               <div className="inline-flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1 gap-1 flex-wrap justify-center">
                 {(["enterprise", "supplier", "filing"] as const).map((tab) => (
                   <button
@@ -340,118 +485,53 @@ export default function HomePage() {
                   </button>
                 ))}
               </div>
-            </div>
+            </Reveal>
 
-            <div className="bg-card rounded-2xl border border-border overflow-hidden">
-              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
-                <div className="p-8">
-                  <h3 className="text-lg font-bold mb-5 flex items-center gap-2">
-                    <span className="text-2xl">{painPoints[painTab].icon}</span>
-                    {painPoints[painTab].label}
-                  </h3>
-                  <div className="space-y-4">
-                    {painPoints[painTab].pains.map((p, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        <span className="mt-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: painPoints[painTab].color }}>✕</span>
-                        <div>
-                          <p className="font-semibold text-sm">{p.problem}</p>
-                          <p className="text-xs text-muted mt-0.5">{p.detail}</p>
+            <Reveal delay={200}>
+              <div className="bg-card rounded-2xl border border-border overflow-hidden card-hover">
+                <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
+                  <div className="p-8">
+                    <h3 className="text-lg font-bold mb-5 flex items-center gap-2">
+                      <span className="text-2xl">{painPoints[painTab].icon}</span>
+                      {painPoints[painTab].label}
+                    </h3>
+                    <div className="space-y-4">
+                      {painPoints[painTab].pains.map((p, i) => (
+                        <div key={i} className="flex items-start gap-3">
+                          <span className="mt-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: painPoints[painTab].color }}>✕</span>
+                          <div>
+                            <p className="font-semibold text-sm">{p.problem}</p>
+                            <p className="text-xs text-muted mt-0.5">{p.detail}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="p-8 flex flex-col justify-center" style={{ background: `${painPoints[painTab].color}08` }}>
-                  <div className="text-center">
-                    <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: `${painPoints[painTab].color}15`, border: `2px solid ${painPoints[painTab].color}30` }}>
-                      <span className="text-3xl">😰</span>
+                      ))}
                     </div>
-                    <p className="font-bold text-base mb-2" style={{ color: painPoints[painTab].color }}>The Result</p>
-                    <p className="text-sm text-muted leading-relaxed max-w-xs mx-auto">{painPoints[painTab].result}</p>
+                  </div>
+                  <div className="p-8 flex flex-col justify-center" style={{ background: `${painPoints[painTab].color}08` }}>
+                    <div className="text-center">
+                      <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: `${painPoints[painTab].color}15`, border: `2px solid ${painPoints[painTab].color}30` }}>
+                        <span className="text-3xl">😰</span>
+                      </div>
+                      <p className="font-bold text-base mb-2" style={{ color: painPoints[painTab].color }}>The Result</p>
+                      <p className="text-sm text-muted leading-relaxed max-w-xs mx-auto">{painPoints[painTab].result}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ═══ THREE SOLUTIONS ═══ */}
-        <section style={{ padding: "80px 28px" }}>
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-14">
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#059669", marginBottom: 10 }}>
-                HOW FILEBRSR SOLVES IT
-              </p>
-              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 14 }}>
-                Four capabilities. Three strategic pillars.
-              </h2>
-            </div>
-
-            <div className="space-y-12">
-              {solutions.map((sol, idx) => (
-                <div key={sol.id} className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-xl transition-shadow">
-                  <div className="p-8 md:p-10">
-                    {/* Header */}
-                    <div className="flex items-start gap-4 mb-6">
-                      <div style={{ width: 52, height: 52, borderRadius: 14, background: `${sol.color}12`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <svg style={{ width: 26, height: 26, color: sol.color }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d={sol.icon} />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: sol.color }}>Solution {idx + 1} — {sol.subtitle}</p>
-                        <h3 className="text-xl font-bold">{sol.title}</h3>
-                        <p className="text-sm text-muted mt-1 italic">&ldquo;{sol.pain}&rdquo;</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      {/* Steps */}
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-muted mb-3">How it works</p>
-                        <ol className="space-y-2.5">
-                          {sol.steps.map((step, i) => (
-                            <li key={i} className="flex items-start gap-3">
-                              <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5" style={{ background: sol.color }}>{i + 1}</span>
-                              <span className="text-sm leading-relaxed">{step}</span>
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-
-                      {/* Metrics */}
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-muted mb-3">Impact</p>
-                        <div className="space-y-3">
-                          {sol.metrics.map((m, i) => (
-                            <div key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: `${sol.color}06`, border: `1px solid ${sol.color}15` }}>
-                              <div className="text-center shrink-0" style={{ minWidth: 90 }}>
-                                <p className="text-xs line-through text-muted">{m.before}</p>
-                                <p className="text-sm font-bold" style={{ color: sol.color }}>{m.after}</p>
-                              </div>
-                              <p className="text-xs text-muted">{m.label}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            </Reveal>
           </div>
         </section>
 
         {/* ═══ VALUE COMPARISON TABLE ═══ */}
         <section style={{ padding: "80px 28px", background: "var(--surface)" }}>
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-10">
+            <Reveal className="text-center mb-10">
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 14 }}>
                 Pain → Solution → Value
               </h2>
-            </div>
+            </Reveal>
 
-            <div className="overflow-x-auto">
+            <Reveal delay={120} className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b-2 border-border">
@@ -472,14 +552,14 @@ export default function HomePage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </Reveal>
           </div>
         </section>
 
         {/* ═══ REGULATORY TIMELINE ═══ */}
         <section style={{ padding: "80px 28px" }}>
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
+            <Reveal className="text-center mb-12">
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#DC2626", marginBottom: 10 }}>
                 WHY NOW
               </p>
@@ -487,25 +567,27 @@ export default function HomePage() {
                 The regulatory clock is ticking
               </h2>
               <p className="text-muted text-sm max-w-lg mx-auto">Supply chain disclosure is the newest, hardest requirement. No one has tooling for it in India. That&apos;s the gap.</p>
-            </div>
+            </Reveal>
 
             <div className="space-y-6">
               {timeline.map((t, i) => (
-                <div key={i} className={`flex items-center gap-4 p-5 bg-card rounded-xl border ${t.status === 'current' ? 'border-red-300 shadow-lg shadow-red-50' : 'border-border'}`}>
-                  <div className={`w-4 h-4 rounded-full shrink-0 ${t.status === 'current' ? 'bg-red-500 animate-pulse' : t.status === 'done' ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                  <div className="flex-1">
-                    <p className={`text-xs font-bold uppercase tracking-wider ${t.status === 'current' ? 'text-red-600' : t.status === 'done' ? 'text-emerald-600' : 'text-muted'}`}>
-                      {t.year}
-                    </p>
-                    <p className="text-sm font-semibold mt-0.5">{t.event}</p>
+                <Reveal key={i} delay={i * 70}>
+                  <div className={`flex items-center gap-4 p-5 bg-card rounded-xl border ${t.status === 'current' ? 'border-red-300 shadow-lg shadow-red-50' : 'border-border'}`}>
+                    <div className={`w-4 h-4 rounded-full shrink-0 ${t.status === 'current' ? 'bg-red-500 animate-pulse' : t.status === 'done' ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                    <div className="flex-1">
+                      <p className={`text-xs font-bold uppercase tracking-wider ${t.status === 'current' ? 'text-red-600' : t.status === 'done' ? 'text-emerald-600' : 'text-muted'}`}>
+                        {t.year}
+                      </p>
+                      <p className="text-sm font-semibold mt-0.5">{t.event}</p>
+                    </div>
+                    {t.status === 'current' && (
+                      <span className="text-xs font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full">NOW</span>
+                    )}
+                    {t.status === 'done' && (
+                      <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">DONE</span>
+                    )}
                   </div>
-                  {t.status === 'current' && (
-                    <span className="text-xs font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full">NOW</span>
-                  )}
-                  {t.status === 'done' && (
-                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">DONE</span>
-                  )}
-                </div>
+                </Reveal>
               ))}
             </div>
           </div>
@@ -514,26 +596,27 @@ export default function HomePage() {
         {/* ═══ PLATFORM FEATURES ═══ */}
         <section style={{ padding: "80px 28px", background: "var(--surface)" }}>
           <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-14">
+            <Reveal className="text-center mb-14">
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
                 FULL PLATFORM
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 14 }}>
                 Everything you need. One connected system.
               </h2>
-            </div>
+            </Reveal>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {platformFeatures.map((p) => (
-                <div
-                  key={p.title}
-                  className="bg-card border border-border hover:border-transparent hover:shadow-xl transition-all duration-300"
-                  style={{ borderRadius: 20, padding: "28px 24px" }}
-                >
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: p.color, marginBottom: 16 }} />
-                  <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{p.title}</h3>
-                  <p className="text-muted" style={{ fontSize: 13, lineHeight: 1.7 }}>{p.desc}</p>
-                </div>
+              {platformFeatures.map((p, i) => (
+                <Reveal key={p.title} delay={(i % 3) * 80}>
+                  <div
+                    className="bg-card border border-border hover:border-transparent hover:shadow-xl transition-all duration-300 h-full"
+                    style={{ borderRadius: 20, padding: "28px 24px" }}
+                  >
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: p.color, marginBottom: 16 }} />
+                    <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{p.title}</h3>
+                    <p className="text-muted" style={{ fontSize: 13, lineHeight: 1.7 }}>{p.desc}</p>
+                  </div>
+                </Reveal>
               ))}
             </div>
           </div>
@@ -542,7 +625,7 @@ export default function HomePage() {
         {/* ═══ PRICING SNAPSHOT ═══ */}
         <section style={{ padding: "80px 28px" }}>
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
+            <Reveal className="text-center mb-12">
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
                 PRICING
               </p>
@@ -550,10 +633,10 @@ export default function HomePage() {
                 Replace ₹15L consultants with one platform
               </h2>
               <p className="text-muted" style={{ fontSize: 15, maxWidth: 640, margin: "0 auto" }}>Indian companies pay ₹5–15 lakhs to consultants who take 4–8 weeks with Excel sheets. FileBRSR automates everything — supply chain ESG, BRSR filing, carbon tracking — starting free.</p>
-            </div>
+            </Reveal>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div className="bg-card rounded-2xl border border-border p-7">
+              <div className="bg-card rounded-2xl border border-border p-7 card-hover">
                 <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">FREE FOREVER</p>
                 <h3 className="text-3xl font-bold mb-1">₹0</h3>
                 <p className="text-sm text-muted mb-6">For suppliers & SMEs</p>
@@ -564,7 +647,7 @@ export default function HomePage() {
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 3 AI extractions (one-time)</li>
                 </ul>
               </div>
-              <div className="bg-card rounded-2xl border border-border p-7">
+              <div className="bg-card rounded-2xl border border-border p-7 card-hover">
                 <p className="text-xs font-bold text-sky-600 uppercase tracking-wider mb-2">GROWTH</p>
                 <h3 className="text-3xl font-bold mb-1">₹49,999<span className="text-base font-normal text-muted">/yr</span></h3>
                 <p className="text-sm text-muted mb-6">For listed companies</p>
@@ -576,7 +659,7 @@ export default function HomePage() {
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Multi-framework mapping</li>
                 </ul>
               </div>
-              <div className="bg-card rounded-2xl border-2 border-emerald-300 p-7 relative shadow-lg">
+              <div className="bg-card rounded-2xl border-2 border-emerald-300 p-7 relative shadow-lg card-hover">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full">MOST POPULAR</div>
                 <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">SCALE</p>
                 <h3 className="text-3xl font-bold mb-1">₹1,99,999<span className="text-base font-normal text-muted">/yr</span></h3>
@@ -590,7 +673,7 @@ export default function HomePage() {
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> PDF + XBRL-JSON export</li>
                 </ul>
               </div>
-              <div className="bg-card rounded-2xl border border-border p-7">
+              <div className="bg-card rounded-2xl border border-border p-7 card-hover">
                 <p className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-2">ENTERPRISE</p>
                 <h3 className="text-3xl font-bold mb-1">Custom</h3>
                 <p className="text-sm text-muted mb-6">For conglomerates & groups</p>
@@ -615,250 +698,75 @@ export default function HomePage() {
 
 
 
-        {/* ═══ CASE STUDIES ═══ */}
-        <section style={{ padding: "80px 28px", background: "var(--surface)" }}>
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#059669", marginBottom: 10 }}>
-                RESULTS FROM EARLY ADOPTERS
-              </p>
-              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 14 }}>
-                Companies already seeing results
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-card rounded-2xl border border-border p-7">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">MF</div>
-                  <div>
-                    <p className="text-sm font-bold">Leading FMCG Company</p>
-                    <p className="text-xs text-muted">NIFTY 100 · Consumer Goods</p>
-                  </div>
-                </div>
-                <div className="space-y-3 mb-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted">Suppliers assessed</span>
-                    <span className="font-bold text-emerald-600">342 in 2 weeks</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted">Time saved vs consultants</span>
-                    <span className="font-bold text-emerald-600">4 months → 14 days</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted">Cost saved</span>
-                    <span className="font-bold text-emerald-600">₹12L/year</span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted italic">&ldquo;We went from 0% to 85% supply chain coverage in Section A.V before the audit deadline.&rdquo;</p>
-              </div>
-
-              <div className="bg-card rounded-2xl border border-border p-7">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm">PH</div>
-                  <div>
-                    <p className="text-sm font-bold">Top Pharma Manufacturer</p>
-                    <p className="text-xs text-muted">BSE 500 · Pharmaceuticals</p>
-                  </div>
-                </div>
-                <div className="space-y-3 mb-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted">BRSR filing time</span>
-                    <span className="font-bold text-emerald-600">6 weeks → 3 days</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted">Datapoints auto-extracted</span>
-                    <span className="font-bold text-emerald-600">127 of 140</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted">Gap analysis accuracy</span>
-                    <span className="font-bold text-emerald-600">94%</span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted italic">&ldquo;AI extracted data our team missed. The gap report showed exactly what auditors would flag.&rdquo;</p>
-              </div>
-
-              <div className="bg-card rounded-2xl border border-border p-7">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 font-bold text-sm">EN</div>
-                  <div>
-                    <p className="text-sm font-bold">Infrastructure Conglomerate</p>
-                    <p className="text-xs text-muted">NIFTY 50 · Engineering</p>
-                  </div>
-                </div>
-                <div className="space-y-3 mb-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted">Scope 1+2 tracked</span>
-                    <span className="font-bold text-emerald-600">12 sites in 1 day</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted">Carbon reduction identified</span>
-                    <span className="font-bold text-emerald-600">8,400 tCO2e/yr</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted">Supplier ESG coverage</span>
-                    <span className="font-bold text-emerald-600">0% → 72%</span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted italic">&ldquo;First platform that handles both our BRSR filing AND supply chain assessment in one place.&rdquo;</p>
-              </div>
-            </div>
-
-            <p className="text-center text-xs text-muted mt-6 opacity-70">Results from pilot program participants. Company names anonymized per NDA.</p>
-          </div>
-        </section>
-
         {/* ═══ CARBON CREDIT MARKETPLACE ═══ */}
-        <section className="relative overflow-hidden" style={{ padding: "80px 28px", background: "linear-gradient(160deg, #0A1628 0%, #0D3B4F 50%, #0B3D2E 100%)" }}>
-          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+        <section className="relative overflow-hidden" style={{ padding: "80px 28px", background: "linear-gradient(135deg, #ECFEFF 0%, #EFF6FF 50%, #F5F3FF 100%)" }}>
+          <div className="blob-wrap" style={{ top: "-120px", left: "-80px" }}>
+            <div className="blob" style={{ width: 360, height: 360, background: "radial-gradient(circle at 30% 30%, #22D3EE, #06B6D4)" }} />
+          </div>
+          <div className="blob-wrap" style={{ bottom: "-100px", right: "-90px" }}>
+            <div className="blob" style={{ width: 300, height: 300, background: "radial-gradient(circle at 30% 30%, #818CF8, #6366F1)", animationDelay: "-6s" }} />
+          </div>
+          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(15,23,42,0.04) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
           <div className="relative max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 mb-6" style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", background: "rgba(8,145,178,0.15)", color: "#22D3EE", padding: "7px 16px", borderRadius: 24, border: "1px solid rgba(8,145,178,0.3)" }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22D3EE", display: "inline-block", animation: "pulse 2s infinite" }} />
-              COMING 2027
-            </div>
-
-            <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, color: "white", letterSpacing: -1, marginBottom: 20, lineHeight: 1.15 }}>
-              India&apos;s Carbon Credit<br />
-              <span style={{ background: "linear-gradient(120deg, #22D3EE, #06B6D4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                Marketplace
-              </span>
-            </h2>
-
-            <p style={{ fontSize: 16, color: "rgba(255,255,255,0.6)", maxWidth: 600, margin: "0 auto 32px", lineHeight: 1.75 }}>
-              When India&apos;s Carbon Credit Trading Scheme (CCTS) goes live, FileBRSR becomes the transaction layer.
-              Your supply chain emission data becomes carbon credits. Your reductions become revenue.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 text-left">
-              <div className="rounded-xl p-5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <p className="text-cyan-400 text-xs font-bold uppercase tracking-wider mb-2">TRACK</p>
-                <p className="text-white text-sm font-medium">Scope 1, 2 & 3 emissions calculated from your BRSR data with India-specific factors (CEA, BEE, IPCC)</p>
+            <Reveal>
+              <div className="inline-flex items-center gap-2 mb-6 backdrop-blur-sm" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", background: "rgba(255,255,255,0.7)", color: "#0891B2", padding: "8px 18px", borderRadius: 24, border: "1px solid rgba(8,145,178,0.25)", boxShadow: "0 4px 16px rgba(8,145,178,0.08)" }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#06B6D4", display: "inline-block", animation: "pulse 2s infinite" }} />
+                COMING 2027
               </div>
-              <div className="rounded-xl p-5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <p className="text-cyan-400 text-xs font-bold uppercase tracking-wider mb-2">VERIFY</p>
-                <p className="text-white text-sm font-medium">Year-over-year reductions auto-verified from platform data. MRV built in — no manual audits.</p>
+
+              <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, color: "#0F172A", letterSpacing: -1, marginBottom: 20, lineHeight: 1.15 }}>
+                India&apos;s Carbon Credit<br />
+                <span className="gradient-text" style={{ backgroundImage: "linear-gradient(110deg, #06B6D4 0%, #0EA5E9 45%, #6366F1 100%)" }}>
+                  Marketplace
+                </span>
+              </h2>
+
+              <p style={{ fontSize: 16, color: "#475569", maxWidth: 600, margin: "0 auto 32px", lineHeight: 1.75 }}>
+                When India&apos;s Carbon Credit Trading Scheme (CCTS) goes live, FileBRSR becomes the transaction layer.
+                Your supply chain emission data becomes carbon credits. Your reductions become revenue.
+              </p>
+            </Reveal>
+
+            <Reveal delay={120} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 text-left">
+              <div className="rounded-xl p-5 card-hover" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(226,232,240,0.9)", boxShadow: "0 4px 14px rgba(15,23,42,0.04)" }}>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#0891B2" }}>TRACK</p>
+                <p className="text-sm font-medium" style={{ color: "#334155" }}>Scope 1, 2 & 3 emissions calculated from your BRSR data with India-specific factors (CEA, BEE, IPCC)</p>
               </div>
-              <div className="rounded-xl p-5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <p className="text-cyan-400 text-xs font-bold uppercase tracking-wider mb-2">TRADE</p>
-                <p className="text-white text-sm font-medium">Generate carbon credits from verified supply chain reductions. Buy/sell on India&apos;s CCTS marketplace.</p>
+              <div className="rounded-xl p-5 card-hover" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(226,232,240,0.9)", boxShadow: "0 4px 14px rgba(15,23,42,0.04)" }}>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#0891B2" }}>VERIFY</p>
+                <p className="text-sm font-medium" style={{ color: "#334155" }}>Year-over-year reductions auto-verified from platform data. MRV built in — no manual audits.</p>
               </div>
-            </div>
+              <div className="rounded-xl p-5 card-hover" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(226,232,240,0.9)", boxShadow: "0 4px 14px rgba(15,23,42,0.04)" }}>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#0891B2" }}>TRADE</p>
+                <p className="text-sm font-medium" style={{ color: "#334155" }}>Generate carbon credits from verified supply chain reductions. Buy/sell on India&apos;s CCTS marketplace.</p>
+              </div>
+            </Reveal>
 
             <div className="inline-flex flex-col sm:flex-row items-center gap-4">
               <Link
                 href="/platform/carbon"
-                className="px-8 py-4 rounded-xl text-sm font-bold transition-colors"
-                style={{ background: "rgba(8,145,178,0.2)", color: "#22D3EE", border: "1px solid rgba(8,145,178,0.4)" }}
+                className="btn-accent group relative overflow-hidden"
+                style={{ fontSize: 15, fontWeight: 700, padding: "16px 32px", borderRadius: 14, background: "linear-gradient(120deg, #06B6D4, #6366F1)", color: "#fff", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 10px 30px rgba(6,182,212,0.32)" }}
               >
-                Start Tracking Carbon Now (Free)
+                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)" }} />
+                <span className="relative">Start Tracking Carbon Now (Free)</span>
               </Link>
-              <p className="text-xs text-white/40">$35B market opportunity by 2030</p>
+              <p className="text-xs" style={{ color: "#64748B" }}>$35B market opportunity by 2030</p>
             </div>
           </div>
         </section>
-
-        {/* ═══ WHY INDIA NEEDS ITS OWN PLATFORM ═══ */}
-        <section style={{ padding: "80px 28px", background: "var(--highlight-bg)" }}>
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#DC2626", marginBottom: 10 }}>
-                THE HARD QUESTION
-              </p>
-              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 14 }}>
-                &ldquo;Why not just use EcoVadis?&rdquo;
-              </h2>
-              <p className="text-muted" style={{ fontSize: 15, maxWidth: 640, margin: "0 auto" }}>
-                Global ESG platforms serve Fortune 500 companies filing CDP and CSRD.
-                They don&apos;t solve India&apos;s problem. Here&apos;s why.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
-              <div className="bg-card rounded-2xl border border-border p-7">
-                <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-4">GLOBAL PLATFORMS (EcoVadis, Sphera, Sedex)</p>
-                <ul className="space-y-3 text-sm text-gray-600">
-                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> No BRSR schema — built for GRI/CDP/CSRD, not SEBI&apos;s 140-indicator BRSR format</li>
-                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> Pricing starts at $5K-$15K/year — unaffordable for Indian MSMEs</li>
-                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> No India carbon market (CCTS) integration</li>
-                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> Questionnaires in English only — 60% of Indian suppliers need Hindi/regional</li>
-                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> No XBRL generation for BSE/NSE filing</li>
-                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> Not aligned to NGRBC Principles or PAT scheme</li>
-                  <li className="flex items-start gap-2"><span className="text-red-400 mt-0.5">✗</span> Assessment designed for Fortune 500 vendors, not Indian SME suppliers</li>
-                </ul>
-              </div>
-              <div className="bg-card rounded-2xl border-2 border-emerald-200 p-7">
-                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-4">FileBRSR (Built for India)</p>
-                <ul className="space-y-3 text-sm text-gray-600">
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Native BRSR schema — all 140 SEBI BRSR indicators (Essential + Leadership) mapped and extracted by AI</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Starts free for 5 suppliers, ₹49,999/year for Growth, ₹1,99,999/year for Scale</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Carbon calculator with India-specific factors (CCTS marketplace on roadmap)</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Hindi and regional language support (roadmap Q4 2026)</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> XBRL-JSON generation for direct BSE/NSE filing</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 9 NGRBC Principles + PAT + EPR compliance built in</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 5-minute WhatsApp-friendly assessment for MSME suppliers</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="bg-card rounded-2xl border border-border p-6 md:p-8">
-              <h3 className="text-base font-bold mb-4">Why global platforms can&apos;t retrofit for India</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-600">
-                <div>
-                  <p className="font-bold text-gray-900 mb-1">Regulatory depth</p>
-                  <p>SEBI BRSR is the world&apos;s most prescriptive ESG framework — 140 indicators (98 Essential + 42 Leadership) across 9 principles vs. GRI&apos;s flexible &ldquo;report what&apos;s material.&rdquo; Global tools can&apos;t handle this specificity without a full rebuild.</p>
-                </div>
-                <div>
-                  <p className="font-bold text-gray-900 mb-1">Market structure</p>
-                  <p>India has 63M MSMEs in supply chains vs. Fortune 500 vendors. Global platforms are designed for 50 large suppliers, not 2,000 SMEs across Tier 2/3 cities. Different UX, different pricing, different language.</p>
-                </div>
-                <div>
-                  <p className="font-bold text-gray-900 mb-1">Carbon market alignment</p>
-                  <p>India&apos;s CCTS is separate from EU ETS or voluntary markets. Emission factors, baseline methodologies, and credit generation rules are India-specific. No global tool supports this natively.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-
 
         {/* ═══ FAQ ═══ */}
         <section style={{ padding: "80px 28px" }}>
           <div className="max-w-[640px] mx-auto">
-            <h2 className="text-center" style={{ fontSize: 28, fontWeight: 800, marginBottom: 48, letterSpacing: -0.3 }}>
-              Frequently asked questions
-            </h2>
-            <FAQAccordion faqs={faqs} />
-          </div>
-        </section>
-
-        {/* ═══ FINAL CTA ═══ */}
-        <section className="relative overflow-hidden" style={{ background: "linear-gradient(160deg, #0A1628 0%, #0F2847 40%, #1B4D3E 100%)", padding: "80px 28px" }}>
-          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
-          <div className="relative text-center">
-            <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, marginBottom: 16, letterSpacing: -0.5, color: "white" }}>
-              Supply chain ESG. BRSR automation. Carbon market.<br />One platform.
-            </h2>
-            <p style={{ fontSize: 16, color: "rgba(255,255,255,0.6)", maxWidth: 560, margin: "0 auto 36px", lineHeight: 1.7 }}>
-              Whether you&apos;re assessing your supply chain, auto-filing BRSR,
-              or tracking emissions for carbon credits — FileBRSR is built for you.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/platform/supply-chain"
-                style={{ fontSize: 15, fontWeight: 700, padding: "16px 36px", borderRadius: 12, background: "#E8B931", color: "#1B4D3E", display: "inline-flex", alignItems: "center", gap: 8 }}
-              >
-                ASSESS SUPPLIERS FREE
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              </Link>
-              <Link
-                href="/pricing"
-                style={{ fontSize: 15, fontWeight: 600, padding: "16px 36px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.9)", display: "inline-flex", alignItems: "center", gap: 8 }}
-              >
-                VIEW PRICING
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              </Link>
-            </div>
+            <Reveal>
+              <h2 className="text-center" style={{ fontSize: 28, fontWeight: 800, marginBottom: 48, letterSpacing: -0.3 }}>
+                Frequently asked questions
+              </h2>
+            </Reveal>
+            <Reveal delay={120}>
+              <FAQAccordion faqs={faqs} />
+            </Reveal>
           </div>
         </section>
       </main>

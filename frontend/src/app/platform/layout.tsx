@@ -34,7 +34,6 @@ import {
   PieChart,
   Menu,
   X,
-  LogIn,
 } from "lucide-react";
 
 const FOUNDER_EMAILS = [
@@ -53,7 +52,7 @@ function getGuestMode(path: string): GuestMode {
 const GUEST_MODE_PATHS: Record<GuestMode, string[]> = {
   carbon: ["/platform/carbon"],
   "supply-chain": ["/platform/supply-chain"],
-  trial: [], // trial mode allows all paths (for 5 min)
+  trial: [], // trial mode allows all paths
 };
 
 // Grouped by ESG compliance workflow priority
@@ -127,7 +126,6 @@ export default function PlatformLayout({
   const [isFounder, setIsFounder] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [guestExpired, setGuestExpired] = useState(false);
   const [guestMode, setGuestMode] = useState<GuestMode>("trial");
 
   useEffect(() => {
@@ -151,16 +149,6 @@ export default function PlatformLayout({
       setAuthChecked(true);
     });
   }, []);
-
-  // 5-minute guest trial timer (only for BRSR Platform trial mode, after auth confirmed)
-  useEffect(() => {
-    if (!authChecked || !isGuest || guestMode !== "trial") return;
-    const GUEST_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-    const timer = setTimeout(() => {
-      setGuestExpired(true);
-    }, GUEST_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [authChecked, isGuest, guestMode]);
 
   // Route guard: restrict guests based on mode
   useEffect(() => {
@@ -205,33 +193,6 @@ export default function PlatformLayout({
     <AnalyticsProvider userId={userId}>
     <div className="flex h-screen bg-gray-50">
 
-      {/* Guest Trial Expired Modal */}
-      {guestExpired && isGuest && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center">
-            <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <LogIn className="w-7 h-7 text-emerald-600" />
-            </div>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Free Trial Ended</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Your 5-minute free trial has ended. Sign up to continue using Data Entry and Carbon Calculator — it&apos;s free!
-            </p>
-            <Link
-              href="/signup"
-              className="block w-full px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium text-sm hover:bg-emerald-700 transition-colors mb-3"
-            >
-              Sign Up Free
-            </Link>
-            <Link
-              href="/login"
-              className="block w-full px-5 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors"
-            >
-              Already have an account? Log In
-            </Link>
-          </div>
-        </div>
-      )}
-
       {/* Mobile Header Bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center h-14 px-3 border-b border-border" style={{ background: "var(--nav-bg)", backdropFilter: "blur(16px)" }}>
         <button
@@ -260,7 +221,7 @@ export default function PlatformLayout({
           {/* Sidebar panel */}
           <aside
             className="absolute left-0 top-0 bottom-0 w-72 text-white flex flex-col overflow-y-auto"
-            style={{ background: "linear-gradient(180deg, #0B2B22 0%, #0F3D2E 40%, #1B4D3E 100%)", animation: "slideRight 0.2s ease-out" }}
+            style={{ background: "linear-gradient(180deg, #064E3B 0%, #0E5E6E 45%, #312E81 100%)", animation: "slideRight 0.2s ease-out" }}
           >
             {/* Header with close button */}
             <div className="p-4 flex items-center justify-between border-b border-white/10">
@@ -278,9 +239,9 @@ export default function PlatformLayout({
               {filteredNavGroups.map((group, gi) => (
                 <div key={gi} className={gi > 0 ? "mt-2 pt-2 border-t border-white/10" : ""}>
                   {group.label && (
-                    <span className="px-4 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                    <p className="px-4 mt-1 mb-1.5 text-[11px] uppercase tracking-wider text-emerald-200/70 font-semibold">
                       {group.label}
-                    </span>
+                    </p>
                   )}
                   {group.items.map((item) => {
                     const isActive =
@@ -294,11 +255,11 @@ export default function PlatformLayout({
                         className={`flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg transition-colors ${
                           isActive
                             ? "bg-emerald-600/30 text-emerald-300"
-                            : "text-gray-300 hover:bg-white/5 hover:text-white"
+                            : "text-gray-200 hover:bg-white/5 hover:text-white"
                         }`}
                       >
-                        <item.icon className="w-4 h-4 flex-shrink-0" />
-                        <span className="text-sm">{item.name}</span>
+                        <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
+                        <span className="text-[14px] font-medium">{item.name}</span>
                       </Link>
                     );
                   })}
@@ -314,7 +275,7 @@ export default function PlatformLayout({
         className={`hidden md:flex ${
           collapsed ? "w-16" : "w-64"
         } text-white flex-col transition-all duration-300 ease-in-out`}
-        style={{ background: "linear-gradient(180deg, #0B2B22 0%, #0F3D2E 40%, #1B4D3E 100%)" }}
+        style={{ background: "linear-gradient(180deg, #064E3B 0%, #0E5E6E 45%, #312E81 100%)" }}
       >
         {/* Logo - links back to home */}
         <Link href="/" className="p-4 flex items-center border-b border-white/10 hover:bg-white/5 transition-colors">
@@ -330,9 +291,9 @@ export default function PlatformLayout({
           {filteredNavGroups.map((group, gi) => (
             <div key={gi} className={gi > 0 ? "mt-3 pt-3 border-t border-white/10" : ""}>
               {!collapsed && group.label && (
-                <span className="px-4 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                <p className="px-4 mt-1 mb-1.5 text-[11px] uppercase tracking-wider text-emerald-200/70 font-semibold">
                   {group.label}
-                </span>
+                </p>
               )}
               {group.items.map((item) => {
                 const isActive =
@@ -345,13 +306,13 @@ export default function PlatformLayout({
                     className={`flex items-center gap-3 px-4 py-2 mx-2 rounded-lg transition-colors ${
                       isActive
                         ? "bg-emerald-600/30 text-emerald-300"
-                        : "text-gray-300 hover:bg-white/5 hover:text-white"
-                    }`}
+                        : "text-gray-200 hover:bg-white/5 hover:text-white"
+                    } ${collapsed ? "justify-center" : ""}`}
                     title={collapsed ? item.name : undefined}
                   >
-                    <item.icon className="w-4 h-4 flex-shrink-0" />
+                    <item.icon className="w-[18px] h-[18px] flex-shrink-0" />
                     {!collapsed && (
-                      <span className="text-sm">{item.name}</span>
+                      <span className="text-[14px] font-medium">{item.name}</span>
                     )}
                   </Link>
                 );

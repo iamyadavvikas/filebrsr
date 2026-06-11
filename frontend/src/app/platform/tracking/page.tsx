@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import TrackingClient from "./TrackingClient";
 
@@ -8,15 +7,20 @@ export default async function TrackingPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  // Fetch user reports only when logged in
+  let reports: { id: string; extracted_data: Record<string, unknown> | null; company_name: string | null; financial_year: string | null; created_at: string; status: string }[] = [];
+  if (user) {
+    const { data } = await supabase
+      .from("reports")
+      .select("id, extracted_data, company_name, financial_year, created_at, status")
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .order("created_at", { ascending: true });
+    reports = (data || []).map((r) => ({
+      ...r,
+      extracted_data: (r.extracted_data as Record<string, unknown> | null) ?? null,
+    }));
+  }
 
-  // Fetch all completed reports for this user to build multi-year view
-  const { data: reports } = await supabase
-    .from("reports")
-    .select("id, extracted_data, company_name, financial_year, created_at, status")
-    .eq("user_id", user.id)
-    .eq("status", "completed")
-    .order("created_at", { ascending: true });
-
-  return <TrackingClient reports={reports || []} />;
+  return <TrackingClient reports={reports} />;
 }

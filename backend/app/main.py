@@ -57,6 +57,28 @@ app = FastAPI(title="FileBRSR Platform API", version="4.0.0")
 settings = get_settings()
 
 
+# ─── Data residency guard (principle #6: AWS Mumbai / ap-south-1 only) ──────
+def _assert_data_residency() -> None:
+    """Refuse to start in prod if data residency is misconfigured.
+
+    DPDPA 2023 / RBI / SEBI posture requires all data-bearing infra in
+    ap-south-1. In non-prod we only warn so local dev stays frictionless.
+    """
+    region = (settings.DATA_REGION or "").strip()
+    if region != "ap-south-1":
+        msg = (
+            f"DATA_REGION is '{region}', expected 'ap-south-1' (AWS Mumbai). "
+            "Data residency is a non-negotiable architectural principle."
+        )
+        if settings.ENVIRONMENT == "production":
+            raise RuntimeError(msg)
+        logger.warning("PROV/residency: %s", msg)
+
+
+_assert_data_residency()
+
+
+
 # ─── Simple IP rate limiter for public endpoints ──────────────────────────
 from collections import defaultdict
 from datetime import datetime, timedelta

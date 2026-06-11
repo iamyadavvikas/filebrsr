@@ -106,6 +106,119 @@ html {
   animation: shimmer 1.5s infinite;
 }
 
+/* Vibrant hero — floating gradient blobs */
+@keyframes blobFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -40px) scale(1.08); }
+  66% { transform: translate(-25px, 25px) scale(0.94); }
+}
+.blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.55;
+  animation: blobFloat 14s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Animated gradient text */
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.gradient-text {
+  background-size: 200% auto;
+  animation: gradientShift 5s ease infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Stat tile hover */
+.stat-tile {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.stat-tile:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(16, 185, 129, 0.12);
+}
+
+/* Hero blob parallax wrapper — smooths mouse-follow */
+.blob-wrap {
+  position: absolute;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+/* Logo marquee */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 28s linear infinite;
+}
+.marquee-mask:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* Floating product preview */
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+.float-y { animation: floatY 6s ease-in-out infinite; }
+
+/* 3D tilt wrapper for the hero preview */
+.tilt {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* Animated score bar fill */
+.score-bar-fill {
+  width: 0;
+  transition: width 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Scroll-triggered reveal — mirrors the hero entrance across all sections */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal.in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .blob,
+  .float-y,
+  .gradient-text,
+  .marquee-track {
+    animation: none !important;
+  }
+  .blob-wrap,
+  .tilt {
+    transform: none !important;
+  }
+  .fade-up {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
 /* Card hover lift */
 .card-hover {
   transition: transform 0.2s ease, box-shadow 0.2s ease;

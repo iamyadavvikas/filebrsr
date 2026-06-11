@@ -504,6 +504,56 @@ async def calc_scope2(req: Scope2Request):
     return calculate_scope2_emissions(req.electricity_mwh, req.financial_year, req.state)
 
 
+class Scope2ProvenanceRequest(BaseModel):
+    kwh: float = Field(..., ge=0, description="Purchased electricity in kWh")
+    grid_region: Optional[str] = Field(None, description="NR | ER | WR | SR | NER")
+    state: Optional[str] = None
+    org_id: str = Field("demo-org", description="Tenant org id (provenance subject)")
+    input_record_ids: List[str] = Field(default_factory=list)
+
+
+@router.post("/carbon/scope2/provenance")
+async def calc_scope2_provenance(req: Scope2ProvenanceRequest):
+    """Scope 2 location-based emissions with a signed W3C PROV-O graph.
+
+    Deterministic (pure Python, principle #1), versioned CEA factor with
+    citation (principle #2), Ed25519-signed provenance (principle #3). Returns
+    the calculated value plus the signed graph and a self-verification flag.
+    Raises 400 if no factor matches (never substitutes a default).
+    """
+    from app.calculator import FactorNotFoundError, scope2_location_based, sign_result
+    from app.prov import verify_signed_provenance
+
+    try:
+        result = scope2_location_based(
+            req.kwh,
+            grid_region=req.grid_region,
+            state=req.state,
+            input_record_ids=req.input_record_ids,
+        )
+    except FactorNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    calc_id, signed = sign_result(result, org_id=req.org_id)
+    return {
+        "calculation_id": calc_id,
+        "scope": result.scope,
+        "value_tco2e": str(result.value),
+        "unit": result.unit,
+        "method": result.method,
+        "factor": {
+            "id": result.factor_id,
+            "version": result.factor_version,
+            "source": result.factor_source,
+            "citation_url": result.factor_citation,
+        },
+        "provenance": signed.to_dict(),
+        "verified": verify_signed_provenance(signed),
+    }
+
+
 @router.post("/carbon/scope3")
 async def calc_scope3(req: Scope3Request):
     """Calculate Scope 3 emissions by category."""
