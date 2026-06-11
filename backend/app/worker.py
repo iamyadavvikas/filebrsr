@@ -9,19 +9,13 @@ Usage:
 """
 
 import asyncio
-import time
 import logging
-import io
-import pdfplumber
 from datetime import datetime
 
+from app.brsr_datapoints import analyze_gaps_v2, get_datapoints_stats
 from app.config import get_settings
-from app.extraction import extract_with_regex, calculate_confidence
-from app.extraction_enhanced import extract_enhanced
-from app.ai_extraction import extract_with_ai
-from app.agent_extraction import extract_with_agent
+from app.extraction_pipeline import run_full_extraction
 from app.nifty50_benchmarks import get_benchmark_comparison
-from app.brsr_datapoints import get_datapoints_stats, analyze_gaps_v2
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,6 +41,7 @@ async def process_job(job: dict) -> None:
     job_id = job["id"]
     report_id = job["report_id"]
     file_url = job["file_url"]
+    user_id = job.get("user_id")
 
     logger.info("Processing job %s (report: %s)", job_id, report_id)
 
@@ -62,57 +57,25 @@ async def process_job(job: dict) -> None:
         if not file_bytes:
             raise Exception("Could not download file from storage")
 
-        # Extract text from PDF (limit 80 pages)
-        text = ""
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-            for i, page in enumerate(pdf.pages):
-                if i >= 80:
-                    break
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+        # Unified pipeline (Phase 5.1). Worker now picks up OCR, citations
+        # and opt-in retrieval — capabilities the legacy pdfplumber-only
+        # worker was missing. 80-page cap preserves free-tier LLM quota.
+        result = await run_full_extraction(
+            file_bytes=file_bytes,
+            settings=settings,
+            report_id=report_id,
+            user_id=user_id,
+            supabase_client=sb,
+            max_pages=80,
+        )
 
-        if not text.strip():
-            raise Exception("No text could be extracted from PDF")
+        if result["status"] != "completed":
+            raise Exception(result["error"] or "Extraction failed")
 
-        # Triple extraction: regex + enhanced + AI
-        regex_results = extract_with_regex(text)
-        enhanced_results = extract_enhanced(text)
-
-        # AI extraction with fallback chain: Gemini → Groq Agent → single-shot
-        ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
-        try:
-            # Try multi-pass agent first (Groq)
-            ai_results = await extract_with_agent(text, settings.GROQ_API_KEY)
-            agent_fields = sum(len(v) for v in ai_results.values() if isinstance(v, dict))
-            if agent_fields < 10:
-                # Supplement with single-shot
-                single_shot = await extract_with_ai(
-                    text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY
-                )
-                for section in ["section_a", "section_b", "section_c"]:
-                    for k, v in single_shot.get(section, {}).items():
-                        if k not in ai_results.get(section, {}):
-                            ai_results.setdefault(section, {})[k] = v
-        except Exception as e:
-            logger.warning("Agent extraction failed, trying single-shot: %s", e)
-            try:
-                ai_results = await extract_with_ai(
-                    text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY
-                )
-            except Exception as e2:
-                logger.error("All AI extraction failed: %s", e2)
-
-        # Merge: enhanced base → regex fills → AI takes precedence
-        merged = {"section_a": {}, "section_b": {}, "section_c": {}}
-        for section in ["section_a", "section_b", "section_c"]:
-            merged[section] = {**enhanced_results.get(section, {})}
-            merged[section].update(regex_results.get(section, {}))
-            merged[section].update(ai_results.get(section, {}))
-
-        confidence = calculate_confidence(regex_results, ai_results)
-        company_name = merged.get("section_a", {}).get("company_name", None)
-        financial_year = merged.get("section_a", {}).get("financial_year", None)
+        merged = result["extracted_data"]
+        confidence = result["confidence_scores"]
+        company_name = result["company_name"]
+        financial_year = result["financial_year"]
         benchmark = get_benchmark_comparison(merged)
         gap_analysis = analyze_gaps_v2(merged)
         datapoints_stats = get_datapoints_stats()

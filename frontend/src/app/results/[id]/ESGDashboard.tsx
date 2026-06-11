@@ -18,14 +18,26 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BRSR_DATAPOINTS, SECTION_LABELS, SUBSECTION_LABELS, FIELD_TO_DATAPOINT_MAP, type BRSRDatapoint } from "@/lib/brsr-datapoints";
+import { EditableField } from "@/components/EditableField";
+import type { Citation } from "@/components/CitationChip";
+import type { Section } from "@/lib/corrections";
 
 // ──────────────────────────────────────────────────────────────────
 // Types
 // ──────────────────────────────────────────────────────────────────
+// Per-section citation map: { field_name: { source_page, snippet, ... } }.
+// Sections / fields with no citation are omitted by the backend so this
+// dict stays small enough to ship in every extract response.
+type CitationsMap = Partial<Record<
+  "section_a" | "section_b" | "section_c",
+  Record<string, Citation>
+>>;
+
 interface ExtractedData {
   section_a?: Record<string, string>;
   section_b?: Record<string, string>;
   section_c?: Record<string, string>;
+  citations?: CitationsMap;
 }
 
 interface GapAnalysis {
@@ -191,7 +203,7 @@ function buildClientManifest(extractedData: ExtractedData | null, backendManifes
 // ──────────────────────────────────────────────────────────────────
 // Dashboard Component
 // ──────────────────────────────────────────────────────────────────
-export function ESGDashboard() {
+export function ESGDashboard({ reportId }: { reportId?: string } = {}) {
   const [data, setData] = useState<ExtractedData | null>(null);
   const [gaps, setGaps] = useState<GapAnalysis | null>(null);
   const [stats, setStats] = useState<DatapointsStats | null>(null);
@@ -604,7 +616,7 @@ export function ESGDashboard() {
         {/* ─── Main Content ─── */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 lg:pb-6">
           {activeTab === "overview" && <OverviewPanel data={data} gaps={gaps} stats={stats} benchmark={benchmark} sectionChartData={sectionChartData} principleChartData={principleChartData} dataTypeChart={dataTypeChart} compliancePieData={compliancePieData} complianceScore={complianceScore} coreScore={coreScore} setActiveTab={setActiveTab} />}
-          {(activeTab === "section_a" || activeTab === "section_b" || activeTab === "section_c") && <SectionPanel sectionKey={activeTab} data={filteredDatapoints} searchQuery={searchQuery} filterStatus={filterStatus} />}
+          {(activeTab === "section_a" || activeTab === "section_b" || activeTab === "section_c") && <SectionPanel sectionKey={activeTab} data={filteredDatapoints} citations={data?.citations} searchQuery={searchQuery} filterStatus={filterStatus} reportId={reportId} />}
           {activeTab === "gaps" && <GapsPanel gaps={gaps} recommendations={filteredRecommendations} filterPriority={filterPriority} searchQuery={searchQuery} extractedData={data} />}
           {activeTab === "benchmark" && <BenchmarkPanel benchmark={benchmark} />}
           {activeTab === "principles" && <PrinciplesPanel stats={stats} gaps={gaps} principleChartData={principleChartData} extractedData={data} selectedPrinciple={selectedPrinciple} onSelectPrinciple={setSelectedPrinciple} />}
@@ -780,16 +792,22 @@ function OverviewPanel({
 // Section Data Panel
 // ══════════════════════════════════════════════════════════════════
 function SectionPanel({
-  sectionKey, data, searchQuery, filterStatus,
+  sectionKey, data, citations, searchQuery, filterStatus, reportId,
 }: {
   sectionKey: string;
   data: Record<string, Record<string, string>>;
+  citations?: CitationsMap;
   searchQuery: string;
   filterStatus: string;
+  reportId?: string;
 }) {
   const sectionData = data[sectionKey];
   const sectionMeta = SECTIONS.find((s) => s.key === sectionKey);
   const Icon = sectionMeta?.icon || Building2;
+  // Citations for this section only. Keyed by field name (same key the
+  // section row iterates), missing entries simply render no chip.
+  const sectionCitations =
+    citations?.[sectionKey as "section_a" | "section_b" | "section_c"];
 
   if (!sectionData || Object.keys(sectionData).length === 0) {
     return (
@@ -853,9 +871,20 @@ function SectionPanel({
                   <p className="text-sm font-semibold text-muted">
                     {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                   </p>
-                  <p className={`text-base mt-0.5 ${isDisclosed ? "text-foreground font-medium" : "text-red-400 italic"}`}>
-                    {isDisclosed ? String(value) : "Not disclosed"}
-                  </p>
+                  {reportId ? (
+                    <EditableField
+                      reportId={reportId}
+                      section={sectionKey as Section}
+                      fieldPath={key}
+                      value={isDisclosed ? String(value) : ""}
+                      isMissing={!isDisclosed}
+                      citation={sectionCitations?.[key] ?? null}
+                    />
+                  ) : (
+                    <p className={`text-base mt-0.5 ${isDisclosed ? "text-foreground font-medium" : "text-red-400 italic"}`}>
+                      {isDisclosed ? String(value) : "Not disclosed"}
+                    </p>
+                  )}
                 </div>
               </div>
             );

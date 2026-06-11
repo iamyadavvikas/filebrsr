@@ -84,7 +84,7 @@ export default async function ResultsPage({ params }: PageProps) {
 
   // For completed reports, render the full ESG Dashboard (it has its own layout)
   if (report.status === "completed" && extractedData) {
-    return <AuthenticatedESGDashboard reportData={extractedData} />;
+    return <AuthenticatedESGDashboard reportData={extractedData} reportId={id} />;
   }
 
   return (

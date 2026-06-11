@@ -107,3 +107,84 @@ class TestGuestExtract:
         )
         # Will either fail gracefully or return error
         assert resp.status_code in (200, 400, 500)
+
+
+class TestCorrectionEndpoint:
+    """Tests for /api/correction — user-supplied fixes to extracted fields."""
+
+    _AUTH = {"Authorization": "Bearer test-service-key"}
+    _BODY = {
+        "report_id": "00000000-0000-0000-0000-000000000001",
+        "user_id": "00000000-0000-0000-0000-000000000002",
+        "section": "section_a",
+        "field_path": "turnover",
+        "original_value": "₹1,234 Cr",
+        "corrected_value": "₹1,500 Cr",
+        "source_page": 12,
+    }
+
+    @pytest.mark.asyncio
+    async def test_correction_requires_auth(self, async_client):
+        resp = await async_client.post("/api/correction", json=self._BODY)
+        assert resp.status_code in (401, 422)
+
+    @pytest.mark.asyncio
+    async def test_correction_rejects_wrong_token(self, async_client):
+        resp = await async_client.post(
+            "/api/correction",
+            headers={"Authorization": "Bearer wrong"},
+            json=self._BODY,
+        )
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_correction_rejects_invalid_section(self, async_client, mock_supabase):
+        with patch("app.main.get_supabase_admin", return_value=mock_supabase):
+            body = {**self._BODY, "section": "section_z"}
+            resp = await async_client.post(
+                "/api/correction", headers=self._AUTH, json=body,
+            )
+            assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_correction_rejects_empty_corrected_value(self, async_client, mock_supabase):
+        with patch("app.main.get_supabase_admin", return_value=mock_supabase):
+            body = {**self._BODY, "corrected_value": "   "}
+            resp = await async_client.post(
+                "/api/correction", headers=self._AUTH, json=body,
+            )
+            assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_correction_inserts_and_returns_id(self, async_client, mock_supabase):
+        with patch("app.main.get_supabase_admin", return_value=mock_supabase):
+            mock_supabase.table.return_value.insert.return_value.execute.return_value = MagicMock(
+                data=[{"id": "corr-123"}]
+            )
+            resp = await async_client.post(
+                "/api/correction", headers=self._AUTH, json=self._BODY,
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["status"] == "ok"
+            assert data["correction_id"] == "corr-123"
+            # Verify the row we tried to insert
+            mock_supabase.table.assert_called_with("extraction_corrections")
+            insert_call = mock_supabase.table.return_value.insert.call_args[0][0]
+            assert insert_call["report_id"] == self._BODY["report_id"]
+            assert insert_call["user_id"] == self._BODY["user_id"]
+            assert insert_call["section"] == "section_a"
+            assert insert_call["field_path"] == "turnover"
+            assert insert_call["corrected_value"] == "₹1,500 Cr"
+            assert insert_call["source_page"] == 12
+
+    @pytest.mark.asyncio
+    async def test_correction_db_failure_returns_500(self, async_client, mock_supabase):
+        with patch("app.main.get_supabase_admin", return_value=mock_supabase):
+            mock_supabase.table.return_value.insert.return_value.execute.side_effect = RuntimeError(
+                "db down"
+            )
+            resp = await async_client.post(
+                "/api/correction", headers=self._AUTH, json=self._BODY,
+            )
+            assert resp.status_code == 500

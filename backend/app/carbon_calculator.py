@@ -2,23 +2,25 @@
 Indian Carbon Emission Factors for GHG Protocol-aligned calculations.
 
 Sources:
-- Central Electricity Authority (CEA) CO2 Baseline Database v19 (2024)
+- Central Electricity Authority (CEA) CO2 Baseline Database (versioned JSON
+  under ``factors/cea/`` — loaded via :mod:`app.factors_india`)
 - IPCC AR6 emission factors
 - India GHG Program (WRI India + CII)
 - Bureau of Energy Efficiency (BEE) PAT Scheme
+
+Note: ``CEA_GRID_EMISSION_FACTORS`` and ``STATE_GRID_FACTORS`` are now built
+from the versioned ``factors/`` registry rather than declared inline. Other
+factor tables (Scope 1 fuels, Scope 3 categories, refrigerants, steam, PAT
+benchmarks) remain literal here pending future factors-india slices.
 """
 
-# CEA Grid Emission Factor (tCO2/MWh) - Updated yearly
-# Source: CEA CO2 Baseline Database
-CEA_GRID_EMISSION_FACTORS = {
-    "FY2023-24": 0.716,  # Latest available
-    "FY2022-23": 0.716,
-    "FY2021-22": 0.708,
-    "FY2020-21": 0.721,
-    "FY2019-20": 0.740,
-    "FY2018-19": 0.820,
-    "default": 0.716,
-}
+# Re-exported from the JSON-backed registry. Same dict shape as the
+# previous inline literal so router_platform.py and other callers are
+# unchanged.
+from app.factors_india._legacy import (  # noqa: E402  (kept near related imports below)
+    CEA_GRID_EMISSION_FACTORS,
+    STATE_GRID_FACTORS,
+)
 
 # Scope 1: Stationary Combustion (tCO2e per unit)
 STATIONARY_COMBUSTION_FACTORS = {
@@ -53,17 +55,9 @@ REFRIGERANT_GWP = {
 }
 
 # Scope 2: Purchased Electricity (location-based)
-# Different state grids have slightly different factors, but CEA national factor is standard
-STATE_GRID_FACTORS = {
-    "national": 0.716,  # tCO2/MWh
-    "karnataka": 0.64,
-    "maharashtra": 0.78,
-    "tamil_nadu": 0.67,
-    "gujarat": 0.82,
-    "rajasthan": 0.85,
-    "andhra_pradesh": 0.70,
-    "delhi": 0.78,
-}
+# STATE_GRID_FACTORS is now imported from app.factors_india._legacy at the top
+# of this module. Slice 1 only exposes the "national" key; SLDC state-level
+# overrides will repopulate this dict in factors-india slice 2.
 
 # Scope 2: Purchased Steam/Heating (tCO2e per GJ)
 STEAM_EMISSION_FACTORS = {

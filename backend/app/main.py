@@ -1,11 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header, Request
+import logging
+import time
+
+import sentry_sdk
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import pdfplumber
-import io
-import time
-import logging
-import sentry_sdk
 from supabase import create_client
 
 from app.config import get_settings
@@ -28,30 +27,29 @@ if _settings.SENTRY_DSN:
         environment=_settings.ENVIRONMENT,
     )
     logger.info("Sentry initialized for %s", _settings.ENVIRONMENT)
-from app.extraction import extract_with_regex, calculate_confidence
-from app.extraction_enhanced import extract_enhanced
-from app.ai_extraction import extract_with_ai
-from app.agent_extraction import extract_with_agent
-from app.brsr_framework import analyze_gaps, BRSR_FRAMEWORK, get_mandatory_fields, get_core_fields
-from app.brsr_datapoints import BRSR_DATAPOINTS, get_datapoints_stats, analyze_gaps_v2, get_esrs_mapped_datapoints
-from app.nifty50_benchmarks import (
-    SECTOR_BENCHMARKS, detect_sector, get_benchmark_comparison,
-    NIFTY50_DISCLOSURE_PATTERNS, BENCHMARK_METADATA,
-)
 from app.billing import router as billing_router
-from app.pdf_generator import generate_compliance_pdf
-from app.router_v2 import router as v2_router
-from app.router_platform import router as platform_router
-from app.router_advanced import router as advanced_router
-from app.router_org import router as org_router
-from app.router_moat import router as moat_router
-from app.router_market import router as market_router
+from app.brsr_datapoints import BRSR_DATAPOINTS, analyze_gaps_v2, get_datapoints_stats, get_esrs_mapped_datapoints
+from app.brsr_framework import BRSR_FRAMEWORK, get_core_fields, get_mandatory_fields
 from app.excel_import import router as excel_import_router
+from app.extraction_pipeline import run_full_extraction
+from app.nifty50_benchmarks import (
+    BENCHMARK_METADATA,
+    NIFTY50_DISCLOSURE_PATTERNS,
+    SECTOR_BENCHMARKS,
+    get_benchmark_comparison,
+)
+from app.pdf_generator import generate_compliance_pdf
+from app.router_advanced import router as advanced_router
 from app.router_cron import router as cron_router
+from app.router_market import router as market_router
+from app.router_moat import router as moat_router
+from app.router_org import router as org_router
+from app.router_platform import router as platform_router
+from app.router_trends import router as trends_router
+from app.router_v2 import router as v2_router
+from app.sebi_pdf_filing import router as sebi_pdf_router
 from app.xbrl_export import router as xbrl_router
 from app.xbrl_filing import router as xbrl_filing_router
-from app.sebi_pdf_filing import router as sebi_pdf_router
-from app.router_trends import router as trends_router
 
 app = FastAPI(title="FileBRSR Platform API", version="4.0.0")
 
@@ -100,6 +98,7 @@ def _check_guest_rate_limit(request: Request) -> None:
             _GUEST_EXTRACT_LOG[k] = [t for t in _GUEST_EXTRACT_LOG[k] if t > cutoff]
             if not _GUEST_EXTRACT_LOG[k]:
                 del _GUEST_EXTRACT_LOG[k]
+
 
 # Register routers
 app.include_router(billing_router)
@@ -181,59 +180,30 @@ async def extract_brsr(
         if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large")
 
-        # Extract text from PDF
-        text = ""
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+        # Run the unified pipeline (Phase 5.1). Handles parse + OCR +
+        # regex/enhanced/ai/agent merge + normalise + citations + retrieval.
+        result = await run_full_extraction(
+            file_bytes=content,
+            settings=settings,
+            report_id=report_id,
+            user_id=user_id,
+            supabase_client=supabase,
+        )
 
-        if not text.strip():
-            supabase.table("reports").update({"status": "failed"}).eq(
-                "id", report_id
-            ).execute()
-            return {"status": "failed", "error": "No text could be extracted from PDF"}
+        if result["status"] != "completed":
+            if report_id != "guest":
+                supabase.table("reports").update({"status": "failed"}).eq(
+                    "id", report_id,
+                ).execute()
+            return {"status": "failed", "error": result["error"]}
 
-        # Dual extraction: regex + AI agent + enhanced
-        regex_results = extract_with_regex(text)
-        enhanced_results = extract_enhanced(text)
+        merged = result["extracted_data"]
+        confidence = result["confidence_scores"]
+        company_name = result["company_name"]
+        financial_year = result["financial_year"]
 
-        # Use multi-pass agent (primary) with single-shot fallback
-        try:
-            ai_results = await extract_with_agent(text, settings.GROQ_API_KEY)
-            agent_fields = sum(len(v) for v in ai_results.values() if isinstance(v, dict))
-            print(f"Agent extraction: {agent_fields} fields")
-            # If agent got very few fields, try single-shot as supplement
-            if agent_fields < 10:
-                print("Agent got few fields, supplementing with single-shot...")
-                single_shot = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
-                for section in ["section_a", "section_b", "section_c"]:
-                    for k, v in single_shot.get(section, {}).items():
-                        if k not in ai_results.get(section, {}):
-                            ai_results.setdefault(section, {})[k] = v
-        except Exception as ai_err:
-            print(f"Agent extraction failed, falling back to single-shot: {ai_err}")
-            try:
-                ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
-            except Exception:
-                ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
-
-        # Merge results: enhanced base → regex fills → AI takes precedence
-        merged = {"section_a": {}, "section_b": {}, "section_c": {}}
-        for section in ["section_a", "section_b", "section_c"]:
-            merged[section] = {**enhanced_results.get(section, {})}
-            merged[section].update(regex_results.get(section, {}))
-            merged[section].update(ai_results.get(section, {}))
-
-        # Calculate confidence scores
-        confidence = calculate_confidence(regex_results, ai_results)
-
-        # Extract company name and FY if available
-        company_name = merged.get("section_a", {}).get("company_name", None)
-        financial_year = merged.get("section_a", {}).get("financial_year", None)
-
-        # Benchmark comparison against NIFTY 50 peers
+        # Benchmark + gap analysis are response-only concerns (not part of
+        # the pipeline's core contract — they don't need OCR/retrieval).
         benchmark = get_benchmark_comparison(merged)
         gap_analysis = analyze_gaps_v2(merged)
         datapoints_stats = get_datapoints_stats()
@@ -290,40 +260,18 @@ async def guest_extract_brsr(
         if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large")
 
-        text = ""
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+        # Unified pipeline — guest path: report_id="guest" disables chunk
+        # persistence so anonymous uploads never touch extraction_chunks.
+        result = await run_full_extraction(
+            file_bytes=content,
+            settings=settings,
+            report_id="guest",
+        )
+        if result["status"] != "completed":
+            return {"status": "failed", "error": result["error"]}
 
-        if not text.strip():
-            return {"status": "failed", "error": "No text could be extracted from PDF"}
-
-        regex_results = extract_with_regex(text)
-        enhanced_results = extract_enhanced(text)
-        try:
-            ai_results = await extract_with_agent(text, settings.GROQ_API_KEY)
-            agent_fields = sum(len(v) for v in ai_results.values() if isinstance(v, dict))
-            if agent_fields < 10:
-                single_shot = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
-                for section in ["section_a", "section_b", "section_c"]:
-                    for k, v in single_shot.get(section, {}).items():
-                        if k not in ai_results.get(section, {}):
-                            ai_results.setdefault(section, {})[k] = v
-        except Exception:
-            try:
-                ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
-            except Exception:
-                ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
-
-        merged = {"section_a": {}, "section_b": {}, "section_c": {}}
-        for section in ["section_a", "section_b", "section_c"]:
-            merged[section] = {**enhanced_results.get(section, {})}
-            merged[section].update(regex_results.get(section, {}))
-            merged[section].update(ai_results.get(section, {}))
-
-        confidence = calculate_confidence(regex_results, ai_results)
+        merged = result["extracted_data"]
+        confidence = result["confidence_scores"]
         benchmark = get_benchmark_comparison(merged)
 
         return {
@@ -500,6 +448,61 @@ async def get_extraction_status(report_id: str, authorization: str = Header(...)
     return {"status": result.data["status"], "company_name": result.data.get("company_name"), "financial_year": result.data.get("financial_year")}
 
 
+class CorrectionRequest(BaseModel):
+    """User-submitted fix to a single extracted BRSR field."""
+
+    report_id: str
+    user_id: str
+    section: str  # "section_a" | "section_b" | "section_c"
+    field_path: str  # e.g. "turnover", "ghg_scope1"
+    original_value: str | None = None
+    corrected_value: str
+    source_page: int | None = None
+
+
+@app.post("/api/correction")
+async def submit_correction(req: CorrectionRequest, authorization: str = Header(...)):
+    """
+    Capture a single user correction. Writes to extraction_corrections
+    (migration v10). The Next.js layer authenticates the user and
+    verifies report ownership before calling us; we accept user_id from
+    the body and trust the shared-bearer pattern the rest of /api/*
+    already uses.
+    """
+    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
+    if authorization != expected_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if req.section not in {"section_a", "section_b", "section_c"}:
+        raise HTTPException(status_code=400, detail="Invalid section")
+    if not req.field_path or not req.field_path.strip():
+        raise HTTPException(status_code=400, detail="field_path required")
+    if not req.corrected_value or not req.corrected_value.strip():
+        raise HTTPException(status_code=400, detail="corrected_value required")
+
+    supabase = get_supabase_admin()
+    try:
+        result = supabase.table("extraction_corrections").insert({
+            "report_id": req.report_id,
+            "user_id": req.user_id,
+            "section": req.section,
+            "field_path": req.field_path.strip(),
+            "original_value": req.original_value,
+            "corrected_value": req.corrected_value.strip(),
+            "source_page": req.source_page,
+        }).execute()
+    except Exception as e:
+        logger.error("Failed to insert correction: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to save correction") from e
+
+    correction_id = result.data[0]["id"] if result.data else None
+    logger.info(
+        "Correction saved: report=%s field=%s.%s user=%s id=%s",
+        req.report_id, req.section, req.field_path, req.user_id, correction_id,
+    )
+    return {"status": "ok", "correction_id": correction_id}
+
+
 @app.post("/api/extract-async")
 async def extract_brsr_async(
     req: ExtractAsyncRequest,
@@ -525,41 +528,39 @@ async def extract_brsr_async(
         if len(file_bytes) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large")
 
-        # Extract text from PDF (limit to first 80 pages for performance on free tier)
-        text = ""
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-            for i, page in enumerate(pdf.pages):
-                if i >= 80:
-                    break
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
-
-        if not text.strip():
-            supabase.table("reports").update({"status": "failed"}).eq(
-                "id", req.report_id
-            ).execute()
-            return {"status": "failed", "error": "No text could be extracted from PDF"}
-
-        # Triple extraction: regex + enhanced + AI
-        regex_results = extract_with_regex(text)
-        enhanced_results = extract_enhanced(text)
+        # Look up user_id once so retrieval-chunk persistence can attribute
+        # the rows (best-effort; doesn't fail the extraction if it can't).
+        worker_user_id = None
         try:
-            ai_results = await extract_with_ai(text, settings.GEMINI_API_KEY, settings.GROQ_API_KEY, settings.ANTHROPIC_API_KEY)
-        except Exception as ai_err:
-            print(f"AI extraction failed (using regex only): {ai_err}")
-            ai_results = {"section_a": {}, "section_b": {}, "section_c": {}}
+            row = supabase.table("reports").select("user_id").eq(
+                "id", req.report_id,
+            ).single().execute()
+            worker_user_id = (row.data or {}).get("user_id")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("failed to resolve user_id for report=%s: %s",
+                           req.report_id, exc)
 
-        # Merge: enhanced base → regex fills → AI takes precedence
-        merged = {"section_a": {}, "section_b": {}, "section_c": {}}
-        for section in ["section_a", "section_b", "section_c"]:
-            merged[section] = {**enhanced_results.get(section, {})}
-            merged[section].update(regex_results.get(section, {}))
-            merged[section].update(ai_results.get(section, {}))
+        # Unified pipeline (Phase 5.1). 80-page cap preserved for free-tier
+        # LLM quota on huge filings.
+        result = await run_full_extraction(
+            file_bytes=file_bytes,
+            settings=settings,
+            report_id=req.report_id,
+            user_id=worker_user_id,
+            supabase_client=supabase,
+            max_pages=80,
+        )
 
-        confidence = calculate_confidence(regex_results, ai_results)
-        company_name = merged.get("section_a", {}).get("company_name", None)
-        financial_year = merged.get("section_a", {}).get("financial_year", None)
+        if result["status"] != "completed":
+            supabase.table("reports").update({"status": "failed"}).eq(
+                "id", req.report_id,
+            ).execute()
+            return {"status": "failed", "error": result["error"]}
+
+        merged = result["extracted_data"]
+        confidence = result["confidence_scores"]
+        company_name = result["company_name"]
+        financial_year = result["financial_year"]
 
         # Update report in DB
         supabase.table("reports").update(
@@ -608,10 +609,10 @@ class PDFReportRequest(BaseModel):
 async def generate_pdf_report(req: PDFReportRequest):
     """Generate a branded PDF compliance report."""
     from fastapi.responses import Response
-    
+
     gap_analysis = analyze_gaps_v2(req.extracted_data)
     benchmark = get_benchmark_comparison(req.extracted_data, req.sector)
-    
+
     pdf_bytes = generate_compliance_pdf(
         extracted_data=req.extracted_data,
         gap_analysis=gap_analysis,
@@ -619,7 +620,7 @@ async def generate_pdf_report(req: PDFReportRequest):
         company_name=req.company_name,
         financial_year=req.financial_year,
     )
-    
+
     filename = f"BRSR_Report_{req.company_name.replace(' ', '_')}_{req.financial_year}.pdf"
     return Response(
         content=pdf_bytes,
@@ -639,6 +640,7 @@ class SEBIFilingRequest(BaseModel):
 async def generate_sebi_filing(req: SEBIFilingRequest, authorization: str = Header(...)):
     """Generate SEBI BRSR Annexure II format PDF — the actual stock exchange filing."""
     from fastapi.responses import Response
+
     from app.sebi_pdf_generator import generate_sebi_brsr_filing
 
     expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"

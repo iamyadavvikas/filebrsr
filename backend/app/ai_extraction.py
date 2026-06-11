@@ -130,7 +130,14 @@ async def _extract_with_bedrock(text: str, region: str = "ap-south-1") -> dict[s
 
 
 async def _extract_with_gemini(text: str, api_key: str) -> dict[str, Any]:
-    """Extract using Google Gemini."""
+    """
+    Extract using Google Gemini Flash with JSON-mode response.
+
+    Forces `response_mime_type="application/json"` so the model can only emit
+    valid JSON — eliminates the brittle regex `_parse_ai_response` fallback
+    path and gives the model a clean signal to return `null` for unknown
+    fields rather than hallucinating or dropping them silently.
+    """
     client = genai.Client(api_key=api_key)
 
     max_chars = 900000
@@ -145,6 +152,7 @@ async def _extract_with_gemini(text: str, api_key: str) -> dict[str, Any]:
             config=genai.types.GenerateContentConfig(
                 temperature=0.1,
                 max_output_tokens=4096,
+                response_mime_type="application/json",
             ),
         ),
         timeout=30.0,

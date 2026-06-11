@@ -7,7 +7,10 @@ on:
     branches: [main, dev]
 
 jobs:
-  frontend-lint-build:
+  # Job IDs are 'frontend' / 'backend' to match the branch-protection
+  # required-status-check names. Don't rename without updating branch
+  # protection in repo Settings → Branches.
+  frontend:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -29,7 +32,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-key-for-build
 
-  backend-lint-test:
+  backend:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -50,11 +53,15 @@ jobs:
       - run: pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
         env:
           SUPABASE_URL: https://example.supabase.co
-          SUPABASE_SERVICE_KEY: test-key
+          # Must match the default in tests/conftest.py — the correction
+          # endpoint compares the request bearer to settings.SUPABASE_SERVICE_KEY,
+          # and conftest only sets this with os.environ.setdefault() so a
+          # different CI value silently breaks TestCorrectionEndpoint with 401s.
+          SUPABASE_SERVICE_KEY: test-service-key
           ALLOWED_ORIGINS: http://localhost:3000
 
   deploy:
-    needs: [frontend-lint-build, backend-lint-test]
+    needs: [frontend, backend]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:

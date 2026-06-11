@@ -5,9 +5,10 @@ import { ESGDashboard } from "./ESGDashboard";
 
 interface Props {
   reportData: Record<string, unknown>;
+  reportId?: string;
 }
 
-export default function AuthenticatedESGDashboard({ reportData }: Props) {
+export default function AuthenticatedESGDashboard({ reportData, reportId }: Props) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -24,5 +25,5 @@ export default function AuthenticatedESGDashboard({ reportData }: Props) {
   }, [reportData]);
 
   if (!ready) return null;
-  return <ESGDashboard />;
+  return <ESGDashboard reportId={reportId} />;
 }
