@@ -162,3 +162,19 @@ async def test_pre_v18_no_published_column_is_visible():
         resp = await _get(calc_id)
     assert resp.status_code == 200
     assert resp.json()["status"] == "PASS"
+
+
+async def test_live_example_passes_without_db():
+    """The worked example is a real signature/verification, no DB row needed."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        resp = await ac.get("/api/verify/example")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "PASS"
+    assert body["verified"] is True
+    assert body["is_example"] is True
+    assert body["scope"] == 2
+    assert body["factor"]["source"]
+    assert body["example_input"]
+

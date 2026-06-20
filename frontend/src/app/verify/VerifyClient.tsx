@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ShieldCheck, ShieldAlert, Search, Loader2, FileDown, KeyRound, GitBranch } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Search, Loader2, FileDown, KeyRound, GitBranch, PlayCircle } from "lucide-react";
 
 type Factor = {
   id: string | null;
@@ -26,11 +26,14 @@ type VerifyResult = {
   jurisdiction: string | null;
   factor: Factor;
   provenance_graph: Record<string, unknown>;
+  is_example?: boolean;
+  example_input?: string;
 };
 
 export default function VerifyClient() {
   const [id, setId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [exampleLoading, setExampleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VerifyResult | null>(null);
 
@@ -80,6 +83,28 @@ export default function VerifyClient() {
     await runVerify(id.trim());
   }
 
+  // One-click live demo: pulls a real, freshly-signed example from the backend
+  // and verifies it through the exact same path a buyer's auditor would. No
+  // input needed — proves the moat to a non-cryptographer in a single click.
+  async function runExample() {
+    setExampleLoading(true);
+    setError(null);
+    setResult(null);
+    setId("");
+    try {
+      const res = await fetch(`${backendUrl}/api/verify/example`);
+      if (!res.ok) {
+        setError("The live example is unavailable right now. Please try again later.");
+        return;
+      }
+      setResult((await res.json()) as VerifyResult);
+    } catch {
+      setError("Could not reach the verification service.");
+    } finally {
+      setExampleLoading(false);
+    }
+  }
+
   const pass = result?.verified === true;
 
   return (
@@ -124,8 +149,9 @@ export default function VerifyClient() {
               </span>
             </h1>
             <p style={{ fontSize: 17, color: "#475569", maxWidth: 560, lineHeight: 1.7, margin: "0 auto" }}>
-              Independently confirm that a FileBRSR-disclosed number is authentic, untampered,
-              and traceable to its emission-factor source. No login required.
+              Auditor-ready evidence on tap. Confirm any FileBRSR number is authentic,
+              untampered and traceable to its emission-factor source &mdash; in seconds,
+              with no login and no manual audit trail to assemble.
             </p>
           </div>
         </section>
@@ -151,9 +177,37 @@ export default function VerifyClient() {
               </button>
             </form>
 
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={runExample}
+                disabled={exampleLoading || loading}
+                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+              >
+                {exampleLoading ? <Loader2 size={16} className="animate-spin" /> : <PlayCircle size={16} />}
+                Try a live example &mdash; no ID needed
+              </button>
+              <span className="text-sm text-gray-500">
+                See a real, signed figure verify to PASS in one click.
+              </span>
+            </div>
+
             {error && (
               <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
                 {error}
+              </div>
+            )}
+
+            {result?.is_example && (
+              <div className="mt-8 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                <span className="font-semibold">Live worked example.</span>{" "}
+                This figure was computed and Ed25519-signed by FileBRSR just now, then
+                re-verified below through the exact path an auditor would use.
+                {result.example_input ? (
+                  <span className="block mt-1 text-emerald-800">
+                    Input: {result.example_input}.
+                  </span>
+                ) : null}
               </div>
             )}
 
@@ -206,14 +260,21 @@ export default function VerifyClient() {
                 </dl>
 
                 <div className="px-6 py-5 border-t border-gray-100">
-                  <a
-                    href={`${backendUrl}/api/verify/${encodeURIComponent(result.calculation_id)}/bundle`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-emerald-700"
-                  >
-                    <FileDown size={16} /> Download auditor evidence bundle
-                  </a>
+                  {result.is_example ? (
+                    <p className="text-sm text-gray-500">
+                      On a real disclosure, an auditor evidence bundle (signed record + factor
+                      citation, self-verifying) is downloadable here.
+                    </p>
+                  ) : (
+                    <a
+                      href={`${backendUrl}/api/verify/${encodeURIComponent(result.calculation_id)}/bundle`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-emerald-700"
+                    >
+                      <FileDown size={16} /> Download auditor evidence bundle
+                    </a>
+                  )}
                 </div>
               </div>
             )}
@@ -225,11 +286,12 @@ export default function VerifyClient() {
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-10">
               <h2 style={{ fontSize: "clamp(24px, 3.5vw, 34px)", fontWeight: 800, color: "#0F172A", letterSpacing: -0.8, marginBottom: 12 }}>
-                How verification works
+                Auditor-ready, without the manual audit
               </h2>
               <p style={{ fontSize: 16, color: "#475569", maxWidth: 620, margin: "0 auto", lineHeight: 1.7 }}>
-                Every number FileBRSR publishes is cryptographically signed and recorded on an append-only ledger.
-                Anyone &mdash; auditors, regulators, buyers &mdash; can confirm it in seconds.
+                Every number FileBRSR publishes carries its own proof. Your auditor, regulator or
+                buyer confirms it in seconds &mdash; no spreadsheets to reconcile, no evidence trail to
+                chase. The cryptography runs underneath; the outcome is a figure they can trust on sight.
               </p>
             </div>
 
