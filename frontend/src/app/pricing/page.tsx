@@ -47,7 +47,7 @@ const plans = [
     features: [
       "5 supplier ESG assessments",
       "3 AI BRSR extractions (one-time)",
-      "Scope 1 & 2 carbon calculator",
+      "Scope 1 & 2 carbon (Scope 3 preview)",
       "Basic gap analysis & scoring",
       "Shareable ESG badge",
       "Industry benchmarks",
@@ -63,11 +63,11 @@ const plans = [
     period: "/year",
     monthlyEquiv: "₹4,167/month",
     desc: "For listed companies scaling supplier oversight",
-    reports: "Unlimited extractions + 25 suppliers + Scope 3",
+    reports: "Unlimited extractions + 25 suppliers",
     features: [
       "25 supplier assessments",
       "Unlimited AI BRSR extractions",
-      "Full Scope 1, 2 & 3 carbon",
+      "Full Scope 3 carbon + signed certificates",
       "Multi-framework mapping (GRI, CDP, TCFD, SASB)",
       "NIFTY 50 sector benchmarks",
       "PDF + XBRL-JSON export",
@@ -124,7 +124,7 @@ const plans = [
 const comparisonData = [
   { feature: "AI BRSR extractions", free: "3 (one-time)", growth: "Unlimited", scale: "Unlimited", enterprise: "Unlimited" },
   { feature: "Supplier assessments", free: "5", growth: "25", scale: "Unlimited", enterprise: "Unlimited" },
-  { feature: "Carbon calculator", free: "Scope 1 & 2", growth: "Scope 1, 2 & 3", scale: "Scope 1, 2 & 3", enterprise: "Scope 1, 2 & 3" },
+  { feature: "Carbon calculator", free: "Scope 1 & 2 (Scope 3 preview)", growth: "Full Scope 3 + signed certificates", scale: "Full Scope 3 + signed certificates", enterprise: "Full Scope 3 + signed certificates" },
   { feature: "ESG scorecard & badge", free: "✓", growth: "✓", scale: "✓", enterprise: "✓" },
   { feature: "Gap analysis", free: "Basic", growth: "Full", scale: "Full", enterprise: "Full" },
   { feature: "Multi-framework mapping", free: "—", growth: "✓", scale: "✓", enterprise: "✓" },

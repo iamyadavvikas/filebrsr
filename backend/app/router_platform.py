@@ -7,10 +7,11 @@ import json
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.action_plan import NGRBC_PRINCIPLES, generate_action_plan_from_gaps
+from app.billing import plan_meets
 from app.brsr_datapoints import BRSR_DATAPOINTS
 from app.carbon_calculator import (
     CEA_GRID_EMISSION_FACTORS,
@@ -546,6 +547,65 @@ async def resolve_org_user(authorization: Optional[str]) -> tuple[Optional[str],
     return org_id, user_id
 
 
+# Free tier may preview up to this many Scope 3 categories on-screen (unsigned,
+# not persisted). Beyond this — or any signing/persistence — requires Growth+.
+FREE_SCOPE3_PREVIEW_LIMIT = 3
+
+
+async def resolve_caller_plan(authorization: Optional[str]) -> str:
+    """Resolve the caller's active plan tier from their ``profiles`` row.
+
+    Mirrors the lookup used by billing/subscription and api_keys (source of
+    truth is ``profiles.plan``). Falls back to ``"free"`` for demo or
+    unauthenticated callers, the service key, or any unresolvable profile.
+    """
+    if not authorization:
+        return "free"
+    token = authorization.replace("Bearer ", "").strip()
+    if not token or token == settings.SUPABASE_SERVICE_KEY:
+        return "free"
+    try:
+        import jwt as pyjwt
+
+        payload = pyjwt.decode(token, options={"verify_signature": False})
+        user_id = payload.get("sub")
+    except Exception:  # noqa: BLE001
+        return "free"
+    if not user_id:
+        return "free"
+    try:
+        sb = get_supabase_admin()
+        profile = (
+            sb.table("profiles").select("plan").eq("id", user_id).single().execute()
+        )
+        return (profile.data or {}).get("plan") or "free"
+    except Exception:  # noqa: BLE001
+        return "free"
+
+
+def require_plan(minimum: str):
+    """FastAPI dependency factory: 402 unless the caller's plan meets ``minimum``.
+
+    Used to gate full Scope 3 (signing + persistence) behind a paid tier while
+    keeping Scope 1 & 2 and the limited free Scope 3 preview ungated.
+    """
+
+    async def _dependency(authorization: Optional[str] = Header(None)) -> str:
+        plan = await resolve_caller_plan(authorization)
+        if not plan_meets(plan, minimum):
+            raise HTTPException(
+                status_code=402,
+                detail=(
+                    f"Full Scope 3 (signed certificates & persistence) requires the "
+                    f"{minimum.title()} plan or higher. The Free tier includes a "
+                    f"preview of up to {FREE_SCOPE3_PREVIEW_LIMIT} Scope 3 categories."
+                ),
+            )
+        return plan
+
+    return _dependency
+
+
 def _persist_signed_result(
     result, signed, calc_id, org_id, user_id, jurisdiction=None, framework_tags=None
 ) -> bool:
@@ -766,8 +826,14 @@ async def calc_scope3_provenance(
     req: Scope3ProvenanceRequest,
     background_tasks: BackgroundTasks,
     authorization: Optional[str] = Header(None),
+    _plan: str = Depends(require_plan("growth")),
 ):
-    """Scope 3 emissions with a signed W3C PROV-O graph."""
+    """Scope 3 emissions with a signed W3C PROV-O graph.
+
+    Signing & persistence of Scope 3 is a paid differentiator — gated to the
+    Growth plan or higher via ``require_plan``. Free tier callers get a 402 and
+    must use the unsigned on-screen preview instead.
+    """
     from app.calculator import FactorNotFoundError, scope3_category, sign_result
     from app.prov import verify_signed_provenance
 
@@ -798,7 +864,13 @@ async def calc_scope3_provenance(
 
 @router.post("/carbon/scope3")
 async def calc_scope3(req: Scope3Request):
-    """Calculate Scope 3 emissions by category."""
+    """Calculate Scope 3 emissions by category.
+
+    Single-category, unsigned, not persisted — this is part of the free Scope 3
+    preview, so it stays ungated. Signing/persistence and the full multi-category
+    summary are gated separately (see /carbon/scope3/provenance and the Scope 3
+    branch in /carbon/summary).
+    """
     result = calculate_scope3_emissions(req.category, req.quantity)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -806,8 +878,32 @@ async def calc_scope3(req: Scope3Request):
 
 
 @router.post("/carbon/summary")
-async def carbon_summary(req: CarbonSummaryRequest):
-    """Calculate complete carbon footprint summary."""
+async def carbon_summary(
+    req: CarbonSummaryRequest,
+    authorization: Optional[str] = Header(None),
+):
+    """Calculate complete carbon footprint summary.
+
+    Scope 1 & 2 are always free. The Scope 3 portion is limited to a preview of
+    up to ``FREE_SCOPE3_PREVIEW_LIMIT`` categories for Free tier callers;
+    requesting more returns 402 (Payment Required). Growth+ gets all 15
+    categories. This endpoint never signs or persists — it is on-screen only.
+    """
+    plan = await resolve_caller_plan(authorization)
+    if req.scope3_entries and not plan_meets(plan, "growth"):
+        distinct_categories = {
+            e.get("category") for e in req.scope3_entries if e.get("category")
+        }
+        if len(distinct_categories) > FREE_SCOPE3_PREVIEW_LIMIT:
+            raise HTTPException(
+                status_code=402,
+                detail=(
+                    "The Free tier includes a preview of up to "
+                    f"{FREE_SCOPE3_PREVIEW_LIMIT} Scope 3 categories. Upgrade to "
+                    "Growth for all 15 categories with signed certificates."
+                ),
+            )
+
     scope1_total = 0
     scope1_details = []
     for entry in req.scope1_entries:
