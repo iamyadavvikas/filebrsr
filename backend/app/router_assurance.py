@@ -20,6 +20,8 @@ the bearer token, so each tenant sees only its own ledger.
 
 from __future__ import annotations
 
+import re
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -45,6 +47,48 @@ def get_supabase_admin():
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
 
+def _ensure_personal_org(sb: object, user_id: str, profile: dict) -> str:
+    """Provision (or adopt) a personal org for a user that has none, and link
+    their profile to it.
+
+    Assurance rows are org-scoped via an FK to ``organizations(id)``, so every
+    caller must belong to exactly one org. Most platform users were never put
+    through org onboarding (``profiles.org_id`` is null), which previously made
+    every assurance call 403 and surfaced as "API offline". This self-heals by
+    giving the user a personal org on first use, mirroring ``POST /api/org``.
+    """
+    existing = (
+        sb.table("organizations").select("id").eq("created_by", user_id).limit(1).execute()
+    )
+    if existing.data:
+        org_id = existing.data[0]["id"]
+    else:
+        name = (
+            (profile.get("company_name") or "").strip()
+            or (profile.get("email") or "").split("@")[0].strip()
+            or "My Organization"
+        )
+        slug = re.sub(r"-+", "-", re.sub(r"[^a-zA-Z0-9]", "-", name.lower())).strip("-")
+        slug = f"{slug or 'org'}-{user_id[:6]}"
+        org = (
+            sb.table("organizations")
+            .insert({"name": name, "slug": slug, "plan": "free", "created_by": user_id})
+            .execute()
+        )
+        org_id = org.data[0]["id"]
+        sb.table("org_members").insert(
+            {
+                "org_id": org_id,
+                "user_id": user_id,
+                "role": "owner",
+                "joined_at": datetime.utcnow().isoformat(),
+                "status": "active",
+            }
+        ).execute()
+    sb.table("profiles").update({"org_id": org_id}).eq("id", user_id).execute()
+    return org_id
+
+
 async def _resolve_org_id(authorization: str) -> tuple[object, str]:
     """Resolve the caller's org from the bearer token; return (supabase, org_id)."""
     token = (authorization or "").replace("Bearer ", "").strip()
@@ -59,11 +103,16 @@ async def _resolve_org_id(authorization: str) -> tuple[object, str]:
 
     sb = get_supabase_admin()
     profile = (
-        sb.table("profiles").select("org_id").eq("id", user_id).single().execute()
+        sb.table("profiles")
+        .select("org_id, email, company_name")
+        .eq("id", user_id)
+        .single()
+        .execute()
     )
-    org_id = (profile.data or {}).get("org_id")
+    data = profile.data or {}
+    org_id = data.get("org_id")
     if not org_id:
-        raise HTTPException(status_code=403, detail="User is not part of an organization")
+        org_id = _ensure_personal_org(sb, user_id, data)
     return sb, org_id
 
 
