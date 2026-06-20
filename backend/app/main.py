@@ -49,6 +49,7 @@ from app.router_org import router as org_router
 from app.router_platform import router as platform_router
 from app.router_tally import router as tally_router
 from app.router_verify import router as verify_router
+from app.router_assurance import router as assurance_router
 from app.router_trends import router as trends_router
 from app.router_v2 import router as v2_router
 from app.sebi_pdf_filing import router as sebi_pdf_router
@@ -142,6 +143,7 @@ app.include_router(sebi_pdf_router)
 app.include_router(trends_router)
 app.include_router(tally_router)
 app.include_router(verify_router)
+app.include_router(assurance_router)
 app.include_router(api_keys_router)
 
 app.add_middleware(
