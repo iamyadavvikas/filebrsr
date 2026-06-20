@@ -157,14 +157,14 @@ def test_state_only_falls_through_to_national():
 
 
 def test_unknown_scope_raises():
-    with pytest.raises(FactorNotFound, match="slice 1 does not support"):
+    with pytest.raises(FactorNotFound, match="unsupported factor request"):
         get_india_factor(
             scope=1, category="electricity_purchased", method="location_based",
         )
 
 
 def test_unknown_method_raises():
-    with pytest.raises(FactorNotFound, match="slice 1 does not support"):
+    with pytest.raises(FactorNotFound, match="unsupported factor request"):
         get_india_factor(
             scope=2, category="electricity_purchased", method="market_based",
         )

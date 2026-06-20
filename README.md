@@ -536,6 +536,66 @@ docker compose -f docker-compose.prod.yml exec nginx nginx -s reload
 
 ---
 
+## Observability (metrics + dashboards)
+
+The backend exposes Prometheus metrics at `GET /metrics` (RED metrics for every
+HTTP request plus domain counters):
+
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `filebrsr_http_requests_total` | counter | `method,path,status` | requests by route template |
+| `filebrsr_http_request_duration_seconds` | histogram | `method,path` | request latency |
+| `filebrsr_prov_signatures_total` | counter | — | provenance signing ops |
+| `filebrsr_prov_verifications_total` | counter | `result` | public verify PASS/FAIL |
+| `filebrsr_ledger_appends_total` | counter | `result` | Merkle ledger appends |
+| `filebrsr_extractions_total` | counter | `result` | extraction pipeline runs |
+
+`path` is always the matched **route template** (e.g. `/api/verify/{calculation_id}`),
+never a raw URL, to keep Prometheus label cardinality bounded. The `/metrics`
+endpoint is internal (scraped from the backend container; not proxied publicly
+via nginx).
+
+### Run the local stack
+
+With the backend running on `localhost:8000`:
+
+```bash
+docker compose -f observability/docker-compose.observability.yml up
+# Grafana    → http://localhost:3001  (admin / admin)
+# Prometheus → http://localhost:9090
+```
+
+If those host ports are taken, override them:
+
+```bash
+PROM_PORT=9091 GRAFANA_PORT=3005 \
+  docker compose -f observability/docker-compose.observability.yml up
+```
+
+Grafana auto-provisions the Prometheus datasource and the **FileBRSR — Service
+Overview** dashboard (request rate, error ratio, p50/p95/p99 latency,
+verification outcomes, signing / ledger / extraction counters). Config lives in
+`observability/`.
+
+### In production
+
+The prod stack ([docker-compose.prod.yml](docker-compose.prod.yml)) runs
+`prometheus` + `grafana` alongside the app. Grafana is served privately at
+**https://filebrsr.com/grafana/** behind its own admin login; the backend
+`/metrics` surface is internal-only (nginx returns 404 for `/backend/metrics`;
+Prometheus scrapes `backend:8000` over the compose network).
+
+Grafana defaults to `admin` / `admin` on first login and prompts for a new
+password. To set credentials up front instead, add to the EC2 `~/filebrsr/.env`:
+
+```bash
+# both optional — default to "admin":
+# GRAFANA_ADMIN_USER=<user>
+# GRAFANA_ADMIN_PASSWORD=<strong-password>
+```
+
+---
+
 ## Known gaps / roadmap
 
 See full breakdown earlier in this session, summary here:

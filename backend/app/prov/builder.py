@@ -70,6 +70,10 @@ def build_calculation_graph(inp: CalculationProvenanceInput) -> dict[str, Any]:
         output_entity["wasDerivedFrom"] = input_iris
     if inp.uncertainty is not None:
         output_entity["fbrsr:uncertainty"] = _stringify(inp.uncertainty)
+    if inp.jurisdiction:
+        output_entity["fbrsr:jurisdiction"] = inp.jurisdiction
+    if inp.framework_tags:
+        output_entity["fbrsr:frameworkTags"] = list(inp.framework_tags)
 
     factor_entity: dict[str, Any] = {
         "@id": factor_iri,
@@ -129,6 +133,9 @@ def sign_graph(graph: dict[str, Any]) -> SignedProvenance:
     signature = signer.sign(canonical)
     import base64
 
+    from app.metrics import record_signature
+
+    record_signature()
     return SignedProvenance(
         graph=graph,
         canonical_sha256=digest_hex,

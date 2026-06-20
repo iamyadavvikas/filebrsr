@@ -39,6 +39,7 @@ _ALLOWED_SCOPES = {1, 2, 3}
 _ALLOWED_METHODS = {"location_based", "market_based", "default"}
 _ALLOWED_REGIONS = {"NR", "ER", "WR", "SR", "NER"}
 _ALLOWED_SPECIFICITY = {"national", "regional", "state"}
+_ALLOWED_JURISDICTIONS = {"IN", "AU"}
 _REQUIRED_METADATA_KEYS = (
     "source", "version", "vintage", "citation_url", "published_on",
 )
@@ -68,6 +69,12 @@ def _validate_metadata(meta: dict[str, Any], *, file: Path) -> None:
         date.fromisoformat(meta["published_on"])
     except (TypeError, ValueError) as exc:
         raise FactorFileError(f"{file}: invalid ISO date: {exc}") from exc
+    jurisdiction = meta.get("jurisdiction", "IN")
+    if jurisdiction not in _ALLOWED_JURISDICTIONS:
+        raise FactorFileError(
+            f"{file}: metadata.jurisdiction must be in {_ALLOWED_JURISDICTIONS}, "
+            f"got {jurisdiction!r}"
+        )
 
 
 def _validate_factor(row: dict[str, Any], *, file: Path, idx: int) -> None:
@@ -139,6 +146,7 @@ class FactorRecord:
     uncertainty: dict[str, Any] | None
     is_placeholder: bool
     # File-level metadata copied onto every row for cheap lookup
+    jurisdiction: str
     source: str
     version: str
     vintage: tuple[str, str]
@@ -181,6 +189,7 @@ def _load_file(path: Path) -> list[FactorRecord]:
             value=float(row["value"]),
             uncertainty=row.get("uncertainty"),
             is_placeholder=bool(row.get("_placeholder", False)),
+            jurisdiction=str(meta.get("jurisdiction", "IN")),
             source=str(meta["source"]),
             version=str(meta["version"]),
             vintage=(str(meta["vintage"][0]), str(meta["vintage"][1])),

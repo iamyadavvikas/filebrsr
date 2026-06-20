@@ -110,3 +110,24 @@ cat <<'EOR'
   aws iam add-role-to-instance-profile --instance-profile-name $ROLE --role-name $ROLE
   # then in console: attach $ROLE instance profile to the EC2
 EOR
+
+echo
+echo "--- PROVENANCE SIGNING KEY (KMS envelope) ---"
+echo "Run scripts/bootstrap-prov-key.sh once to create the KMS key + encrypted"
+echo "Ed25519 seed, then grant the EC2 instance role kms:Decrypt on that key:"
+cat <<'EOR'
+  ROLE=filebrsr-ec2-role
+  KEY_ARN=$(aws kms describe-key --key-id alias/filebrsr-prov-signing \
+    --region ap-south-1 --query 'KeyMetadata.Arn' --output text)
+  aws iam put-role-policy --role-name $ROLE --policy-name prov-kms-decrypt \
+    --policy-document "{
+      \"Version\":\"2012-10-17\",
+      \"Statement\":[{
+        \"Effect\":\"Allow\",
+        \"Action\":[\"kms:Decrypt\",\"kms:Encrypt\"],
+        \"Resource\":\"$KEY_ARN\"
+      }]
+    }"
+  # Encrypt is only needed for the one-time bootstrap; drop it to Decrypt-only
+  # once PROV_SIGNING_KEY_CIPHERTEXT_B64 is set.
+EOR

@@ -37,6 +37,7 @@ from app.extract_retrieval import (
 )
 from app.extraction import calculate_confidence, extract_with_regex
 from app.extraction_enhanced import extract_enhanced
+from app.metrics import record_extraction
 from app.normalise import normalise_extracted
 from app.ocr import ocr_document
 from app.pdf_parser import parse_pdf
@@ -244,6 +245,7 @@ async def run_full_extraction(
             else parse_pdf(file_bytes)
     except Exception as exc:  # noqa: BLE001
         logger.error("parse_pdf failed: %s", exc)
+        record_extraction(ok=False)
         return {
             "status": "failed",
             "error": f"PDF parse failed: {exc}",
@@ -313,6 +315,7 @@ async def run_full_extraction(
     company_name = merged.get("section_a", {}).get("company_name")
     financial_year = merged.get("section_a", {}).get("financial_year")
 
+    record_extraction(ok=True)
     return {
         "status": "completed",
         "error": None,

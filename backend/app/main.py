@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from supabase import create_client
 
 from app.config import get_settings
+from app.metrics import observe_http, render_latest
 
 # ─── Structured Logging ───────────────────────────────────────
 logging.basicConfig(
@@ -46,6 +47,7 @@ from app.router_moat import router as moat_router
 from app.router_org import router as org_router
 from app.router_platform import router as platform_router
 from app.router_tally import router as tally_router
+from app.router_verify import router as verify_router
 from app.router_trends import router as trends_router
 from app.router_v2 import router as v2_router
 from app.sebi_pdf_filing import router as sebi_pdf_router
@@ -138,6 +140,7 @@ app.include_router(xbrl_filing_router)
 app.include_router(sebi_pdf_router)
 app.include_router(trends_router)
 app.include_router(tally_router)
+app.include_router(verify_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -148,18 +151,33 @@ app.add_middleware(
 )
 
 
-# ─── Request Logging Middleware ────────────────────────────────
+# ─── Request Logging + Metrics Middleware ──────────────────────
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start = time.time()
     response = await call_next(request)
     duration = time.time() - start
+    # Use the matched route template (not the raw URL) so Prometheus label
+    # cardinality stays bounded; fall back to the path for unmatched routes.
+    route = request.scope.get("route")
+    path = getattr(route, "path", request.url.path)
+    if path != "/metrics":  # don't record the scrape endpoint itself
+        observe_http(request.method, path, response.status_code, duration)
     if duration > 2.0 or response.status_code >= 400:
         logger.warning(
             "%s %s → %d (%.2fs)",
             request.method, request.url.path, response.status_code, duration,
         )
     return response
+
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus scrape endpoint (RED metrics + domain counters)."""
+    from fastapi.responses import Response
+
+    payload, content_type = render_latest()
+    return Response(content=payload, media_type=content_type)
 
 
 def get_supabase_admin():

@@ -2,7 +2,7 @@ name: CI/CD
 
 on:
   pull_request:
-    branches: [main, staging]
+    branches: [main]
   push:
     branches: [main, dev]
 
@@ -152,7 +152,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.prod.yml,nginx/nginx.conf,scripts/deploy.sh,scripts/rollback.sh"
+          source: "docker-compose.prod.yml,nginx/nginx.conf,scripts/deploy.sh,scripts/rollback.sh,observability/prometheus/prometheus.prod.yml,observability/grafana/provisioning,observability/grafana/dashboards"
           target: "/home/ec2-user/filebrsr/"
           strip_components: 0
           overwrite: true

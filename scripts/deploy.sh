@@ -43,6 +43,9 @@ echo "→ Bringing up services"
 docker compose -f docker-compose.prod.yml up -d --remove-orphans \
   --force-recreate frontend backend worker
 
+# Observability stack (Prometheus scrapes backend; Grafana serves /grafana/)
+docker compose -f docker-compose.prod.yml up -d prometheus grafana
+
 # nginx + certbot only restart if their config / image changed
 docker compose -f docker-compose.prod.yml up -d nginx certbot
 
