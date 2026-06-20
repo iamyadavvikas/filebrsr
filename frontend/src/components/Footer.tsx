@@ -1,34 +1,68 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border" style={{ padding: "40px 28px", textAlign: "center" }}>
-      <div className="flex items-center justify-center gap-2 mb-2.5">
-        <div
-          className="flex items-center justify-center text-white font-extrabold"
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 8,
-            background: "linear-gradient(135deg, #1B4D3E, #2D7A5F)",
-            fontSize: 12,
-          }}
-        >
-          F
+    <footer className="border-t border-border" style={{ background: "var(--surface)" }}>
+      <div className="max-w-6xl mx-auto px-6 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+          {/* Brand */}
+          <div className="md:col-span-1">
+            <div className="flex items-center gap-2 mb-3">
+              <Image src="/logo-icon.svg" alt="FileBRSR" width={28} height={28} />
+              <span className="font-extrabold gradient-text" style={{ fontSize: 18, backgroundImage: "linear-gradient(110deg, #10B981 0%, #06B6D4 45%, #6366F1 100%)" }}>
+                fileBRSR
+              </span>
+            </div>
+            <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7 }}>
+              India&apos;s supply chain ESG platform. Assess suppliers, file BRSR, prove compliance.
+            </p>
+          </div>
+
+          {/* Platform */}
+          <div>
+            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Platform</h4>
+            <ul className="space-y-2.5">
+              {[
+                { label: "Supply Chain ESG", href: "/platform/supply-chain" },
+                { label: "BRSR Automation", href: "/platform" },
+                { label: "Carbon Calculator", href: "/platform/carbon" },
+                { label: "Pricing", href: "/pricing" },
+              ].map((l) => (
+                <li key={l.label}>
+                  <Link href={l.href} className="text-sm text-muted hover:text-foreground transition-colors">{l.label}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Company */}
+          <div>
+            <h4 style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--primary)", marginBottom: 14 }}>Company</h4>
+            <ul className="space-y-2.5">
+              {[
+                { label: "Contact", href: "/contact" },
+                { label: "Terms of Use", href: "/terms" },
+                { label: "Privacy Policy", href: "/privacy" },
+              ].map((l) => (
+                <li key={l.label}>
+                  <Link href={l.href} className="text-sm text-muted hover:text-foreground transition-colors">{l.label}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-        <span className="font-extrabold text-primary" style={{ fontSize: 17 }}>
-          File<span className="text-accent">BRSR</span>
-        </span>
+
+        {/* Bottom bar */}
+        <div className="mt-10 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p style={{ fontSize: 12, color: "var(--muted-light)" }}>
+            © {new Date().getFullYear()} FileBRSR. All rights reserved. Made in India 🇮🇳
+          </p>
+          <Link href="mailto:support@filebrsr.com" className="text-xs text-muted hover:text-foreground transition-colors">
+            support@filebrsr.com
+          </Link>
+        </div>
       </div>
-      <p className="text-muted-light" style={{ fontSize: 12 }}>
-        AI-powered BRSR compliance for India&apos;s listed companies
-      </p>
-      <p style={{ fontSize: 11, color: "#D1D5DB", marginTop: 6 }}>
-        © {new Date().getFullYear()} FileBRSR · Made in India 🇮🇳 ·{" "}
-        <Link href="mailto:hello@filebrsr.com" style={{ color: "#9CA3AF" }}>
-          hello@filebrsr.com
-        </Link>
-      </p>
     </footer>
   );
 }

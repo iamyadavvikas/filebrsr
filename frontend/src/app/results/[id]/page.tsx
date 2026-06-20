@@ -1,14 +1,23 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
+import ProcessingPoller from "./ProcessingPoller";
+import AuthenticatedESGDashboard from "./AuthenticatedESGDashboard";
 import {
   ArrowLeft,
-  Download,
   CheckCircle,
   Clock,
   XCircle,
 } from "lucide-react";
+
+function getAdminClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -17,10 +26,10 @@ interface PageProps {
 export default async function ResultsPage({ params }: PageProps) {
   const { id } = await params;
 
-  // Guest mode — render client component
+  // Guest mode or inline results — render interactive ESG dashboard
   if (id === "guest") {
-    const { GuestResults } = await import("./GuestResults");
-    return <GuestResults />;
+    const { ESGDashboard } = await import("./ESGDashboard");
+    return <ESGDashboard />;
   }
 
   const supabase = await createClient();
@@ -30,7 +39,16 @@ export default async function ResultsPage({ params }: PageProps) {
 
   if (!user) redirect("/login");
 
-  const { data: report } = await supabase
+  // Use admin client to bypass RLS (we verify ownership via user_id filter)
+  const adminDb = getAdminClient();
+
+  const { data: profile } = await adminDb
+    .from("profiles")
+    .select("full_name, plan")
+    .eq("id", user.id)
+    .single();
+
+  const { data: report } = await adminDb
     .from("reports")
     .select("*")
     .eq("id", id)
@@ -62,77 +80,16 @@ export default async function ResultsPage({ params }: PageProps) {
     }
   };
 
-  const renderSection = (
-    title: string,
-    data: Record<string, string> | undefined,
-    confidences: Record<string, number> | undefined
-  ) => {
-    if (!data || Object.keys(data).length === 0) return null;
+  const extractedData = report.extracted_data as Record<string, unknown> | null;
 
-    return (
-      <div className="bg-white rounded-2xl border border-border overflow-hidden mb-6">
-        <div className="px-6 py-4 border-b border-border" style={{ background: "#F8FAFC" }}>
-          <h3 className="font-semibold text-foreground">{title}</h3>
-        </div>
-        <div className="divide-y divide-border">
-          {Object.entries(data).map(([key, value]) => {
-            const confKey = `${title.toLowerCase().replace(/[^a-z]/g, "_")}.${key}`;
-            const confidence = confidences?.[confKey];
-            return (
-              <div
-                key={key}
-                className="px-6 py-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4"
-              >
-                <span className="text-sm font-medium text-muted w-64 shrink-0">
-                  {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-                </span>
-                <span className="text-sm text-foreground flex-1">
-                  {String(value)}
-                </span>
-                {confidence !== undefined && (
-                  <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded shrink-0 ${
-                      confidence >= 0.8
-                        ? "bg-green-100 text-green-700"
-                        : confidence >= 0.6
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {Math.round(confidence * 100)}%
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const extractedData = report.extracted_data as Record<
-    string,
-    Record<string, string>
-  > | null;
-  const confidenceScores = report.confidence_scores as Record<
-    string,
-    number
-  > | null;
-
-  const downloadJSON = () => {
-    const blob = new Blob([JSON.stringify(extractedData, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${report.file_name.replace(".pdf", "")}_brsr_data.json`;
-    a.click();
-  };
+  // For completed reports, render the full ESG Dashboard (it has its own layout)
+  if (report.status === "completed" && extractedData) {
+    return <AuthenticatedESGDashboard reportData={extractedData} reportId={id} />;
+  }
 
   return (
     <>
-      <Navbar user={{ email: user.email! }} />
+      <Navbar user={{ email: user.email!, name: profile?.full_name || user.user_metadata?.full_name || "", plan: profile?.plan || "Free" }} />
       <main className="flex-1">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
@@ -159,16 +116,6 @@ export default async function ResultsPage({ params }: PageProps) {
                 </span>
               </div>
             </div>
-            {report.status === "completed" && extractedData && (
-              <button
-                onClick={downloadJSON}
-                className="inline-flex items-center gap-2 text-white text-sm font-semibold transition-all"
-                style={{ padding: "8px 18px", borderRadius: 10, background: "#1B4D3E" }}
-              >
-                <Download className="w-4 h-4" />
-                Download JSON
-              </button>
-            )}
           </div>
 
           {/* Results */}
@@ -179,9 +126,9 @@ export default async function ResultsPage({ params }: PageProps) {
                 Processing Your Report
               </h2>
               <p className="text-muted">
-                This usually takes 1-2 minutes. Refresh the page to check
-                status.
+                This usually takes 1-2 minutes. The page will refresh automatically.
               </p>
+              <ProcessingPoller />
             </div>
           )}
 
@@ -202,26 +149,6 @@ export default async function ResultsPage({ params }: PageProps) {
                 Try uploading again
               </Link>
             </div>
-          )}
-
-          {report.status === "completed" && extractedData && (
-            <>
-              {renderSection(
-                "Section A — General Disclosures",
-                extractedData.section_a,
-                confidenceScores ?? undefined
-              )}
-              {renderSection(
-                "Section B — Management & Process",
-                extractedData.section_b,
-                confidenceScores ?? undefined
-              )}
-              {renderSection(
-                "Section C — Principle-wise Performance",
-                extractedData.section_c,
-                confidenceScores ?? undefined
-              )}
-            </>
           )}
         </div>
       </main>

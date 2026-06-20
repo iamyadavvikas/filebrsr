@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://filebrsr.dev/schemas/factor-file/v1",
+  "title": "Emission-factor data file",
+  "description": "Envelope for one source × edition of emission factors. Loaded by backend/app/factors_india/_registry.py. The validator there is hand-rolled (no jsonschema dependency), so this file is canonical documentation rather than enforced. Keep them in sync.",
+  "type": "object",
+  "required": ["metadata", "factors"],
+  "additionalProperties": false,
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["source", "version", "vintage", "citation_url", "published_on"],
+      "additionalProperties": false,
+      "properties": {
+        "jurisdiction": {
+          "type": "string",
+          "enum": ["IN", "AU"],
+          "description": "ISO 3166-1 alpha-2 country the factors apply to. Defaults to 'IN' when omitted (legacy CEA files)."
+        },
+        "source": {
+          "type": "string",
+          "description": "Human-readable source name, e.g. 'CEA CO2 Baseline Database v20 (June 2025)'."
+        },
+        "version": {
+          "type": "string",
+          "description": "Stable version slug, e.g. 'CEA-2025-06'. Used as the version field on returned IndiaFactor."
+        },
+        "vintage": {
+          "type": "array",
+          "description": "ISO-date pair [from, to] giving the period the data applies to (typically an Indian financial year).",
+          "items": {"type": "string", "format": "date"},
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "citation_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Direct URL to the source document or landing page."
+        },
+        "published_on": {
+          "type": "string",
+          "format": "date",
+          "description": "When the source publisher released this edition."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional curator notes (methodology, caveats)."
+        }
+      }
+    },
+    "factors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["scope", "category", "method", "unit", "regional_specificity", "value"],
+        "additionalProperties": false,
+        "properties": {
+          "scope": {
+            "type": "integer",
+            "enum": [1, 2, 3],
+            "description": "GHG Protocol scope."
+          },
+          "category": {
+            "type": "string",
+            "description": "Stable category key, e.g. 'electricity_purchased'."
+          },
+          "method": {
+            "type": "string",
+            "enum": ["location_based", "market_based", "default"],
+            "description": "Calculation method per GHG Protocol Scope 2 Guidance."
+          },
+          "grid_region": {
+            "type": ["string", "null"],
+            "enum": ["NR", "ER", "WR", "SR", "NER", null],
+            "description": "Indian electricity grid region (CEA convention) when regional_specificity == 'regional'."
+          },
+          "state": {
+            "type": ["string", "null"],
+            "description": "Sub-national code: ISO 3166-2:IN state (e.g. 'MH', 'TN', 'GJ') or an Australian state/territory ('NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT') when regional_specificity == 'state'."
+          },
+          "regional_specificity": {
+            "type": "string",
+            "enum": ["national", "regional", "state"]
+          },
+          "unit": {
+            "type": "string",
+            "description": "Unit of the value, e.g. 'tCO2/MWh'."
+          },
+          "value": {
+            "type": "number",
+            "description": "Numeric emission factor in the unit above."
+          },
+          "uncertainty": {
+            "type": ["object", "null"],
+            "required": ["distribution", "min", "max"],
+            "additionalProperties": false,
+            "properties": {
+              "distribution": {"type": "string", "enum": ["uniform", "normal", "triangular"]},
+              "min": {"type": "number"},
+              "max": {"type": "number"},
+              "stddev": {"type": "number"}
+            }
+          },
+          "_placeholder": {
+            "type": "boolean",
+            "description": "If true, the value has not been verified against the cited source. Loader returns IndiaFactor.is_placeholder=True so consumers can warn or refuse. A guard test xfail-marks runs until every placeholder is cleared."
+          },
+          "_verify_against": {
+            "type": "string",
+            "description": "Free-form note describing what the curator needs to consult to clear the placeholder."
+          }
+        }
+      }
+    }
+  }
+}

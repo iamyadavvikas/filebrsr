@@ -1,4 +1,7 @@
+from anthropic import Anthropic
 from google import genai
+from groq import Groq
+import boto3
 import json
 import re
 import asyncio
@@ -31,44 +34,197 @@ TEXT:
 """
 
 
-async def extract_with_ai(text: str, api_key: str) -> dict[str, Any]:
-    """Extract BRSR metrics using Google Gemini."""
-    if not api_key or api_key == "your_gemini_api_key":
+def _parse_ai_response(response_text: str) -> dict[str, Any]:
+    """Parse JSON from AI response text."""
+    try:
+        return json.loads(response_text)
+    except json.JSONDecodeError:
+        json_match = re.search(r"\{[\s\S]*\}", response_text)
+        if json_match:
+            try:
+                return json.loads(json_match.group())
+            except json.JSONDecodeError:
+                pass
         return {"section_a": {}, "section_b": {}, "section_c": {}}
 
-    client = genai.Client(api_key=api_key)
 
-    # Truncate text to fit within context window
-    max_chars = 900000  # Gemini supports ~1M tokens
+async def _extract_with_claude(text: str, api_key: str) -> dict[str, Any]:
+    """Extract using Anthropic Claude."""
+    client = Anthropic(api_key=api_key)
+
+    # Claude context is 200K tokens (~800K chars)
+    max_chars = 600000
     if len(text) > max_chars:
         text = text[:max_chars]
 
-    # Run with timeout to avoid hanging on rate limits
+    response = await asyncio.wait_for(
+        asyncio.to_thread(
+            client.messages.create,
+            model="claude-sonnet-4-20250514",
+            max_tokens=4096,
+            messages=[
+                {"role": "user", "content": BRSR_EXTRACTION_PROMPT.format(text=text)},
+            ],
+            temperature=0.1,
+        ),
+        timeout=30.0,
+    )
+    return _parse_ai_response(response.content[0].text)
+
+
+async def _extract_with_bedrock(text: str, region: str = "ap-south-1") -> dict[str, Any]:
+    """Extract using Claude 3 Sonnet via AWS Bedrock. Falls back to Llama 3 70B if Claude fails."""
+    client = boto3.client("bedrock-runtime", region_name=region)
+
+    max_chars = 600000
+    if len(text) > max_chars:
+        text = text[:max_chars]
+
+    # Try Claude first (requires valid payment method)
     try:
+        body = json.dumps({
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 4096,
+            "temperature": 0.1,
+            "messages": [
+                {"role": "user", "content": BRSR_EXTRACTION_PROMPT.format(text=text)},
+            ],
+        })
         response = await asyncio.wait_for(
             asyncio.to_thread(
-                client.models.generate_content,
-                model="gemini-2.0-flash",
-                contents=BRSR_EXTRACTION_PROMPT.format(text=text),
-                config=genai.types.GenerateContentConfig(
-                    temperature=0.1,
-                    max_output_tokens=4096,
-                ),
+                client.invoke_model,
+                modelId="anthropic.claude-3-sonnet-20240229-v1:0",
+                contentType="application/json",
+                accept="application/json",
+                body=body,
             ),
-            timeout=15.0,
+            timeout=60.0,
         )
+        response_body = json.loads(response["body"].read())
+        result = _parse_ai_response(response_body["content"][0]["text"])
+        if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
+            print("Bedrock: Claude 3 Sonnet succeeded")
+            return result
+    except Exception as e:
+        print(f"Bedrock Claude failed: {e}")
 
-        response_text = response.text
+    # Fallback to Llama 3 70B
+    max_chars_llama = 120000
+    text_llama = text[:max_chars_llama] if len(text) > max_chars_llama else text
+    prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\nYou extract structured data from documents. Return ONLY valid JSON, no explanation.<|eot_id|><|start_header_id|>user<|end_header_id|>\n{BRSR_EXTRACTION_PROMPT.format(text=text_llama)}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n"
+    body = json.dumps({"prompt": prompt, "max_gen_len": 4096, "temperature": 0.1})
 
-        # Extract JSON from response
+    response = await asyncio.wait_for(
+        asyncio.to_thread(
+            client.invoke_model,
+            modelId="meta.llama3-70b-instruct-v1:0",
+            contentType="application/json",
+            accept="application/json",
+            body=body,
+        ),
+        timeout=60.0,
+    )
+    response_body = json.loads(response["body"].read())
+    print("Bedrock: Llama 3 70B fallback")
+    return _parse_ai_response(response_body.get("generation", ""))
+
+
+async def _extract_with_gemini(text: str, api_key: str) -> dict[str, Any]:
+    """
+    Extract using Google Gemini Flash with JSON-mode response.
+
+    Forces `response_mime_type="application/json"` so the model can only emit
+    valid JSON — eliminates the brittle regex `_parse_ai_response` fallback
+    path and gives the model a clean signal to return `null` for unknown
+    fields rather than hallucinating or dropping them silently.
+    """
+    client = genai.Client(api_key=api_key)
+
+    max_chars = 900000
+    if len(text) > max_chars:
+        text = text[:max_chars]
+
+    response = await asyncio.wait_for(
+        asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-2.0-flash",
+            contents=BRSR_EXTRACTION_PROMPT.format(text=text),
+            config=genai.types.GenerateContentConfig(
+                temperature=0.1,
+                max_output_tokens=4096,
+                response_mime_type="application/json",
+            ),
+        ),
+        timeout=30.0,
+    )
+    return _parse_ai_response(response.text)
+
+
+async def _extract_with_groq(text: str, api_key: str) -> dict[str, Any]:
+    """Extract using Groq (Llama 3.3 70B)."""
+    client = Groq(api_key=api_key)
+
+    # Groq context window is 128K tokens (~500K chars)
+    max_chars = 120000
+    if len(text) > max_chars:
+        text = text[:max_chars]
+
+    response = await asyncio.wait_for(
+        asyncio.to_thread(
+            client.chat.completions.create,
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "You extract structured data from documents. Return ONLY valid JSON."},
+                {"role": "user", "content": BRSR_EXTRACTION_PROMPT.format(text=text)},
+            ],
+            temperature=0.1,
+            max_tokens=4096,
+        ),
+        timeout=30.0,
+    )
+    return _parse_ai_response(response.choices[0].message.content or "")
+
+
+async def extract_with_ai(text: str, gemini_key: str, groq_key: str = "", anthropic_key: str = "") -> dict[str, Any]:
+    """Extract BRSR metrics using AI. Chain: Gemini (free, fast) → Groq → Bedrock → Claude."""
+    # Primary: Gemini Flash (free tier: 1500 RPD, 1M context)
+    if gemini_key and gemini_key != "your_gemini_api_key":
         try:
-            return json.loads(response_text)
-        except json.JSONDecodeError:
-            json_match = re.search(r"\{[\s\S]*\}", response_text)
-            if json_match:
-                return json.loads(json_match.group())
-            return {"section_a": {}, "section_b": {}, "section_c": {}}
+            result = await _extract_with_gemini(text, gemini_key)
+            if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
+                print("AI extraction: Gemini Flash succeeded")
+                return result
+        except Exception as e:
+            print(f"Gemini failed: {e}")
 
-    except (asyncio.TimeoutError, Exception) as e:
-        print(f"AI extraction skipped: {e}")
-        return {"section_a": {}, "section_b": {}, "section_c": {}}
+    # Fallback 1: Groq (free tier: 30 RPM)
+    if groq_key:
+        try:
+            result = await _extract_with_groq(text, groq_key)
+            if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
+                print("AI extraction: Groq succeeded")
+                return result
+        except Exception as e:
+            print(f"Groq failed: {e}")
+
+    # Fallback 2: AWS Bedrock (uses IAM credentials)
+    try:
+        result = await _extract_with_bedrock(text)
+        if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
+            print("AI extraction: Bedrock succeeded")
+            return result
+    except Exception as e:
+        print(f"Bedrock failed: {e}")
+
+    # Fallback 3: Claude direct API (most expensive)
+    if anthropic_key:
+        try:
+            result = await _extract_with_claude(text, anthropic_key)
+            if any(result.get(s) for s in ["section_a", "section_b", "section_c"]):
+                print("AI extraction: Claude succeeded")
+                return result
+        except Exception as e:
+            print(f"Claude failed: {e}")
+
+    print("AI extraction: all providers failed, using regex only")
+    return {"section_a": {}, "section_b": {}, "section_c": {}}

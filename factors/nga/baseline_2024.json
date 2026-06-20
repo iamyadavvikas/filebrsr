@@ -1,0 +1,117 @@
+{
+  "metadata": {
+    "jurisdiction": "AU",
+    "source": "Australian National Greenhouse Accounts Factors (NGA) — August 2024",
+    "version": "NGA-2024-08",
+    "vintage": ["2023-07-01", "2024-06-30"],
+    "citation_url": "https://www.dcceew.gov.au/climate-change/publications/national-greenhouse-accounts-factors-2024",
+    "published_on": "2024-08-01",
+    "notes": "PLACEHOLDER EDITION. All Scope 2 electricity values below are seeded at 0.68 tCO2-e/MWh and tagged _placeholder=true until the NGA 2024 'Electricity — Scope 2 emission factors by state/territory' table is consulted. Australia reports under NGER (National Greenhouse and Energy Reporting) and AASB S2; these are state/territory grid factors for Scope 2 location-based reporting. Replace each value with the published NGA 2024 state factor and clear the _placeholder flag. Loader and the get_factor('AU', ...) path are wired against this structure and need no code changes when real numbers land."
+  },
+  "factors": [
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": null,
+      "state": null,
+      "regional_specificity": "national",
+      "unit": "tCO2-e/MWh",
+      "value": 0.68,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "NGA 2024 — national average Scope 2 electricity emission factor"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": null,
+      "state": "NSW",
+      "regional_specificity": "state",
+      "unit": "tCO2-e/MWh",
+      "value": 0.68,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "NGA 2024 — New South Wales & ACT Scope 2 electricity factor"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": null,
+      "state": "VIC",
+      "regional_specificity": "state",
+      "unit": "tCO2-e/MWh",
+      "value": 0.68,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "NGA 2024 — Victoria Scope 2 electricity factor"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": null,
+      "state": "QLD",
+      "regional_specificity": "state",
+      "unit": "tCO2-e/MWh",
+      "value": 0.68,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "NGA 2024 — Queensland Scope 2 electricity factor"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": null,
+      "state": "SA",
+      "regional_specificity": "state",
+      "unit": "tCO2-e/MWh",
+      "value": 0.68,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "NGA 2024 — South Australia Scope 2 electricity factor"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": null,
+      "state": "WA",
+      "regional_specificity": "state",
+      "unit": "tCO2-e/MWh",
+      "value": 0.68,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "NGA 2024 — Western Australia (SWIS) Scope 2 electricity factor"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": null,
+      "state": "TAS",
+      "regional_specificity": "state",
+      "unit": "tCO2-e/MWh",
+      "value": 0.68,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "NGA 2024 — Tasmania Scope 2 electricity factor"
+    },
+    {
+      "scope": 2,
+      "category": "electricity_purchased",
+      "method": "location_based",
+      "grid_region": null,
+      "state": "NT",
+      "regional_specificity": "state",
+      "unit": "tCO2-e/MWh",
+      "value": 0.68,
+      "uncertainty": null,
+      "_placeholder": true,
+      "_verify_against": "NGA 2024 — Northern Territory (DKIS) Scope 2 electricity factor"
+    }
+  ]
+}

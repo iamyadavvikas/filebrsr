@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: filebrsr-backend
+    metrics_path: /metrics
+    static_configs:
+      # host.docker.internal lets the Prometheus container reach the backend
+      # running on the host (localhost:8000). On Linux, run compose with
+      # `--add-host=host.docker.internal:host-gateway` or point this at the
+      # backend service name if you add it to a shared compose network.
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          service: backend

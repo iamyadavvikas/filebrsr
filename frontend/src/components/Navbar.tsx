@@ -1,45 +1,87 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Menu, X, ChevronDown, User, CreditCard, LogOut } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
-export default function Navbar({ user }: { user?: { email: string } | null }) {
+interface NavUser {
+  email: string;
+  name?: string;
+  plan?: string;
+}
+
+export default function Navbar({ user: userProp }: { user?: NavUser | null }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [user, setUser] = useState<NavUser | null>(userProp || null);
+  const profileRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
-  const navLinks = user
-    ? [
-        { href: "/dashboard", label: "Dashboard" },
-        { href: "/upload", label: "Extract" },
-        { href: "/pricing", label: "Pricing" },
-      ]
-    : [
-        { href: "/upload", label: "Extract" },
-        { href: "/pricing", label: "Pricing" },
-      ];
+  // Auto-detect auth if no user prop passed
+  useEffect(() => {
+    if (userProp) {
+      setUser(userProp);
+      return;
+    }
+    const loadUser = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          setUser({
+            email: authUser.email ?? "",
+            name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || "",
+            plan: "Free",
+          });
+        }
+      } catch {
+        // Silently ignore — Log In button stays visible by default
+      }
+    };
+    loadUser();
+  }, [userProp]);
+
+  const navLinks = [
+    { href: "/", label: "Home" },
+    { href: "/products", label: "Products & Services" },
+    { href: "/pricing", label: "Pricing" },
+    { href: "/pilot", label: "Pilot Program" },
+    { href: "/contact", label: "Contact" },
+  ];
 
   const handleSignOut = async () => {
     await fetch("/api/auth/signout", { method: "POST" });
     window.location.href = "/";
   };
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const displayName = user?.name || user?.email?.split("@")[0] || "";
+  const initials = displayName.slice(0, 1).toUpperCase();
+  const planLabel = user?.plan || "Free";
+
   return (
-    <nav className="sticky top-0 z-50 border-b border-border" style={{ background: "rgba(250,251,249,0.92)", backdropFilter: "blur(16px)" }}>
+    <nav className="sticky top-0 z-50 border-b border-border" style={{ background: "var(--nav-bg)", backdropFilter: "blur(16px)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-7">
-        <div className="flex justify-between items-center" style={{ height: 58 }}>
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center text-white font-extrabold" style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg, #1B4D3E, #2D7A5F)", fontSize: 15 }}>
-              F
-            </div>
-            <span className="font-extrabold text-primary" style={{ fontSize: 20, letterSpacing: -0.5 }}>
-              File<span className="text-accent">BRSR</span>
-            </span>
+        <div className="flex items-center" style={{ height: 58 }}>
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/logo.svg" alt="fileBRSR" width={160} height={40} priority />
           </Link>
 
-          {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-7">
+          {/* Desktop nav - left aligned after logo */}
+          <div className="hidden md:flex items-center gap-7 ml-8">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -51,42 +93,115 @@ export default function Navbar({ user }: { user?: { email: string } | null }) {
                 {link.label}
               </Link>
             ))}
+          </div>
+
+          {/* Right side: profile */}
+          <div className="hidden md:flex items-center gap-4 ml-auto">
+
+            {/* Profile dropdown */}
             {user ? (
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-muted">{user.email}</span>
+              <div className="relative" ref={profileRef}>
                 <button
-                  onClick={handleSignOut}
-                  className="text-sm font-medium text-muted hover:text-foreground transition-colors"
+                  onClick={() => setProfileOpen(!profileOpen)}
+                  className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
                 >
-                  Sign Out
+                  <div
+                    className="flex items-center justify-center text-white font-bold"
+                    style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(120deg, #10B981, #06B6D4)", fontSize: 12 }}
+                  >
+                    {initials}
+                  </div>
+                  <span className="max-w-[120px] truncate">{displayName}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${profileOpen ? "rotate-180" : ""}`} />
                 </button>
+
+                {profileOpen && (
+                  <div
+                    className="absolute right-0 mt-2 bg-card border border-border shadow-lg"
+                    style={{ borderRadius: 12, width: 240, padding: "8px 0", zIndex: 100 }}
+                  >
+                    {/* User info */}
+                    <div className="border-b border-border" style={{ padding: "12px 16px" }}>
+                      <p className="text-foreground" style={{ fontSize: 13, fontWeight: 600 }}>{displayName}</p>
+                      <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>{user.email}</p>
+                    </div>
+
+                    {/* Plan */}
+                    <div className="border-b border-border" style={{ padding: "10px 16px" }}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-3.5 h-3.5 text-muted" />
+                          <span style={{ fontSize: 12, color: "var(--muted)" }}>Plan</span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            background: planLabel === "Free" ? "var(--surface)" : "var(--icon-soft)",
+                            color: planLabel === "Free" ? "var(--muted)" : "var(--success)",
+                          }}
+                        >
+                          {planLabel}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Links */}
+                    <div style={{ padding: "4px 0" }}>
+                      <Link
+                        href="/platform"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-gray-50 transition-colors"
+                      >
+                        <User className="w-3.5 h-3.5 text-muted" />
+                        Platform
+                      </Link>
+                      <Link
+                        href="/pricing"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-gray-50 transition-colors"
+                      >
+                        <CreditCard className="w-3.5 h-3.5 text-muted" />
+                        Upgrade Plan
+                      </Link>
+                    </div>
+
+                    {/* Sign out */}
+                    <div style={{ borderTop: "1px solid var(--border)", padding: "4px 0" }}>
+                      <button
+                        onClick={handleSignOut}
+                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/login"
-                  className="text-sm font-medium text-muted hover:text-foreground transition-colors"
-                >
-                  Log In
-                </Link>
-                <Link
-                  href="/signup"
-                  className="text-white text-sm font-semibold transition-colors"
-                  style={{ padding: "8px 22px", borderRadius: 10, background: "#1B4D3E" }}
-                >
-                  Try Free →
-                </Link>
-              </div>
+              <Link
+                href="/login"
+                className="text-white text-sm font-semibold transition-opacity hover:opacity-90"
+                style={{ padding: "8px 20px", borderRadius: 10, background: "linear-gradient(120deg, #10B981, #06B6D4)", boxShadow: "0 6px 18px rgba(16,185,129,0.25)" }}
+              >
+                Log In
+              </Link>
             )}
           </div>
 
           {/* Mobile toggle */}
-          <button
-            className="md:hidden p-2"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="md:hidden flex items-center gap-2 ml-auto">
+            <button
+              className="w-9 h-9 flex items-center justify-center rounded-lg border border-border text-foreground"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label="Toggle menu"
+            >
+              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile menu */}
@@ -103,30 +218,45 @@ export default function Navbar({ user }: { user?: { email: string } | null }) {
               </Link>
             ))}
             {user ? (
-              <button
-                onClick={handleSignOut}
-                className="block w-full text-left py-2 text-sm font-medium text-muted hover:text-foreground"
-              >
-                Sign Out
-              </button>
-            ) : (
               <>
+                <div className="py-2 border-t border-border mt-2 pt-3">
+                  <p className="text-xs text-muted px-1">Signed in as</p>
+                  <p className="text-sm font-medium mt-0.5 px-1">{displayName}</p>
+                  <p className="text-xs text-muted px-1">{user.email}</p>
+                  <div className="flex items-center gap-2 mt-2 px-1">
+                    <span className="text-xs text-muted">Plan:</span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: 6,
+                        background: planLabel === "Free" ? "#F3F4F6" : "#F0FDF4",
+                        color: planLabel === "Free" ? "#6B7280" : "#166534",
+                      }}
+                    >
+                      {planLabel}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSignOut}
+                  className="block w-full text-left py-2 mt-2 text-sm font-medium text-red-600 hover:text-red-700"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <div className="mt-2 space-y-2">
                 <Link
                   href="/login"
-                  className="block py-2 text-sm font-medium text-muted hover:text-primary"
+                  className="block px-4 py-2 text-white text-sm font-semibold text-center"
+                  style={{ borderRadius: 10, background: "linear-gradient(120deg, #10B981, #06B6D4)" }}
                   onClick={() => setMobileOpen(false)}
                 >
                   Log In
                 </Link>
-                <Link
-                  href="/signup"
-                  className="block mt-2 px-4 py-2 bg-primary text-white text-sm font-semibold text-center"
-                  style={{ borderRadius: 10 }}
-                  onClick={() => setMobileOpen(false)}
-                >
-                  Try Free →
-                </Link>
-              </>
+              </div>
             )}
           </div>
         )}

@@ -1,0 +1,790 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  Calculator,
+  Plus,
+  Trash2,
+  Zap,
+  Factory,
+  CloudRain,
+  TrendingDown,
+  Info,
+  Save,
+  CheckCircle2,
+  ShieldCheck,
+  ExternalLink,
+  Loader2,
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+
+// Emission Factor Organizations
+const EMISSION_FACTOR_ORGS = [
+  { value: "cea_2024", label: "CEA India 2024", desc: "Central Electricity Authority — India grid factor", region: "India" },
+  { value: "ipcc_ar6", label: "IPCC AR6 (2021)", desc: "Intergovernmental Panel on Climate Change — 6th Assessment", region: "Global" },
+  { value: "epa_2024", label: "US EPA (2024)", desc: "US Environmental Protection Agency — GHG Emission Factors Hub", region: "USA" },
+  { value: "defra_2024", label: "UK DEFRA (2024)", desc: "UK Dept for Environment, Food & Rural Affairs — Conversion Factors", region: "UK" },
+  { value: "ghg_protocol", label: "GHG Protocol", desc: "WRI/WBCSD GHG Protocol — Cross-sector tools", region: "Global" },
+  { value: "isro_india", label: "ISRO / BEE India", desc: "Bureau of Energy Efficiency — India-specific factors", region: "India" },
+];
+
+const FUEL_TYPES = [
+  { value: "coal", label: "Coal", unit: "MT" },
+  { value: "natural_gas", label: "Natural Gas", unit: "SCM" },
+  { value: "diesel_dg_set", label: "Diesel (DG Set)", unit: "KL" },
+  { value: "furnace_oil", label: "Furnace Oil", unit: "KL" },
+  { value: "lpg", label: "LPG", unit: "MT" },
+  { value: "pet_coke", label: "Pet Coke", unit: "MT" },
+  { value: "lng", label: "LNG", unit: "MT" },
+  { value: "petrol", label: "Petrol (Vehicles)", unit: "KL" },
+  { value: "diesel", label: "Diesel (Vehicles)", unit: "KL" },
+  { value: "cng", label: "CNG (Vehicles)", unit: "kg" },
+  { value: "biomass", label: "Biomass / Briquettes", unit: "MT" },
+  { value: "propane", label: "Propane", unit: "KL" },
+  { value: "kerosene", label: "Kerosene", unit: "KL" },
+  { value: "wood_charcoal", label: "Wood / Charcoal", unit: "MT" },
+  { value: "biogas", label: "Biogas / Biomethane", unit: "SCM" },
+  { value: "hsd", label: "High Speed Diesel (HSD)", unit: "KL" },
+  { value: "naphtha", label: "Naphtha", unit: "KL" },
+  { value: "acetylene", label: "Acetylene", unit: "kg" },
+  { value: "refrigerant_r22", label: "Refrigerant R-22 (HCFC)", unit: "kg" },
+  { value: "refrigerant_r410a", label: "Refrigerant R-410A (HFC)", unit: "kg" },
+  { value: "refrigerant_r134a", label: "Refrigerant R-134a", unit: "kg" },
+  { value: "sf6", label: "SF₆ (Switchgear)", unit: "kg" },
+  { value: "co2_fire_extinguisher", label: "CO₂ Fire Extinguishers", unit: "kg" },
+];
+
+const SCOPE2_CATEGORIES = [
+  { value: "purchased_electricity", label: "Purchased Electricity (Location-based)", unit: "MWh", subcategory: "location_based" },
+  { value: "purchased_electricity_market", label: "Purchased Electricity (Market-based)", unit: "MWh", subcategory: "market_based" },
+  { value: "purchased_steam", label: "Purchased Steam / Heat", unit: "GJ", subcategory: "location_based" },
+  { value: "purchased_cooling", label: "Purchased Cooling", unit: "GJ", subcategory: "location_based" },
+  { value: "purchased_hot_water", label: "Purchased Hot Water", unit: "GJ", subcategory: "location_based" },
+  { value: "renewable_electricity_ppa", label: "Renewable (PPA / Open Access)", unit: "MWh", subcategory: "market_based" },
+  { value: "renewable_electricity_rec", label: "Renewable (REC Certificates)", unit: "MWh", subcategory: "market_based" },
+  { value: "renewable_electricity_igc", label: "Renewable (I-GEC / Green Certificates)", unit: "MWh", subcategory: "market_based" },
+  { value: "captive_solar", label: "Captive Solar Power", unit: "MWh", subcategory: "market_based" },
+  { value: "captive_wind", label: "Captive Wind Power", unit: "MWh", subcategory: "market_based" },
+  { value: "captive_biomass_power", label: "Captive Biomass Power", unit: "MWh", subcategory: "market_based" },
+  { value: "wheeled_power", label: "Wheeled Power (Third Party)", unit: "MWh", subcategory: "market_based" },
+];
+
+const SCOPE3_CATEGORIES = [
+  { value: "business_travel_air_domestic", label: "Air Travel (Domestic)", unit: "passenger-km", cat: "Cat 6: Business Travel" },
+  { value: "business_travel_air_short_haul", label: "Air Travel (Short-haul International)", unit: "passenger-km", cat: "Cat 6: Business Travel" },
+  { value: "business_travel_air_long_haul", label: "Air Travel (Long-haul International)", unit: "passenger-km", cat: "Cat 6: Business Travel" },
+  { value: "business_travel_rail", label: "Rail Travel", unit: "passenger-km", cat: "Cat 6: Business Travel" },
+  { value: "business_travel_taxi", label: "Taxi / Cab Travel", unit: "km", cat: "Cat 6: Business Travel" },
+  { value: "business_travel_hotel", label: "Hotel Nights", unit: "nights", cat: "Cat 6: Business Travel" },
+  { value: "employee_commute_car", label: "Employee Commute (Car)", unit: "km", cat: "Cat 7: Employee Commute" },
+  { value: "employee_commute_two_wheeler", label: "Employee Commute (2-Wheeler)", unit: "km", cat: "Cat 7: Employee Commute" },
+  { value: "employee_commute_bus", label: "Employee Commute (Bus)", unit: "passenger-km", cat: "Cat 7: Employee Commute" },
+  { value: "employee_commute_metro", label: "Employee Commute (Metro/Rail)", unit: "passenger-km", cat: "Cat 7: Employee Commute" },
+  { value: "employee_commute_wfh", label: "Work from Home", unit: "FTE-days", cat: "Cat 7: Employee Commute" },
+  { value: "waste_landfill", label: "Waste to Landfill", unit: "MT", cat: "Cat 5: Waste" },
+  { value: "waste_incineration", label: "Waste Incineration", unit: "MT", cat: "Cat 5: Waste" },
+  { value: "waste_recycling", label: "Waste Recycled", unit: "MT", cat: "Cat 5: Waste" },
+  { value: "waste_composting", label: "Waste Composting", unit: "MT", cat: "Cat 5: Waste" },
+  { value: "water_supply", label: "Water Supply & Treatment", unit: "KL", cat: "Cat 5: Waste" },
+  { value: "freight_road", label: "Freight (Road)", unit: "tonne-km", cat: "Cat 4/9: Transport" },
+  { value: "freight_rail", label: "Freight (Rail)", unit: "tonne-km", cat: "Cat 4/9: Transport" },
+  { value: "freight_sea", label: "Freight (Sea)", unit: "tonne-km", cat: "Cat 4/9: Transport" },
+  { value: "freight_air", label: "Freight (Air)", unit: "tonne-km", cat: "Cat 4/9: Transport" },
+  { value: "purchased_goods", label: "Purchased Goods & Services", unit: "₹ Lakhs spent", cat: "Cat 1: Purchased Goods" },
+  { value: "capital_goods", label: "Capital Goods", unit: "₹ Lakhs spent", cat: "Cat 2: Capital Goods" },
+  { value: "fuel_energy_upstream", label: "Fuel & Energy (Upstream)", unit: "MWh", cat: "Cat 3: Fuel & Energy" },
+  { value: "end_of_life_products", label: "End-of-Life Treatment of Sold Products", unit: "MT", cat: "Cat 12: End of Life" },
+  { value: "use_of_sold_products", label: "Use of Sold Products", unit: "units × kWh", cat: "Cat 11: Use of Products" },
+  { value: "leased_assets", label: "Leased Assets (Downstream)", unit: "sq.ft", cat: "Cat 13: Leased Assets" },
+  { value: "investments", label: "Investments", unit: "₹ Cr invested", cat: "Cat 15: Investments" },
+];
+
+const STATES = [
+  { value: "national", label: "National Average (CEA 2024)" },
+  { value: "maharashtra", label: "Maharashtra" },
+  { value: "karnataka", label: "Karnataka" },
+  { value: "tamil_nadu", label: "Tamil Nadu" },
+  { value: "gujarat", label: "Gujarat" },
+  { value: "delhi", label: "Delhi NCR" },
+  { value: "rajasthan", label: "Rajasthan" },
+  { value: "andhra_pradesh", label: "Andhra Pradesh" },
+  { value: "telangana", label: "Telangana" },
+  { value: "uttar_pradesh", label: "Uttar Pradesh" },
+  { value: "west_bengal", label: "West Bengal" },
+  { value: "madhya_pradesh", label: "Madhya Pradesh" },
+  { value: "kerala", label: "Kerala" },
+  { value: "punjab", label: "Punjab" },
+  { value: "chhattisgarh", label: "Chhattisgarh" },
+  { value: "jharkhand", label: "Jharkhand" },
+  { value: "odisha", label: "Odisha" },
+  { value: "assam", label: "Assam" },
+];
+
+interface EmissionEntry {
+  id: string;
+  type: string;
+  quantity: number;
+  result?: { total_tco2e: number };
+}
+
+interface Scope2Entry {
+  id: string;
+  category: string;
+  quantity: number;
+  state: string;
+}
+
+interface CarbonResults {
+  scope_1: { total_tco2e: number };
+  scope_2: { total_tco2e: number };
+  scope_3: { total_tco2e: number };
+  total_emissions_tco2e: number;
+  ghg_intensity?: { intensity: number } | null;
+  brsr_mapping: {
+    "C.P6.GHG.1": number;
+    "C.P6.GHG.2": number;
+    "C.P6.GHG.3": number;
+    total_scope_1_2: number;
+  };
+}
+
+export default function CarbonClient() {
+  const [financialYear, setFinancialYear] = useState("FY2025-26");
+  const [emissionFactorOrg, setEmissionFactorOrg] = useState("cea_2024");
+  const [scope1Entries, setScope1Entries] = useState<EmissionEntry[]>([
+    { id: "1", type: "diesel_dg_set", quantity: 0 },
+  ]);
+  const [scope2Entries, setScope2Entries] = useState<Scope2Entry[]>([
+    { id: "1", category: "purchased_electricity", quantity: 0, state: "national" },
+  ]);
+  const [scope3Entries, setScope3Entries] = useState<EmissionEntry[]>([
+    { id: "1", type: "business_travel_air_domestic", quantity: 0 },
+  ]);
+  const [revenueCrores, setRevenueCrores] = useState<number>(0);
+  const [results, setResults] = useState<CarbonResults | null>(null);
+  const [calculating, setCalculating] = useState(false);
+  const [calcError, setCalcError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  // Verifiable certificate (signed Scope-2 calculation) state
+  const [certifying, setCertifying] = useState(false);
+  const [certError, setCertError] = useState("");
+  const [verifyId, setVerifyId] = useState<string | null>(null);
+
+  // Load saved data on mount
+  useEffect(() => {
+    loadSavedData();
+  }, [financialYear]);
+
+  async function loadSavedData() {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("brsr_entries")
+        .select("datapoint_id, value")
+        .eq("user_id", user.id)
+        .eq("financial_year", financialYear)
+        .like("datapoint_id", "CARBON_%");
+      if (data && data.length > 0) {
+        const carbonData = data.reduce((acc: Record<string, string>, d) => {
+          acc[d.datapoint_id] = d.value;
+          return acc;
+        }, {} as Record<string, string>);
+        if (carbonData.CARBON_SCOPE1) {
+          try { setScope1Entries(JSON.parse(carbonData.CARBON_SCOPE1)); } catch {}
+        }
+        if (carbonData.CARBON_SCOPE2) {
+          try { setScope2Entries(JSON.parse(carbonData.CARBON_SCOPE2)); } catch {}
+        }
+        if (carbonData.CARBON_SCOPE3) {
+          try { setScope3Entries(JSON.parse(carbonData.CARBON_SCOPE3)); } catch {}
+        }
+        if (carbonData.CARBON_REVENUE) {
+          setRevenueCrores(parseFloat(carbonData.CARBON_REVENUE) || 0);
+        }
+      }
+    } catch {}
+  }
+
+  async function saveData() {
+    setSaving(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setSaving(false); return; }
+      const entries = [
+        { datapoint_id: "CARBON_SCOPE1", value: JSON.stringify(scope1Entries) },
+        { datapoint_id: "CARBON_SCOPE2", value: JSON.stringify(scope2Entries) },
+        { datapoint_id: "CARBON_SCOPE3", value: JSON.stringify(scope3Entries) },
+        { datapoint_id: "CARBON_REVENUE", value: String(revenueCrores) },
+      ];
+      if (results) {
+        entries.push({ datapoint_id: "CARBON_RESULTS", value: JSON.stringify(results) });
+      }
+      for (const entry of entries) {
+        await supabase.from("brsr_entries").upsert({
+          user_id: user.id,
+          financial_year: financialYear,
+          datapoint_id: entry.datapoint_id,
+          value: entry.value,
+        }, { onConflict: "user_id,financial_year,datapoint_id" });
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {}
+    setSaving(false);
+  }
+
+  // Sign the total Scope-2 result with an Ed25519 provenance certificate and
+  // publish it so anyone can verify it at /verify?id=<calculation_id>.
+  async function generateCertificate() {
+    setCertifying(true);
+    setCertError("");
+    try {
+      const totalMwh = scope2Entries.reduce((sum, e) => sum + (e.quantity || 0), 0);
+      if (totalMwh <= 0) {
+        setCertError("Enter a Scope 2 electricity figure before generating a certificate.");
+        setCertifying(false);
+        return;
+      }
+
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setCertError("Please sign in to generate a verifiable certificate.");
+        setCertifying(false);
+        return;
+      }
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      };
+
+      const signRes = await fetch("/backend/api/platform/carbon/scope2/provenance", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ kwh: totalMwh * 1000, jurisdiction: "IN" }),
+      });
+      if (!signRes.ok) {
+        const text = await signRes.text();
+        setCertError(`Signing failed (${signRes.status}): ${text.slice(0, 200)}`);
+        setCertifying(false);
+        return;
+      }
+      const signed = await signRes.json();
+      const calcId: string | undefined = signed.calculation_id;
+      if (!calcId) {
+        setCertError("Signing succeeded but no calculation id was returned.");
+        setCertifying(false);
+        return;
+      }
+
+      const pubRes = await fetch("/backend/api/platform/carbon/publish", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ calculation_id: calcId, published: true }),
+      });
+      if (!pubRes.ok) {
+        const text = await pubRes.text();
+        setCertError(`Publish failed (${pubRes.status}): ${text.slice(0, 200)}`);
+        setCertifying(false);
+        return;
+      }
+
+      setVerifyId(calcId);
+    } catch (err) {
+      setCertError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    setCertifying(false);
+  }
+
+  async function calculateAll() {
+    setCalculating(true);
+    setCalcError("");
+    try {
+      const res = await fetch("/backend/api/platform/carbon/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          financial_year: financialYear,
+          emission_factor_source: emissionFactorOrg,
+          scope1_entries: scope1Entries
+            .filter((e) => e.quantity > 0)
+            .map((e) => ({ fuel_type: e.type, quantity: e.quantity })),
+          scope2_entries: scope2Entries
+            .filter((e) => e.quantity > 0)
+            .map((e) => ({ category: e.category, electricity_mwh: e.quantity, state: e.state })),
+          scope3_entries: scope3Entries
+            .filter((e) => e.quantity > 0)
+            .map((e) => ({ category: e.type, quantity: e.quantity })),
+          revenue_crores: revenueCrores > 0 ? revenueCrores : null,
+        }),
+      });
+      if (res.ok) {
+        setResults(await res.json());
+      } else {
+        const text = await res.text();
+        setCalcError(`Calculation failed (${res.status}): ${text.slice(0, 200)}`);
+      }
+    } catch (err) {
+      setCalcError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    setCalculating(false);
+  }
+
+  function addScope1Entry() {
+    setScope1Entries([...scope1Entries, { id: Date.now().toString(), type: "diesel_dg_set", quantity: 0 }]);
+  }
+
+  function addScope3Entry() {
+    setScope3Entries([...scope3Entries, { id: Date.now().toString(), type: "business_travel_air_domestic", quantity: 0 }]);
+  }
+
+  return (
+    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Carbon Calculator</h1>
+          <p className="text-gray-500 mt-1">
+            Calculate GHG emissions (Scope 1, 2, 3) with configurable emission factors
+          </p>
+        </div>
+        <select
+          value={financialYear}
+          onChange={(e) => setFinancialYear(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+        >
+          <option value="FY2022-23">FY 2022-23</option>
+          <option value="FY2023-24">FY 2023-24</option>
+          <option value="FY2024-25">FY 2024-25</option>
+          <option value="FY2025-26">FY 2025-26</option>
+          <option value="FY2026-27">FY 2026-27</option>
+        </select>
+      </div>
+
+      {/* Emission Factor Organization Selector */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-gray-900 text-sm">Emission Factor Source</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Select the organization whose emission factors to use for calculations</p>
+          </div>
+          <select
+            value={emissionFactorOrg}
+            onChange={(e) => setEmissionFactorOrg(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white font-medium min-w-[260px]"
+          >
+            <optgroup label="India-Specific">
+              {EMISSION_FACTOR_ORGS.filter(o => o.region === "India").map((org) => (
+                <option key={org.value} value={org.value}>{org.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Global Standards">
+              {EMISSION_FACTOR_ORGS.filter(o => o.region === "Global").map((org) => (
+                <option key={org.value} value={org.value}>{org.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="International">
+              {EMISSION_FACTOR_ORGS.filter(o => !["India", "Global"].includes(o.region)).map((org) => (
+                <option key={org.value} value={org.value}>{org.label}</option>
+              ))}
+            </optgroup>
+          </select>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          {EMISSION_FACTOR_ORGS.find(o => o.value === emissionFactorOrg)?.desc}
+        </p>
+      </div>
+
+      {/* Info Banner */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+        <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+        <div className="text-sm text-blue-800">
+          <strong>BRSR P6 Compliance:</strong> Scope 1 & 2 are mandatory for all BRSR-reporting companies.
+          Scope 3 is a Leadership indicator. Grid emission factor: <strong>0.716 tCO2/MWh</strong> (CEA 2024).
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {/* Scope 1 */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+              <Factory className="w-4 h-4 text-red-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Scope 1 — Direct Emissions</h3>
+              <p className="text-xs text-gray-500">Fuel combustion in owned facilities & vehicles</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {scope1Entries.map((entry, idx) => (
+              <div key={entry.id} className="flex items-center gap-3">
+                <select
+                  value={entry.type}
+                  onChange={(e) => {
+                    const updated = [...scope1Entries];
+                    updated[idx].type = e.target.value;
+                    setScope1Entries(updated);
+                  }}
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  {FUEL_TYPES.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label} ({f.unit})
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  placeholder="Quantity"
+                  value={entry.quantity || ""}
+                  onChange={(e) => {
+                    const updated = [...scope1Entries];
+                    updated[idx].quantity = parseFloat(e.target.value) || 0;
+                    setScope1Entries(updated);
+                  }}
+                  className="w-40 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                />
+                <button
+                  onClick={() => setScope1Entries(scope1Entries.filter((_, i) => i !== idx))}
+                  className="p-2 text-gray-400 hover:text-red-500"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={addScope1Entry}
+              className="flex items-center gap-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+            >
+              <Plus className="w-4 h-4" /> Add fuel source
+            </button>
+          </div>
+        </div>
+
+        {/* Scope 2 */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+              <Zap className="w-4 h-4 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Scope 2 — Indirect Emissions (Energy)</h3>
+              <p className="text-xs text-gray-500">Purchased electricity, steam, heat & cooling (Location-based & Market-based)</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {scope2Entries.map((entry, idx) => (
+              <div key={entry.id} className="flex items-center gap-3 flex-wrap">
+                <select
+                  value={entry.category}
+                  onChange={(e) => {
+                    const updated = [...scope2Entries];
+                    updated[idx].category = e.target.value;
+                    setScope2Entries(updated);
+                  }}
+                  className="flex-1 min-w-[200px] px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <optgroup label="Location-based">
+                    {SCOPE2_CATEGORIES.filter(c => c.subcategory === "location_based").map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label} ({c.unit})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Market-based">
+                    {SCOPE2_CATEGORIES.filter(c => c.subcategory === "market_based").map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label} ({c.unit})
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+                <select
+                  value={entry.state}
+                  onChange={(e) => {
+                    const updated = [...scope2Entries];
+                    updated[idx].state = e.target.value;
+                    setScope2Entries(updated);
+                  }}
+                  className="w-44 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  {STATES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  placeholder={`Qty (${SCOPE2_CATEGORIES.find(c => c.value === entry.category)?.unit || "MWh"})`}
+                  value={entry.quantity || ""}
+                  onChange={(e) => {
+                    const updated = [...scope2Entries];
+                    updated[idx].quantity = parseFloat(e.target.value) || 0;
+                    setScope2Entries(updated);
+                  }}
+                  className="w-40 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                />
+                <button
+                  onClick={() => setScope2Entries(scope2Entries.filter((_, i) => i !== idx))}
+                  className="p-2 text-gray-400 hover:text-red-500"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => setScope2Entries([...scope2Entries, { id: Date.now().toString(), category: "purchased_electricity", quantity: 0, state: "national" }])}
+              className="flex items-center gap-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+            >
+              <Plus className="w-4 h-4" /> Add energy source
+            </button>
+          </div>
+        </div>
+
+        {/* Scope 3 — Value Chain Emissions */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+              <CloudRain className="w-4 h-4 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">Scope 3 — Value Chain Emissions</h3>
+              <p className="text-xs text-gray-500">Business travel, employee commute, waste, freight (Leadership indicator)</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {scope3Entries.map((entry, idx) => (
+              <div key={entry.id} className="flex items-center gap-3">
+                <select
+                  value={entry.type}
+                  onChange={(e) => {
+                    const updated = [...scope3Entries];
+                    updated[idx].type = e.target.value;
+                    setScope3Entries(updated);
+                  }}
+                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  {(() => {
+                    const groups = Array.from(new Set(SCOPE3_CATEGORIES.map(c => c.cat)));
+                    return groups.map(group => (
+                      <optgroup key={group} label={group}>
+                        {SCOPE3_CATEGORIES.filter(c => c.cat === group).map(c => (
+                          <option key={c.value} value={c.value}>{c.label} ({c.unit})</option>
+                        ))}
+                      </optgroup>
+                    ));
+                  })()}
+                </select>
+                <input
+                  type="number"
+                  placeholder="Quantity"
+                  value={entry.quantity || ""}
+                  onChange={(e) => {
+                    const updated = [...scope3Entries];
+                    updated[idx].quantity = parseFloat(e.target.value) || 0;
+                    setScope3Entries(updated);
+                  }}
+                  className="w-40 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                />
+                <button
+                  onClick={() => setScope3Entries(scope3Entries.filter((_, i) => i !== idx))}
+                  className="p-2 text-gray-400 hover:text-red-500"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={addScope3Entry}
+              className="flex items-center gap-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+            >
+              <Plus className="w-4 h-4" /> Add source
+            </button>
+          </div>
+        </div>
+
+        {/* Revenue for Intensity */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="font-semibold text-gray-900 mb-3">GHG Intensity Denominator</h3>
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-gray-600 w-40">Revenue (₹ Crores)</label>
+            <input
+              type="number"
+              placeholder="e.g., 5000"
+              value={revenueCrores || ""}
+              onChange={(e) => setRevenueCrores(parseFloat(e.target.value) || 0)}
+              className="w-48 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            />
+            <span className="text-xs text-gray-400">For intensity ratio (tCO2e/₹ Cr)</span>
+          </div>
+        </div>
+
+        {/* Calculate & Save Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={calculateAll}
+            disabled={calculating}
+            className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <Calculator className="w-5 h-5" />
+            {calculating ? "Calculating..." : "Calculate Total Carbon Footprint"}
+          </button>
+          <button
+            onClick={saveData}
+            disabled={saving}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saved ? <CheckCircle2 className="w-5 h-5" /> : <Save className="w-5 h-5" />}
+            {saving ? "Saving..." : saved ? "Saved!" : "Save"}
+          </button>
+        </div>
+
+        {/* Error Display */}
+        {calcError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+            <strong>Error:</strong> {calcError}
+          </div>
+        )}
+
+        {/* Results */}
+        {results && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <TrendingDown className="w-5 h-5 text-emerald-600" />
+              Carbon Footprint Summary — {financialYear}
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <ResultCard
+                label="Scope 1"
+                value={results.scope_1.total_tco2e}
+                color="text-red-600"
+                bg="bg-red-50"
+              />
+              <ResultCard
+                label="Scope 2"
+                value={results.scope_2.total_tco2e}
+                color="text-amber-600"
+                bg="bg-amber-50"
+              />
+              <ResultCard
+                label="Scope 3"
+                value={results.scope_3.total_tco2e}
+                color="text-blue-600"
+                bg="bg-blue-50"
+              />
+              <ResultCard
+                label="Total"
+                value={results.total_emissions_tco2e}
+                color="text-emerald-700"
+                bg="bg-emerald-50"
+                bold
+              />
+            </div>
+
+            {results.ghg_intensity && (
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm text-gray-600">
+                  <strong>GHG Intensity:</strong>{" "}
+                  <span className="text-lg font-bold text-gray-900">
+                    {results.ghg_intensity.intensity} tCO2e/₹ Cr
+                  </span>
+                </p>
+              </div>
+            )}
+
+            {/* BRSR Mapping */}
+            <div className="mt-6 pt-4 border-t border-gray-100">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">BRSR Disclosure Mapping</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between px-3 py-1.5 bg-gray-50 rounded">
+                  <span className="text-gray-500 font-mono text-xs">C.P6.GHG.1</span>
+                  <span className="font-medium">{results.brsr_mapping["C.P6.GHG.1"]} tCO2e</span>
+                </div>
+                <div className="flex justify-between px-3 py-1.5 bg-gray-50 rounded">
+                  <span className="text-gray-500 font-mono text-xs">C.P6.GHG.2</span>
+                  <span className="font-medium">{results.brsr_mapping["C.P6.GHG.2"]} tCO2e</span>
+                </div>
+                <div className="flex justify-between px-3 py-1.5 bg-gray-50 rounded">
+                  <span className="text-gray-500 font-mono text-xs">C.P6.GHG.3</span>
+                  <span className="font-medium">{results.brsr_mapping["C.P6.GHG.3"]} tCO2e</span>
+                </div>
+                <div className="flex justify-between px-3 py-1.5 bg-emerald-50 rounded">
+                  <span className="text-emerald-700 font-mono text-xs">Total Scope 1+2</span>
+                  <span className="font-bold text-emerald-700">{results.brsr_mapping.total_scope_1_2} tCO2e</span>
+                </div>
+              </div>
+            </div>
+            {/* Verifiable certificate (signed Scope-2) */}
+            <div className="mt-6 pt-4 border-t border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3">
+                <div className="flex items-start gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-800">Cryptographically verifiable</p>
+                    <p className="text-xs text-emerald-700/80">
+                      Sign your Scope 2 result with a tamper-evident certificate anyone can verify — no login needed.
+                    </p>
+                  </div>
+                </div>
+                {verifyId ? (
+                  <a
+                    href={`/verify?id=${encodeURIComponent(verifyId)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 shrink-0"
+                  >
+                    <ExternalLink className="w-4 h-4" /> View verification
+                  </a>
+                ) : (
+                  <button
+                    onClick={generateCertificate}
+                    disabled={certifying}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 shrink-0"
+                  >
+                    {certifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                    {certifying ? "Signing…" : "Generate certificate"}
+                  </button>
+                )}
+              </div>
+              {certError && <p className="text-xs text-red-600 mt-2">{certError}</p>}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResultCard({
+  label,
+  value,
+  color,
+  bg,
+  bold,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  bg: string;
+  bold?: boolean;
+}) {
+  return (
+    <div className={`${bg} rounded-lg p-4 text-center`}>
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <p className={`${bold ? "text-xl" : "text-lg"} font-bold ${color}`}>
+        {value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+      </p>
+      <p className="text-xs text-gray-400">tCO2e</p>
+    </div>
+  );
+}

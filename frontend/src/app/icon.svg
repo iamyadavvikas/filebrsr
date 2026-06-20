@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Leaf icon in emerald rounded square -->
+  <rect x="4" y="4" width="40" height="40" rx="10" fill="#10B981"/>
+  <path d="M24 12 C19 18, 19 28, 24 36 C29 28, 29 18, 24 12z" fill="white"/>
+  <line x1="24" y1="15" x2="24" y2="32" stroke="#10B981" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M24 20 C21.5 22, 20 24, 19 26" stroke="#10B981" stroke-width="1" stroke-linecap="round" fill="none"/>
+  <path d="M24 25 C26.5 27, 28 29, 29 31" stroke="#10B981" stroke-width="1" stroke-linecap="round" fill="none"/>
+</svg>
