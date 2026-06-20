@@ -26,6 +26,7 @@ import {
   Code,
   Shield,
   ShieldCheck,
+  BadgeCheck,
   Star,
   Compass,
   ClipboardList,
@@ -79,6 +80,7 @@ const navGroups = [
     items: [
       { name: "Supply Chain ESG", href: "/platform/supply-chain", icon: Network },
       { name: "Documents & Evidence", href: "/platform/documents", icon: FolderOpen },
+      { name: "Carbon Assurance", href: "/platform/assurance", icon: BadgeCheck },
       { name: "Compliance Tracker", href: "/platform/compliance", icon: Shield },
     ],
   },

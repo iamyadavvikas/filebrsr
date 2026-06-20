@@ -35,6 +35,33 @@ class EmissionRecord(BaseModel):
     occurred_at: datetime
 
 
+class SignedSubmission(BaseModel):
+    """A supplier-signed emission record offered to the assurance ledger.
+
+    ``signature`` is the supplier's Ed25519 signature (base64) over the JCS
+    canonical bytes of ``record`` (``mode="json"`` dump); ``supplier_public_key``
+    is the raw 32-byte Ed25519 public key, base64. The server verifies the
+    signature before persisting — an invalid signature is rejected, never stored.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    record: EmissionRecord
+    supplier_public_key: str
+    signature: str
+
+
+class SubmissionAccepted(BaseModel):
+    """Receipt returned after a submission is verified, persisted and checkpointed."""
+
+    leaf_index: int = Field(ge=0)
+    record_hash: str
+    root: str
+    size: int = Field(ge=1)
+    supplier_id: str
+    batch_id: str
+
+
 class ProofStepModel(BaseModel):
     """Serializable form of a Merkle audit-path step."""
 
