@@ -18,6 +18,7 @@ import {
   Eye,
   Zap,
   Trash2,
+  ShieldCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import UpgradeNudge from "./UpgradeNudge";
@@ -381,7 +382,7 @@ export default function PlatformOverview({
             { step: 1, label: "Extract", desc: "Upload annual report", href: "/platform/upload-extract", icon: Upload, done: reports.length > 0 },
             { step: 2, label: "Review Gaps", desc: "See what's missing", href: reports.length > 0 ? `/platform/reports/${reports[0]?.id}` : "/platform/upload-extract", icon: Eye, done: false },
             { step: 3, label: "Fill Data", desc: "Complete datapoints", href: "/platform/data-entry", icon: FileInput, done: stats.totalEntries > 50 },
-            { step: 4, label: "Verify", desc: "Supply chain + evidence", href: "/platform/supply-chain", icon: Network, done: false },
+            { step: 4, label: "Verify", desc: "Cryptographic audit trail + evidence", href: "/platform/assurance", icon: ShieldCheck, done: false },
             { step: 5, label: "File", desc: "Generate XBRL & submit", href: "/platform/xbrl", icon: FileText, done: false },
           ].map((s) => (
             <Link key={s.step} href={s.href} className="relative flex flex-col items-center text-center p-3 rounded-lg hover:bg-white/60 transition-colors group">
@@ -430,6 +431,7 @@ export default function PlatformOverview({
         {[
           { title: "Upload & Extract", desc: "AI-extract from annual report", href: "/platform/upload-extract", icon: Upload, color: "bg-emerald-500" },
           { title: "Calculate Carbon", desc: "Scope 1, 2, 3 emissions", href: "/platform/carbon", icon: Calculator, color: "bg-blue-500" },
+          { title: "Carbon Assurance", desc: "Prove numbers with audit trail", href: "/platform/assurance", icon: ShieldCheck, color: "bg-indigo-500" },
           { title: "Supply Chain ESG", desc: "Assess vendor compliance", href: "/platform/supply-chain", icon: Network, color: "bg-violet-500" },
           { title: "View Calendar", desc: "SEBI deadlines & reminders", href: "/platform/calendar", icon: Calendar, color: "bg-purple-500" },
         ].map((action) => (
@@ -460,7 +462,7 @@ export default function PlatformOverview({
               From FY 2026-27, top 250 listed companies require reasonable assurance on BRSR Core indicators.
               Ensure your data collection has complete audit trails. Supply chain ESG data is now mandatory under BRSR Core.
             </p>
-            <div className="flex gap-4 mt-3">
+            <div className="flex flex-wrap gap-4 mt-3">
               <Link
                 href="/platform/action-plan"
                 className="inline-flex items-center gap-1 text-sm font-medium text-amber-900 hover:text-amber-700"
@@ -472,6 +474,12 @@ export default function PlatformOverview({
                 className="inline-flex items-center gap-1 text-sm font-medium text-amber-900 hover:text-amber-700"
               >
                 Assess supply chain <ArrowRight className="w-3 h-3" />
+              </Link>
+              <Link
+                href="/platform/assurance"
+                className="inline-flex items-center gap-1 text-sm font-medium text-amber-900 hover:text-amber-700"
+              >
+                Set up Carbon Assurance <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
           </div>

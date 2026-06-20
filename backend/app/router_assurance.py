@@ -1,54 +1,77 @@
-"""Carbon Assurance API.
+"""Carbon Assurance API (persisted, supplier-signed).
 
-Exposes the tamper-evident Scope 3 provenance subsystem:
+Exposes the tamper-evident Scope 3 provenance subsystem, backed by Supabase
+(migration v22). Suppliers submit Ed25519-signed emission records; the backend
+verifies each signature, appends it as an RFC 6962 Merkle leaf and checkpoints a
+KMS-signed tree head (see :mod:`app.assurance.store`).
 
-* ``GET /api/assurance/profiles``            — supported regulatory report profiles
-* ``GET /api/assurance/report``              — Scope 3 report for a profile/region
-* ``GET /api/assurance/ledger``              — append-only ledger entries
-* ``GET /api/assurance/provenance``          — W3C PROV-JSON + simplified graph
-* ``GET /api/assurance/bundle/{leaf_index}`` — offline-verifiable proof bundle
-* ``GET /api/assurance/verify/{leaf_index}`` — server-side bundle verification
+* ``GET  /api/assurance/profiles``           — supported regulatory report profiles
+* ``POST /api/assurance/submissions``        — ingest a supplier-signed record
+* ``POST /api/assurance/demo/seed``          — seed a real signed supply chain (demo)
+* ``GET  /api/assurance/report``             — Scope 3 report from persisted records
+* ``GET  /api/assurance/ledger``             — append-only ledger entries
+* ``GET  /api/assurance/provenance``         — W3C PROV-JSON + simplified graph
+* ``GET  /api/assurance/bundle/{leaf_index}``— offline-verifiable proof bundle
+* ``GET  /api/assurance/verify/{leaf_index}``— server-side bundle verification
 
-The ledger is deterministic per ``(region, packs, ore_kg)`` and self-contained
-(no database), so these endpoints work even if the rest of the platform's data
-stores are unavailable.
+All data endpoints are org-scoped: the caller's organization is resolved from
+the bearer token, so each tenant sees only its own ledger.
 """
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 
-from app.assurance import ledger as ledger_mod
+from app.assurance import crypto, store
 from app.assurance import provenance as prov_mod
 from app.assurance.factors import REGION_LABELS
+from app.assurance.ledger import build_chain
 from app.assurance.profiles import DEFAULT_PROFILE, PROFILES, build_report
-from app.assurance.schemas import to_jsonable
+from app.assurance.schemas import SignedSubmission, to_jsonable
 from app.assurance.verify_cli import verify_bundle
+from app.config import get_settings
 
 router = APIRouter(prefix="/api/assurance", tags=["assurance"])
+settings = get_settings()
 
 _MAX_PACKS = 25
 
 
-def _resolve_region(profile_code: str, region: str | None) -> str:
-    profile = PROFILES.get(profile_code.lower())
-    if profile is None:
-        raise HTTPException(404, f"unknown profile '{profile_code}'")
-    chosen = (region or profile.default_region).upper()
-    if chosen not in REGION_LABELS:
-        raise HTTPException(400, f"unsupported region '{chosen}'")
-    return chosen
+def get_supabase_admin():
+    from supabase import create_client
+
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
 
-def _validate_ore(ore_kg: str) -> str:
+async def _resolve_org_id(authorization: str) -> tuple[object, str]:
+    """Resolve the caller's org from the bearer token; return (supabase, org_id)."""
+    token = (authorization or "").replace("Bearer ", "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing auth token")
     try:
-        if Decimal(ore_kg) <= 0:
-            raise ValueError
-    except (InvalidOperation, ValueError) as exc:
-        raise HTTPException(400, "ore_kg must be a positive number") from exc
-    return ore_kg
+        import jwt as pyjwt
+
+        user_id = pyjwt.decode(token, options={"verify_signature": False}).get("sub", token)
+    except Exception:  # noqa: BLE001
+        user_id = token
+
+    sb = get_supabase_admin()
+    profile = (
+        sb.table("profiles").select("org_id").eq("id", user_id).single().execute()
+    )
+    org_id = (profile.data or {}).get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="User is not part of an organization")
+    return sb, org_id
+
+
+def _validate_region(region: str) -> str:
+    chosen = region.upper()
+    if chosen not in REGION_LABELS:
+        raise HTTPException(400, f"unsupported region '{region}'")
+    return chosen
 
 
 @router.get("/profiles")
@@ -70,56 +93,126 @@ def list_profiles() -> dict:
     }
 
 
-@router.get("/report")
-def get_report(
-    profile: str = Query(DEFAULT_PROFILE),
-    region: str | None = Query(None),
+@router.post("/submissions", status_code=201)
+async def submit_record(
+    submission: SignedSubmission, authorization: str = Header(...)
+) -> dict:
+    """Verify a supplier-signed emission record, persist it and checkpoint the root."""
+    sb, org_id = await _resolve_org_id(authorization)
+    try:
+        accepted = store.append_submission(sb, org_id=org_id, submission=submission)
+    except store.InvalidSupplierSignature as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except store.SupplierKeyMismatch as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except store.DuplicateBatch as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return to_jsonable(accepted)
+
+
+@router.post("/demo/seed")
+async def seed_demo_chain(
+    region: str = Query("EU"),
     packs: int = Query(3, ge=1, le=_MAX_PACKS),
     ore_kg: str = Query("20000"),
+    authorization: str = Header(...),
 ) -> dict:
-    """Build a cradle-to-gate Scope 3 report for the given regulatory profile."""
-    chosen = _resolve_region(profile, region)
-    _validate_ore(ore_kg)
-    led = ledger_mod.build_ledger(chosen, packs, ore_kg)
-    report = build_report(profile, ledger_mod.report_rows(led))
+    """Seed a *real* signed ore->battery chain through the genuine ingest path.
+
+    Each generated record is signed with a deterministic-but-genuine Ed25519
+    supplier key, then verified and persisted exactly like an external
+    submission. Re-running is safe: already-present batches are skipped.
+    """
+    chosen = _validate_region(region)
+    try:
+        ore = Decimal(ore_kg)
+        if ore <= 0:
+            raise ValueError
+    except (ValueError, ArithmeticError) as exc:
+        raise HTTPException(400, "ore_kg must be a positive number") from exc
+
+    sb, org_id = await _resolve_org_id(authorization)
+
+    seeded = 0
+    skipped = 0
+    last: object | None = None
+    for pack_no in range(1, packs + 1):
+        for record, _gen_priv, _gen_pub in build_chain(chosen, ore, pack_no):
+            # Deterministic-but-genuine supplier key per (org, supplier_id) so
+            # re-seeding keeps the TOFU binding stable.
+            priv, pub = crypto.keypair_from_seed(f"{org_id}/{record.supplier_id}")
+            record_json = record.model_dump(mode="json")
+            signature = crypto.sign(priv, crypto.canonical_bytes(record_json))
+            submission = SignedSubmission(
+                record=record, supplier_public_key=pub, signature=signature
+            )
+            try:
+                last = store.append_submission(sb, org_id=org_id, submission=submission)
+                seeded += 1
+            except store.DuplicateBatch:
+                skipped += 1
+            except store.SupplierKeyMismatch as exc:
+                raise HTTPException(409, str(exc)) from exc
+
+    root = store.latest_signed_root(sb, org_id)
+    return {
+        "region": chosen,
+        "seeded": seeded,
+        "skipped": skipped,
+        "root": root.root if root else None,
+        "size": root.size if root else 0,
+        "last": to_jsonable(last) if last is not None else None,
+    }
+
+
+@router.get("/report")
+async def get_report(
+    profile: str = Query(DEFAULT_PROFILE),
+    region: str | None = Query(None),
+    authorization: str = Header(...),
+) -> dict:
+    """Build a cradle-to-gate Scope 3 report from the org's persisted ledger."""
+    if profile.lower() not in PROFILES:
+        raise HTTPException(404, f"unknown profile '{profile}'")
+    region_filter = _validate_region(region) if region else None
+    sb, org_id = await _resolve_org_id(authorization)
+    rows = store.report_rows(sb, org_id, region=region_filter)
+    report = build_report(profile, rows)
     return to_jsonable(report)
 
 
 @router.get("/ledger")
-def get_ledger(
-    region: str = Query("EU"),
-    packs: int = Query(3, ge=1, le=_MAX_PACKS),
-    ore_kg: str = Query("20000"),
+async def get_ledger(
+    region: str | None = Query(None),
+    authorization: str = Header(...),
 ) -> dict:
     """Return the append-only ledger entries (in Merkle-leaf order)."""
-    if region.upper() not in REGION_LABELS:
-        raise HTTPException(400, f"unsupported region '{region}'")
-    _validate_ore(ore_kg)
-    led = ledger_mod.build_ledger(region, packs, ore_kg)
+    region_filter = _validate_region(region) if region else None
+    sb, org_id = await _resolve_org_id(authorization)
+    entries = store.ledger_entries(sb, org_id, region=region_filter)
+    root = store.latest_signed_root(sb, org_id)
     return {
-        "region": led.region,
-        "root": led.root_hex,
-        "size": led.signed_root.size,
-        "entries": [to_jsonable(e) for e in ledger_mod.ledger_entries(led)],
+        "region": region_filter,
+        "root": root.root if root else None,
+        "size": root.size if root else 0,
+        "entries": [to_jsonable(e) for e in entries],
     }
 
 
 @router.get("/provenance")
-def get_provenance(
-    region: str = Query("EU"),
-    packs: int = Query(3, ge=1, le=_MAX_PACKS),
-    ore_kg: str = Query("20000"),
+async def get_provenance(
+    region: str | None = Query(None),
     batch_id: str | None = Query(None),
+    authorization: str = Header(...),
 ) -> dict:
     """Return the W3C PROV-JSON document, a simplified graph, and quality stats."""
-    if region.upper() not in REGION_LABELS:
-        raise HTTPException(400, f"unsupported region '{region}'")
-    _validate_ore(ore_kg)
-    led = ledger_mod.build_ledger(region, packs, ore_kg)
-    stats = prov_mod.provenance_stats(led.entries)
+    region_filter = _validate_region(region) if region else None
+    sb, org_id = await _resolve_org_id(authorization)
+    entries = store.signed_entries(sb, org_id, region=region_filter)
+    stats = prov_mod.provenance_stats(entries)
     return {
-        "prov": prov_mod.build_prov_json(led.entries, batch_id=batch_id),
-        "graph": prov_mod.build_graph(led.entries, batch_id=batch_id),
+        "prov": prov_mod.build_prov_json(entries, batch_id=batch_id),
+        "graph": prov_mod.build_graph(entries, batch_id=batch_id),
         "stats": {
             "batches": stats.batches,
             "derived_edges": stats.derived_edges,
@@ -131,38 +224,22 @@ def get_provenance(
 
 
 @router.get("/bundle/{leaf_index}")
-def get_bundle(
-    leaf_index: int,
-    region: str = Query("EU"),
-    packs: int = Query(3, ge=1, le=_MAX_PACKS),
-    ore_kg: str = Query("20000"),
-) -> dict:
+async def get_bundle(leaf_index: int, authorization: str = Header(...)) -> dict:
     """Return a self-contained, offline-verifiable proof bundle for one entry."""
-    if region.upper() not in REGION_LABELS:
-        raise HTTPException(400, f"unsupported region '{region}'")
-    _validate_ore(ore_kg)
-    led = ledger_mod.build_ledger(region, packs, ore_kg)
+    sb, org_id = await _resolve_org_id(authorization)
     try:
-        bundle = ledger_mod.proof_bundle(led, leaf_index)
+        bundle = store.build_proof_bundle(sb, org_id, leaf_index)
     except IndexError as exc:
         raise HTTPException(404, str(exc)) from exc
     return to_jsonable(bundle)
 
 
 @router.get("/verify/{leaf_index}")
-def verify_entry(
-    leaf_index: int,
-    region: str = Query("EU"),
-    packs: int = Query(3, ge=1, le=_MAX_PACKS),
-    ore_kg: str = Query("20000"),
-) -> dict:
+async def verify_entry(leaf_index: int, authorization: str = Header(...)) -> dict:
     """Server-side verification of one entry (same logic as the offline CLI)."""
-    if region.upper() not in REGION_LABELS:
-        raise HTTPException(400, f"unsupported region '{region}'")
-    _validate_ore(ore_kg)
-    led = ledger_mod.build_ledger(region, packs, ore_kg)
+    sb, org_id = await _resolve_org_id(authorization)
     try:
-        bundle = ledger_mod.proof_bundle(led, leaf_index)
+        bundle = store.build_proof_bundle(sb, org_id, leaf_index)
     except IndexError as exc:
         raise HTTPException(404, str(exc)) from exc
     return verify_bundle(bundle).as_dict()

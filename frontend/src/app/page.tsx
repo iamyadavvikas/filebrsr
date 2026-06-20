@@ -741,7 +741,11 @@ export default function HomePage() {
               </div>
               <div className="rounded-xl p-5 card-hover" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(226,232,240,0.9)", boxShadow: "0 4px 14px rgba(15,23,42,0.04)" }}>
                 <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#0891B2" }}>VERIFY</p>
-                <p className="text-sm font-medium" style={{ color: "#334155" }}>Year-over-year reductions auto-verified from platform data. MRV built in — no manual audits.</p>
+                <p className="text-sm font-medium" style={{ color: "#334155" }}>Reductions cryptographically verified — auditor-checkable MRV. Signed, append-only, offline-provable. No manual audits.</p>
+                <span className="inline-flex items-center gap-1.5 mt-3" style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "#6366F1", background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)", padding: "4px 10px", borderRadius: 20 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#6366F1", display: "inline-block" }} />
+                  Powered by CarbonTrace
+                </span>
               </div>
               <div className="rounded-xl p-5 card-hover" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(226,232,240,0.9)", boxShadow: "0 4px 14px rgba(15,23,42,0.04)" }}>
                 <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#0891B2" }}>TRADE</p>

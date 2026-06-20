@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ShieldCheck, ShieldAlert, Search, Loader2, FileDown } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Search, Loader2, FileDown, KeyRound, GitBranch } from "lucide-react";
 
 type Factor = {
   id: string | null;
@@ -217,6 +217,54 @@ export default function VerifyClient() {
                 </div>
               </div>
             )}
+          </div>
+        </section>
+
+        {/* Product explainer — makes /verify work as a landing for the "Verified Carbon Ledger" card */}
+        <section className="py-12 md:py-16 px-4 sm:px-8" style={{ background: "#F8FAFC" }}>
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-10">
+              <h2 style={{ fontSize: "clamp(24px, 3.5vw, 34px)", fontWeight: 800, color: "#0F172A", letterSpacing: -0.8, marginBottom: 12 }}>
+                How verification works
+              </h2>
+              <p style={{ fontSize: 16, color: "#475569", maxWidth: 620, margin: "0 auto", lineHeight: 1.7 }}>
+                Every number FileBRSR publishes is cryptographically signed and recorded on an append-only ledger.
+                Anyone &mdash; auditors, regulators, buyers &mdash; can confirm it in seconds.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {[
+                { icon: KeyRound, color: "#059669", title: "1 · Signed at source", body: "When a calculation is published, FileBRSR signs the value, factor and method with an Ed25519 key. The signature travels with the number." },
+                { icon: GitBranch, color: "#0891B2", title: "2 · Recorded on a ledger", body: "Each disclosure is written to an append-only ledger. Figures can't be silently edited after publishing — any change is detectable." },
+                { icon: ShieldCheck, color: "#6366F1", title: "3 · Verified by anyone", body: "Paste a calculation ID above to re-check the signature, trace the emission factor to its source, and download an auditor evidence bundle." },
+              ].map((s) => (
+                <div key={s.title} className="bg-white rounded-2xl border border-gray-200 p-6 card-hover">
+                  <div className="inline-flex items-center justify-center rounded-xl mb-4" style={{ width: 44, height: 44, background: `${s.color}12` }}>
+                    <s.icon size={22} style={{ color: s.color }} />
+                  </div>
+                  <h3 className="font-bold mb-2" style={{ color: "#0F172A", fontSize: 17 }}>{s.title}</h3>
+                  <p className="text-sm" style={{ color: "#475569", lineHeight: 1.65 }}>{s.body}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6">
+              <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: "#059669" }}>What every check confirms</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+                {[
+                  "The number is authentic and signed by FileBRSR",
+                  "It hasn't been tampered with since it was published",
+                  "It traces to a named emission factor (CEA, BEE, IPCC…)",
+                  "The factor links to its public citation source",
+                ].map((t) => (
+                  <div key={t} className="flex items-start gap-2">
+                    <ShieldCheck size={18} style={{ color: "#059669", flexShrink: 0, marginTop: 2 }} />
+                    <span className="text-sm" style={{ color: "#334155" }}>{t}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
       </main>

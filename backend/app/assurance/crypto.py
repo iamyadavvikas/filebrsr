@@ -148,6 +148,22 @@ def generate_keypair() -> tuple[str, str]:
     )
 
 
+def keypair_from_seed(seed: str) -> tuple[str, str]:
+    """Deterministically derive an Ed25519 ``(private_b64, public_b64)`` from a string.
+
+    The private scalar is ``sha256(seed)`` (a valid raw 32-byte Ed25519 key). The
+    signatures it produces are genuine Ed25519 signatures; the seed only makes the
+    keypair reproducible (used for repeatable demo-supplier identities, never for
+    the server checkpoint key \u2014 that comes from :func:`app.prov.get_signer`).
+    """
+    raw = hashlib.sha256(seed.encode("utf-8")).digest()
+    private = Ed25519PrivateKey.from_private_bytes(raw)
+    return (
+        _b64encode(raw),
+        _b64encode(private.public_key().public_bytes_raw()),
+    )
+
+
 def load_private_key(private_b64: str) -> Ed25519PrivateKey:
     return Ed25519PrivateKey.from_private_bytes(_b64decode(private_b64))
 
