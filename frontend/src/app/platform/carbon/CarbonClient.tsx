@@ -237,6 +237,69 @@ export default function CarbonClient() {
     setSaving(false);
   }
 
+  // Sign the total Scope-2 result with an Ed25519 provenance certificate and
+  // publish it so anyone can verify it at /verify?id=<calculation_id>.
+  async function generateCertificate() {
+    setCertifying(true);
+    setCertError("");
+    try {
+      const totalMwh = scope2Entries.reduce((sum, e) => sum + (e.quantity || 0), 0);
+      if (totalMwh <= 0) {
+        setCertError("Enter a Scope 2 electricity figure before generating a certificate.");
+        setCertifying(false);
+        return;
+      }
+
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setCertError("Please sign in to generate a verifiable certificate.");
+        setCertifying(false);
+        return;
+      }
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      };
+
+      const signRes = await fetch("/backend/api/platform/carbon/scope2/provenance", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ kwh: totalMwh * 1000, jurisdiction: "IN" }),
+      });
+      if (!signRes.ok) {
+        const text = await signRes.text();
+        setCertError(`Signing failed (${signRes.status}): ${text.slice(0, 200)}`);
+        setCertifying(false);
+        return;
+      }
+      const signed = await signRes.json();
+      const calcId: string | undefined = signed.calculation_id;
+      if (!calcId) {
+        setCertError("Signing succeeded but no calculation id was returned.");
+        setCertifying(false);
+        return;
+      }
+
+      const pubRes = await fetch("/backend/api/platform/carbon/publish", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ calculation_id: calcId, published: true }),
+      });
+      if (!pubRes.ok) {
+        const text = await pubRes.text();
+        setCertError(`Publish failed (${pubRes.status}): ${text.slice(0, 200)}`);
+        setCertifying(false);
+        return;
+      }
+
+      setVerifyId(calcId);
+    } catch (err) {
+      setCertError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    setCertifying(false);
+  }
+
   async function calculateAll() {
     setCalculating(true);
     setCalcError("");
