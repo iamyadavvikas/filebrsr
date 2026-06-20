@@ -859,6 +859,47 @@ async def carbon_summary(req: CarbonSummaryRequest):
     return summary
 
 
+class PublishCalculationRequest(BaseModel):
+    calculation_id: str = Field(..., description="ID of a signed calculation owned by the caller's org")
+    published: bool = Field(True, description="True to expose on the public verify endpoint, False to retract")
+
+
+@router.post("/carbon/publish")
+async def publish_calculation(
+    req: PublishCalculationRequest,
+    authorization: Optional[str] = Header(None),
+):
+    """Toggle the public-verify ``published`` flag on a signed calculation.
+
+    The anonymous ``GET /api/verify/{id}`` endpoint only resolves calculations
+    whose org has opted in via ``published = true`` (migration v18). This lets
+    an authenticated owner publish (or retract) one of their signed carbon
+    calculations so it becomes shareable/verifiable. Scoped to the caller's
+    org, so one tenant can never publish another tenant's calculation.
+    """
+    org_id, _user_id = await resolve_org_user(authorization)
+    if not org_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    sb = get_supabase_admin()
+    owned = (
+        sb.table("calculations")
+        .select("id")
+        .eq("id", req.calculation_id)
+        .eq("org_id", org_id)
+        .limit(1)
+        .execute()
+    )
+    if not owned.data:
+        raise HTTPException(status_code=404, detail="Calculation not found")
+
+    sb.table("calculations").update({"published": req.published}).eq(
+        "id", req.calculation_id
+    ).eq("org_id", org_id).execute()
+
+    return {"calculation_id": req.calculation_id, "published": req.published}
+
+
 @router.get("/carbon/factors")
 async def get_emission_factors():
     """Get all available emission factors for reference."""

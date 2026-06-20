@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, CheckCircle, Loader2, UserPlus, Crown, Shield, Eye, User, Mail, X, Users } from "lucide-react";
+import { Save, CheckCircle, Loader2, UserPlus, Crown, Shield, Eye, User, Mail, X, Users, KeyRound, Copy, Trash2, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 
@@ -27,6 +27,26 @@ interface PendingInvite {
   role: string;
 }
 
+interface BillingState {
+  plan: string;
+  plan_name: string;
+  credits_remaining: number | null;
+  subscription_status: string;
+  cancellable: boolean;
+}
+
+interface ApiKey {
+  id: string;
+  name: string;
+  key_prefix: string;
+  tier: string;
+  active: boolean;
+  last_used_at: string | null;
+  created_at: string;
+  usage_today: number;
+  daily_limit: number;
+}
+
 export default function SettingsClient({ userId, userEmail }: Props) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -50,9 +70,24 @@ export default function SettingsClient({ userId, userEmail }: Props) {
   const [inviteError, setInviteError] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState("");
 
+  // Billing state
+  const [billing, setBilling] = useState<BillingState | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelMsg, setCancelMsg] = useState("");
+
+  // API keys state
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [keyError, setKeyError] = useState("");
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     loadSettings();
     loadTeam();
+    loadBilling();
+    loadApiKeys();
   }, []);
 
   async function loadSettings() {
@@ -89,6 +124,115 @@ export default function SettingsClient({ userId, userEmail }: Props) {
       setOrgData(data.org);
       setMembers(data.members || []);
       setPendingInvites(data.invites || []);
+    } catch {}
+  }
+
+  async function loadBilling() {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch("/backend/api/billing/subscription", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) return;
+      setBilling(await res.json());
+    } catch {}
+  }
+
+  async function handleCancelSubscription() {
+    if (!confirm("Cancel your subscription? You'll keep access until the end of the current billing period, then move to the Free plan.")) {
+      return;
+    }
+    setCancelling(true);
+    setCancelMsg("");
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setCancelling(false); return; }
+      const res = await fetch("/backend/api/billing/cancel", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setCancelMsg(err.detail || "Failed to cancel subscription.");
+      } else {
+        setCancelMsg("Subscription cancelled. Access continues until the end of your billing period.");
+        loadBilling();
+      }
+    } catch {
+      setCancelMsg("Network error.");
+    }
+    setCancelling(false);
+  }
+
+  async function loadApiKeys() {
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch("/backend/api/keys", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setApiKeys(data.keys || []);
+    } catch {}
+  }
+
+  async function handleCreateKey() {
+    setCreatingKey(true);
+    setKeyError("");
+    setRevealedKey(null);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setCreatingKey(false); return; }
+      const res = await fetch("/backend/api/keys", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: newKeyName.trim() || "API key" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setKeyError(err.detail || "Failed to create API key.");
+      } else {
+        const data = await res.json();
+        setRevealedKey(data.api_key);
+        setNewKeyName("");
+        loadApiKeys();
+      }
+    } catch {
+      setKeyError("Network error.");
+    }
+    setCreatingKey(false);
+  }
+
+  async function handleRevokeKey(keyId: string) {
+    if (!confirm("Revoke this API key? Any integration using it will stop working immediately.")) {
+      return;
+    }
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch(`/backend/api/keys/${keyId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      loadApiKeys();
+    } catch {}
+  }
+
+  async function copyKey(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {}
   }
 
@@ -360,16 +504,140 @@ export default function SettingsClient({ userId, userEmail }: Props) {
         {/* Plan */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Current Plan</h3>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">You are on the <span className="font-semibold text-emerald-700">Free</span> plan</p>
-              <p className="text-xs text-gray-400 mt-1">3 PDF extractions &bull; Basic data entry &bull; Limited reports</p>
-            </div>
-            <Link href="/pricing"
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors">
-              Upgrade
-            </Link>
+          {(() => {
+            const plan = billing?.plan ?? "free";
+            const isFree = plan === "free";
+            const planLabel = billing?.plan_name ?? "Free";
+            return (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">
+                      You are on the{" "}
+                      <span className="font-semibold text-emerald-700">{planLabel}</span> plan
+                      {billing?.subscription_status === "cancelled" && !isFree && (
+                        <span className="ml-2 text-xs text-amber-600">(cancels at period end)</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {isFree
+                        ? "3 PDF extractions • Basic data entry • Limited reports"
+                        : `Credits remaining: ${billing?.credits_remaining === -1 ? "Unlimited" : billing?.credits_remaining ?? "—"}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {billing?.cancellable && (
+                      <button
+                        onClick={handleCancelSubscription}
+                        disabled={cancelling}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                      >
+                        {cancelling ? "Cancelling..." : "Cancel plan"}
+                      </button>
+                    )}
+                    <Link href="/pricing"
+                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors">
+                      {isFree ? "Upgrade" : "Change plan"}
+                    </Link>
+                  </div>
+                </div>
+                {cancelMsg && (
+                  <p className="mt-3 text-xs text-gray-600">{cancelMsg}</p>
+                )}
+              </>
+            );
+          })()}
+        </div>
+
+        {/* API Keys */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-emerald-600" />
+              API Keys
+            </h3>
           </div>
+          <p className="text-xs text-gray-500 mb-4">
+            Programmatic access to the FileBRSR API. Send your key in the
+            <code className="mx-1 px-1 py-0.5 bg-gray-100 rounded text-[11px]">X-API-Key</code>
+            header. Daily limits depend on your plan.
+          </p>
+
+          {/* Newly created key — shown once */}
+          {revealedKey && (
+            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <p className="text-xs font-semibold text-emerald-800 mb-1">
+                Copy your new key now — it won&apos;t be shown again.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 px-2 py-1.5 bg-white border border-emerald-200 rounded text-xs font-mono break-all">
+                  {revealedKey}
+                </code>
+                <button
+                  onClick={() => copyKey(revealedKey)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded text-xs font-medium hover:bg-emerald-700 shrink-0"
+                >
+                  <Copy className="w-3.5 h-3.5" /> {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Create form */}
+          <div className="flex items-center gap-2 mb-4">
+            <input
+              type="text"
+              value={newKeyName}
+              onChange={e => setNewKeyName(e.target.value)}
+              placeholder="Key name (e.g. Production server)"
+              maxLength={80}
+              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              onKeyDown={e => e.key === "Enter" && handleCreateKey()}
+            />
+            <button
+              onClick={handleCreateKey}
+              disabled={creatingKey}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 shrink-0"
+            >
+              {creatingKey ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Create key
+            </button>
+          </div>
+          {keyError && <p className="text-xs text-red-600 mb-3">{keyError}</p>}
+
+          {/* Key list */}
+          {apiKeys.length === 0 ? (
+            <p className="text-sm text-gray-400 py-2">No API keys yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {apiKeys.map(k => (
+                <div
+                  key={k.id}
+                  className={`flex items-center justify-between gap-3 px-3 py-2.5 border rounded-lg ${k.active ? "border-gray-200" : "border-gray-100 bg-gray-50 opacity-70"}`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-gray-900 truncate">{k.name}</p>
+                      <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{k.tier}</span>
+                      {!k.active && <span className="text-[10px] text-red-500">revoked</span>}
+                    </div>
+                    <p className="text-xs text-gray-400 font-mono mt-0.5">{k.key_prefix}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      {k.usage_today}/{k.daily_limit === -1 ? "∞" : k.daily_limit} today
+                    </p>
+                  </div>
+                  {k.active && (
+                    <button
+                      onClick={() => handleRevokeKey(k.id)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Revoke
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Team Management */}

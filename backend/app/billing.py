@@ -282,6 +282,8 @@ async def _handle_subscription_activated(entity: dict):
         supabase.table("profiles").update({
             "plan": plan,
             "credits_remaining": PLANS[plan]["reports_per_month"],
+            "subscription_id": entity.get("id"),
+            "subscription_status": "active",
         }).eq("id", user_id).execute()
 
     if org_id:
@@ -320,6 +322,7 @@ async def _handle_subscription_cancelled(entity: dict):
         supabase.table("profiles").update({
             "plan": "free",
             "credits_remaining": 3,
+            "subscription_status": "cancelled",
         }).eq("id", user_id).execute()
 
     if org_id:
@@ -452,3 +455,85 @@ async def verify_payment(
 
     logger.info("Entitlement granted: user=%s plan=%s", user_id, plan)
     return {"status": "verified", "plan": plan}
+
+
+@router.get("/subscription")
+async def get_subscription(authorization: str | None = Header(default=None)):
+    """Return the authenticated user's current plan and subscription state.
+
+    Source of truth is the user's own `profiles` row (set by the Razorpay
+    webhook). Used by Settings to render the real plan and a cancel option.
+    """
+    user_id = await require_user_id(authorization)
+
+    from supabase import create_client
+    supabase = create_client(get_settings().SUPABASE_URL, get_settings().SUPABASE_SERVICE_KEY)
+
+    res = (
+        supabase.table("profiles")
+        .select("plan, credits_remaining, subscription_id, subscription_status")
+        .eq("id", user_id)
+        .single()
+        .execute()
+    )
+    data = res.data or {}
+    plan = data.get("plan", "free")
+    plan_meta = PLANS.get(plan, {})
+    return {
+        "plan": plan,
+        "plan_name": plan_meta.get("name", "Free"),
+        "credits_remaining": data.get("credits_remaining"),
+        "subscription_id": data.get("subscription_id"),
+        "subscription_status": data.get("subscription_status", "inactive"),
+        "cancellable": bool(data.get("subscription_id"))
+        and data.get("subscription_status") == "active",
+    }
+
+
+@router.post("/cancel")
+async def cancel_subscription(authorization: str | None = Header(default=None)):
+    """Cancel the authenticated user's Razorpay subscription at cycle end.
+
+    The subscription_id is read server-side from the user's profile (never the
+    client). Access remains until the current billing period ends; the
+    `subscription.cancelled` webhook will downgrade the plan to free.
+    """
+    user_id = await require_user_id(authorization)
+
+    from supabase import create_client
+    supabase = create_client(get_settings().SUPABASE_URL, get_settings().SUPABASE_SERVICE_KEY)
+
+    res = (
+        supabase.table("profiles")
+        .select("subscription_id, subscription_status")
+        .eq("id", user_id)
+        .single()
+        .execute()
+    )
+    data = res.data or {}
+    subscription_id = data.get("subscription_id")
+    if not subscription_id:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+    if data.get("subscription_status") != "active":
+        raise HTTPException(status_code=400, detail="Subscription is not active")
+
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"https://api.razorpay.com/v1/subscriptions/{subscription_id}/cancel",
+                auth=(get_settings().RAZORPAY_KEY_ID, get_settings().RAZORPAY_KEY_SECRET),
+                json={"cancel_at_cycle_end": 1},
+            )
+            if r.status_code != 200:
+                logger.error("Razorpay cancel failed: %s %s", r.status_code, r.text)
+                raise HTTPException(status_code=502, detail="Failed to cancel subscription with gateway")
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Payment gateway error: {str(e)}")
+
+    # Mark as scheduled-to-cancel; final downgrade happens on the webhook at
+    # cycle end. Access is retained until then.
+    supabase.table("profiles").update({"subscription_status": "cancelled"}).eq("id", user_id).execute()
+
+    logger.info("Subscription cancel scheduled: user=%s sub=%s", user_id, subscription_id)
+    return {"status": "cancelled", "cancel_at_cycle_end": True}
