@@ -141,6 +141,71 @@ def _inclusion_proof(org_id, calculation_id: str) -> dict | None:
         return None
 
 
+# Fixed inputs for the public worked example (Scope 2, India CEA grid). Chosen
+# so the result is a clean, relatable figure for a non-technical buyer.
+_EXAMPLE_KWH = 50_000
+
+
+@router.get("/example")
+async def verify_example(request: Request):
+    """A live, self-contained worked example — real engine, real signature.
+
+    Computes a Scope 2 (CEA grid) calculation with the production engine, signs
+    it with the live Ed25519 signer, and re-verifies it through the same path
+    as a real disclosure. Returns the SAME payload shape as
+    ``GET /{calculation_id}`` so the public page can render an authentic PASS +
+    factor lineage with one click — no login, and no seeded database row. This
+    is a genuine cryptographic verification, not a mock.
+    """
+    _check_rate_limit(request)
+    from app.calculator import (
+        FactorNotFoundError,
+        scope2_location_based,
+        sign_result,
+    )
+
+    try:
+        result = scope2_location_based(_EXAMPLE_KWH, jurisdiction="IN")
+        calc_id, signed = sign_result(
+            result, org_id="filebrsr-demo", jurisdiction="IN"
+        )
+    except FactorNotFoundError as exc:  # factor pack not loaded
+        logger.warning("verify example unavailable: %s", exc)
+        raise HTTPException(
+            status_code=503, detail="Example temporarily unavailable."
+        ) from exc
+
+    verified = verify_signed_provenance(signed)
+    record_verification(verified)
+
+    return {
+        "calculation_id": calc_id,
+        "verified": verified,
+        "status": "PASS" if verified else "FAIL",
+        "algorithm": signed.algorithm,
+        "key_id": signed.key_id,
+        "signed_at": signed.signed_at,
+        "value": str(result.value),
+        "unit": result.unit,
+        "scope": result.scope,
+        "method": result.method,
+        "jurisdiction": "IN",
+        "factor": {
+            "id": result.factor_id,
+            "version": result.factor_version,
+            "source": result.factor_source,
+            "citation_url": result.factor_citation,
+        },
+        "is_example": True,
+        "example_input": (
+            f"{_EXAMPLE_KWH:,} kWh of purchased grid electricity "
+            "(India · CEA national grid factor)"
+        ),
+        "ledger_inclusion": None,
+        "provenance_graph": signed.graph,
+    }
+
+
 @router.get("/{calculation_id}")
 async def verify_calculation(calculation_id: str, request: Request):
     """Verify a published calculation's signed provenance. PASS/FAIL + lineage."""
