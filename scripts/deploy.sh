@@ -49,6 +49,16 @@ docker compose -f docker-compose.prod.yml up -d prometheus grafana
 # nginx + certbot only restart if their config / image changed
 docker compose -f docker-compose.prod.yml up -d nginx certbot
 
+# compose won't recreate nginx when only the mounted nginx.conf changed on disk,
+# so explicitly reload to pick up config changes (e.g. the /grafana/ route).
+# Zero-downtime; skipped if the new config fails validation.
+if docker exec filebrsr-nginx-1 nginx -t >/dev/null 2>&1; then
+  docker exec filebrsr-nginx-1 nginx -s reload || true
+  echo "→ nginx config reloaded"
+else
+  echo "⚠ nginx -t failed; keeping previous config"
+fi
+
 # 5. Health check — give containers 60s to become healthy
 echo "→ Health check (up to 60s)"
 ok=0
