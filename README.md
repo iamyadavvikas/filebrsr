@@ -585,16 +585,14 @@ The prod stack ([docker-compose.prod.yml](docker-compose.prod.yml)) runs
 `/metrics` surface is internal-only (nginx returns 404 for `/backend/metrics`;
 Prometheus scrapes `backend:8000` over the compose network).
 
-Required before the first deploy: set a strong admin password in the EC2
-`~/filebrsr/.env`:
+Grafana defaults to `admin` / `admin` on first login and prompts for a new
+password. To set credentials up front instead, add to the EC2 `~/filebrsr/.env`:
 
 ```bash
-GRAFANA_ADMIN_PASSWORD=<strong-password>
-# optional, defaults to "admin":
+# both optional — default to "admin":
 # GRAFANA_ADMIN_USER=<user>
+# GRAFANA_ADMIN_PASSWORD=<strong-password>
 ```
-
-Grafana refuses to start without `GRAFANA_ADMIN_PASSWORD`.
 
 ---
 
