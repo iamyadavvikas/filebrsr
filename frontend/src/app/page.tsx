@@ -72,17 +72,19 @@ const platformFeatures = [
   { title: "Supply Chain ESG Ratings", desc: "Rate and monitor sustainability across your entire supplier base. Auto-scoring aligned to SEBI BRSR.", color: "#059669" },
   { title: "AI-Powered BRSR Filing", desc: "Upload any sustainability report — AI extracts all 140 BRSR indicators (98 Essential + 42 Leadership) across 9 NGRBC Principles in 60 seconds.", color: "#E8B931" },
   { title: "Carbon Calculator & Tracking", desc: "Scope 1/2/3 emissions from BRSR data with India-specific factors. Year-over-year reduction tracking. Carbon market integration coming 2027.", color: "#0891B2" },
+  { title: "Verifiable Carbon Certificates", desc: "Sign any emissions result with a tamper-evident Ed25519 certificate. Anyone can independently verify it — no login needed. MRV-ready for assurance and the carbon market.", color: "#0D9488" },
   { title: "ESG Badges & Scorecards", desc: "Industry-wide percentile rankings. Platinum/Gold/Silver/Bronze medals. Public badges suppliers showcase to win business.", color: "#7C3AED" },
   { title: "Supplier Self-Assessment", desc: "Invite suppliers to complete BRSR-aligned ESG questionnaires. No signup needed. Auto-scored with instant results.", color: "#2563EB" },
   { title: "Multi-Framework Compliance", desc: "One assessment maps to BRSR, GRI, CDP, TCFD, SASB, UN SDGs & ESRS. Single platform for all frameworks.", color: "#DC2626" },
   { title: "XBRL Filing Generation", desc: "Auto-generate XBRL-formatted filings ready for BSE/NSE submission. Validated output, zero manual tagging.", color: "#4F46E5" },
   { title: "Workflow Approvals", desc: "Maker-checker workflows for data entry, report approval, and corrective action plans. Full audit trail.", color: "#0D9488" },
+  { title: "Developer API & Integrations", desc: "Self-serve API keys to pull scores, emissions and filings into your own systems. Foundation for SAP/ERP and data-warehouse integrations.", color: "#1D4ED8" },
   { title: "Regulatory Tracker", desc: "Track compliance with PAT scheme, EPR, POSH, LODR, Companies Act 135, and environmental clearances.", color: "#B45309" },
 ];
 
 const faqs = [
   { q: "What is FileBRSR?", a: "FileBRSR is India's Supply Chain ESG + BRSR Automation + Carbon platform. We help listed companies assess suppliers, automate BRSR filing, track emissions, and prepare for India's carbon credit market — all in one connected system." },
-  { q: "Who needs this?", a: "SEBI mandates the top 1,000 listed companies to disclose value chain ESG data (BRSR Section A.V). This means 50,000–100,000 suppliers need to prove ESG readiness. FileBRSR serves both sides — enterprises assessing suppliers, and SMEs proving compliance." },
+  { q: "Who needs this?", a: "SEBI requires the top 1,000 listed companies to file BRSR, and is phasing in value-chain ESG disclosure (BRSR Section A.V) — currently on an assess-or-explain basis, expanding over time. Value-chain partners are those cumulatively making up ~75% of purchases/sales by value, so this still pulls in 50,000+ suppliers. FileBRSR serves both sides — enterprises assessing suppliers, and SMEs proving compliance." },
   { q: "How is this different from consultants?", a: "Consultants charge ₹5–15L/year, take months, use Excel, and provide no standardized scoring. FileBRSR automates the entire process — assessment, scoring, gap analysis, and filing — starting free for 5 suppliers." },
   { q: "How do supplier assessments work?", a: "Enterprise users add suppliers and send invite links. Suppliers complete a 20-question ESG questionnaire (no signup needed). Scores are auto-calculated across Environment (40%), Social (35%) & Governance (25%). First 5 suppliers free, unlimited on paid plans." },
   { q: "What are FileBRSR badges?", a: "Based on assessment scores and industry percentile ranking, suppliers earn Platinum (top 1%), Gold (top 5%), Silver (top 15%), or Bronze (top 35%) badges. These are publicly shareable to attract new business." },
@@ -112,7 +114,10 @@ function CountUpStat({
   label: string;
   delay?: number;
 }) {
-  const [val, setVal] = useState(0);
+  // Initialise to the target so the server-rendered HTML (and any non-JS
+  // crawler / preview fetch) shows the real figure instead of "0". The
+  // count-up animation resets to 0 and runs only once the tile scrolls in.
+  const [val, setVal] = useState(target);
   const ref = useRef<HTMLDivElement>(null);
   const started = useRef(false);
 
@@ -124,6 +129,7 @@ function CountUpStat({
         entries.forEach((e) => {
           if (e.isIntersecting && !started.current) {
             started.current = true;
+            setVal(0);
             const duration = 1400;
             const start = performance.now();
             const tick = (now: number) => {
@@ -437,12 +443,13 @@ export default function HomePage() {
                 THE REGULATION
               </p>
               <h2 style={{ fontSize: "clamp(28px, 3.5vw, 40px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 16 }}>
-                SEBI mandates supply chain ESG disclosure
+                SEBI is phasing in supply chain ESG disclosure
               </h2>
               <p className="text-muted mx-auto" style={{ fontSize: 16, maxWidth: 680, lineHeight: 1.8 }}>
-                SEBI (India&apos;s SEC) mandates <strong>BRSR</strong> for the top 1,000 listed companies.
-                From <strong>FY 2026-27</strong>, the top 250 must also disclose supply chain ESG data with
-                <strong> third-party assurance</strong>.
+                SEBI (India&apos;s SEC) requires <strong>BRSR</strong> for the top 1,000 listed companies.
+                <strong> Value-chain ESG disclosure</strong> (BRSR Core) is being phased in on an
+                assess-or-explain basis — covering the partners that make up{" "}
+                <strong>~75% of purchases &amp; sales by value</strong>.
               </p>
             </Reveal>
 
@@ -453,7 +460,7 @@ export default function HomePage() {
                   &ldquo;Do you assess the ESG performance of your value chain partners? If yes, what % of your value chain has been assessed?&rdquo;
                 </blockquote>
                 <p className="mt-4 text-sm text-muted">
-                  Most companies today answer <strong>&ldquo;0%&rdquo;</strong>. That&apos;s no longer acceptable.
+                  Most companies today answer <strong>&ldquo;0%&rdquo;</strong>. Regulators and global buyers increasingly expect a real number.
                 </p>
               </div>
             </Reveal>
