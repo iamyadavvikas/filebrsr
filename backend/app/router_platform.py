@@ -3,29 +3,29 @@ Platform API Router - Data Entry, Carbon Calculator, Action Plans, Calendar, Rep
 Full Greenomy-equivalent API for Indian ESG compliance.
 """
 
-from fastapi import APIRouter, HTTPException, Header, Depends
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import date, datetime
 import json
+from datetime import datetime
+from typing import List, Optional
 
-from app.config import get_settings
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
+from pydantic import BaseModel, Field
+
+from app.action_plan import NGRBC_PRINCIPLES, generate_action_plan_from_gaps
+from app.brsr_datapoints import BRSR_DATAPOINTS
 from app.carbon_calculator import (
+    CEA_GRID_EMISSION_FACTORS,
+    MOBILE_COMBUSTION_FACTORS,
+    PAT_SECTOR_BENCHMARKS,
+    SCOPE_3_FACTORS,
+    SEBI_COMPLIANCE_CALENDAR,
+    STATIONARY_COMBUSTION_FACTORS,
+    calculate_ghg_intensity,
     calculate_scope1_emissions,
     calculate_scope2_emissions,
     calculate_scope3_emissions,
-    calculate_energy_intensity,
-    calculate_ghg_intensity,
     get_pat_compliance,
-    CEA_GRID_EMISSION_FACTORS,
-    SEBI_COMPLIANCE_CALENDAR,
-    STATIONARY_COMBUSTION_FACTORS,
-    MOBILE_COMBUSTION_FACTORS,
-    SCOPE_3_FACTORS,
-    PAT_SECTOR_BENCHMARKS,
 )
-from app.action_plan import generate_action_plan_from_gaps, NGRBC_PRINCIPLES
-from app.brsr_datapoints import BRSR_DATAPOINTS, get_datapoints_stats
+from app.config import get_settings
 
 router = APIRouter(prefix="/api/platform", tags=["Platform"])
 
@@ -73,12 +73,12 @@ class BulkDataEntryRequest(BaseModel):
 async def save_data_entry(req: DataEntryRequest, authorization: str = Header(...)):
     """Save a single BRSR data point entry."""
     supabase = get_supabase_admin()
-    
+
     # Find the datapoint metadata
     dp = next((d for d in BRSR_DATAPOINTS if d["id"] == req.datapoint_id), None)
     if not dp:
         raise HTTPException(status_code=400, detail=f"Invalid datapoint_id: {req.datapoint_id}")
-    
+
     entry_data = {
         "financial_year": req.financial_year,
         "datapoint_id": req.datapoint_id,
@@ -90,13 +90,13 @@ async def save_data_entry(req: DataEntryRequest, authorization: str = Header(...
     }
     if req.user_id:
         entry_data["user_id"] = req.user_id
-    
+
     # Upsert (update if exists, insert if not)
     result = supabase.table("brsr_entries").upsert(
         entry_data,
         on_conflict="user_id,financial_year,datapoint_id"
     ).execute()
-    
+
     return {"status": "saved", "datapoint_id": req.datapoint_id, "entry": result.data}
 
 
@@ -106,14 +106,14 @@ async def save_bulk_entries(req: BulkDataEntryRequest, authorization: str = Head
     supabase = get_supabase_admin()
     saved = 0
     errors = []
-    
+
     for entry in req.entries:
         dp_id = entry.get("datapoint_id")
         dp = next((d for d in BRSR_DATAPOINTS if d["id"] == dp_id), None)
         if not dp:
             errors.append(f"Invalid: {dp_id}")
             continue
-        
+
         entry_data = {
             "financial_year": req.financial_year,
             "datapoint_id": dp_id,
@@ -125,7 +125,7 @@ async def save_bulk_entries(req: BulkDataEntryRequest, authorization: str = Head
         }
         if req.user_id:
             entry_data["user_id"] = req.user_id
-        
+
         try:
             supabase.table("brsr_entries").upsert(
                 entry_data,
@@ -134,7 +134,7 @@ async def save_bulk_entries(req: BulkDataEntryRequest, authorization: str = Head
             saved += 1
         except Exception as e:
             errors.append(f"{dp_id}: {str(e)}")
-    
+
     return {"status": "completed", "saved": saved, "errors": errors}
 
 
@@ -142,22 +142,22 @@ async def save_bulk_entries(req: BulkDataEntryRequest, authorization: str = Head
 async def get_entries(financial_year: str, section: Optional[str] = None, user_id: Optional[str] = None, authorization: str = Header(...)):
     """Get all data entries for a financial year."""
     supabase = get_supabase_admin()
-    
+
     query = supabase.table("brsr_entries").select("*").eq("financial_year", financial_year)
     if section:
         query = query.eq("section", section)
     if user_id:
         query = query.eq("user_id", user_id)
-    
+
     result = query.order("datapoint_id").execute()
-    
+
     # Calculate completion stats
     total_mandatory = len([d for d in BRSR_DATAPOINTS if d["mandatory"]])
     total_core = len([d for d in BRSR_DATAPOINTS if d.get("core")])
     filled_ids = {e["datapoint_id"] for e in (result.data or [])}
     filled_mandatory = len([d for d in BRSR_DATAPOINTS if d["mandatory"] and d["id"] in filled_ids])
     filled_core = len([d for d in BRSR_DATAPOINTS if d.get("core") and d["id"] in filled_ids])
-    
+
     return {
         "financial_year": financial_year,
         "entries": result.data or [],
@@ -176,10 +176,10 @@ async def get_entries(financial_year: str, section: Optional[str] = None, user_i
 async def get_progress(financial_year: str, authorization: str = Header(...)):
     """Get section-wise completion progress."""
     supabase = get_supabase_admin()
-    
+
     result = supabase.table("brsr_entries").select("datapoint_id, section").eq("financial_year", financial_year).execute()
     filled_ids = {e["datapoint_id"] for e in (result.data or [])}
-    
+
     sections = {}
     for dp in BRSR_DATAPOINTS:
         section = dp["section"]
@@ -192,13 +192,13 @@ async def get_progress(financial_year: str, authorization: str = Header(...)):
             sections[section]["mandatory"] += 1
             if dp["id"] in filled_ids:
                 sections[section]["mandatory_filled"] += 1
-    
+
     # Calculate percentages
     for section in sections:
         s = sections[section]
         s["percent"] = round((s["filled"] / s["total"]) * 100, 1) if s["total"] > 0 else 0
         s["mandatory_percent"] = round((s["mandatory_filled"] / s["mandatory"]) * 100, 1) if s["mandatory"] > 0 else 0
-    
+
     return {"financial_year": financial_year, "sections": sections}
 
 
@@ -209,11 +209,12 @@ async def get_progress(financial_year: str, authorization: str = Header(...)):
 @router.get("/data-entry/{financial_year}/download-excel")
 async def download_data_entry_excel(financial_year: str, authorization: str = Header(...)):
     """Download all filled BRSR entries as an Excel file."""
-    from fastapi.responses import Response
     from io import BytesIO
+
+    from fastapi.responses import Response
     try:
         from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     except ImportError:
         raise HTTPException(status_code=500, detail="openpyxl not installed")
 
@@ -309,7 +310,7 @@ async def save_all_entries(request: BulkDataEntryRequest, authorization: str = H
             dp = next((d for d in BRSR_DATAPOINTS if d["id"] == dp_id), None)
             section = dp["section"] if dp else ("section_a" if dp_id.startswith("A") else "section_b" if dp_id.startswith("B") else "section_c")
             subsection = dp.get("subsection", "") if dp else ""
-            
+
             upsert_data = {
                 "datapoint_id": dp_id,
                 "financial_year": request.financial_year,
@@ -320,7 +321,7 @@ async def save_all_entries(request: BulkDataEntryRequest, authorization: str = H
             }
             if request.user_id:
                 upsert_data["user_id"] = request.user_id
-            
+
             supabase.table("brsr_entries").upsert(
                 upsert_data,
                 on_conflict="user_id,financial_year,datapoint_id"
@@ -340,9 +341,9 @@ async def save_all_entries(request: BulkDataEntryRequest, authorization: str = H
 async def import_extraction_to_entries(report_id: str, authorization: str = Header(...)):
     """Import extracted data from a report into brsr_entries for data entry auto-fill."""
     from app.brsr_datapoints import _FIELD_TO_DATAPOINT_MAP
-    
+
     supabase = get_supabase_admin()
-    
+
     # Fetch the report's extracted data
     try:
         result = supabase.table("reports").select("extracted_data, financial_year, user_id").eq("id", report_id).single().execute()
@@ -350,18 +351,18 @@ async def import_extraction_to_entries(report_id: str, authorization: str = Head
         raise HTTPException(status_code=404, detail="Report not found")
     if not result.data:
         raise HTTPException(status_code=404, detail="Report not found")
-    
+
     report = result.data
     extracted_data = report.get("extracted_data", {})
     financial_year = report.get("financial_year") or "FY2024-25"
     user_id = report.get("user_id")
-    
+
     if not extracted_data:
         raise HTTPException(status_code=400, detail="No extracted data in this report")
-    
+
     if not user_id:
         raise HTTPException(status_code=400, detail="Report has no associated user")
-    
+
     # Flatten all sections into a single dict of field_name -> value
     flat_data = {}
     for section_key, section_val in extracted_data.items():
@@ -369,12 +370,12 @@ async def import_extraction_to_entries(report_id: str, authorization: str = Head
             for k, v in section_val.items():
                 if v is not None and v != "" and v != "N/A" and k not in ("gap_analysis", "datapoints_stats", "benchmark"):
                     flat_data[k] = v
-    
+
     # Map extracted fields to datapoint IDs
     imported = 0
     errors = []
     entries_to_upsert = []
-    
+
     for field_name, value in flat_data.items():
         if field_name in _FIELD_TO_DATAPOINT_MAP:
             datapoint_ids = _FIELD_TO_DATAPOINT_MAP[field_name]
@@ -392,7 +393,7 @@ async def import_extraction_to_entries(report_id: str, authorization: str = Head
                     "source": "ai_extracted",
                     "notes": f"Auto-imported from report {report_id}",
                 })
-    
+
     # Batch upsert
     for entry in entries_to_upsert:
         try:
@@ -403,7 +404,7 @@ async def import_extraction_to_entries(report_id: str, authorization: str = Head
             imported += 1
         except Exception as e:
             errors.append(f"{entry['datapoint_id']}: {str(e)}")
-    
+
     return {
         "status": "completed",
         "imported": imported,
@@ -421,9 +422,9 @@ async def import_extraction_to_entries(report_id: str, authorization: str = Head
 async def get_multi_year_data(authorization: str = Header(...)):
     """Get year-over-year progress for all financial years."""
     supabase = get_supabase_admin()
-    
+
     result = supabase.table("brsr_entries").select("financial_year, datapoint_id, section, value").execute()
-    
+
     years = {}
     for entry in (result.data or []):
         fy = entry["financial_year"]
@@ -433,12 +434,12 @@ async def get_multi_year_data(authorization: str = Header(...)):
         section = entry.get("section", "section_a")
         if section in years[fy]["sections"]:
             years[fy]["sections"][section] += 1
-    
+
     # Calculate completion for each year
     total_datapoints = len(BRSR_DATAPOINTS)
     for fy in years:
         years[fy]["completion_percent"] = round((years[fy]["total_entries"] / total_datapoints) * 100, 1)
-    
+
     return {"years": years, "total_datapoints": total_datapoints}
 
 
@@ -446,13 +447,13 @@ async def get_multi_year_data(authorization: str = Header(...)):
 async def get_datapoint_trend(datapoint_id: str, authorization: str = Header(...)):
     """Get historical values for a specific datapoint across years."""
     supabase = get_supabase_admin()
-    
+
     result = supabase.table("brsr_entries").select("financial_year, value, source, updated_at").eq(
         "datapoint_id", datapoint_id
     ).order("financial_year").execute()
-    
+
     dp = next((d for d in BRSR_DATAPOINTS if d["id"] == datapoint_id), None)
-    
+
     return {
         "datapoint_id": datapoint_id,
         "metadata": dp,
@@ -504,40 +505,137 @@ async def calc_scope2(req: Scope2Request):
     return calculate_scope2_emissions(req.electricity_mwh, req.financial_year, req.state)
 
 
-class Scope2ProvenanceRequest(BaseModel):
-    kwh: float = Field(..., ge=0, description="Purchased electricity in kWh")
-    grid_region: Optional[str] = Field(None, description="NR | ER | WR | SR | NER")
-    state: Optional[str] = None
-    org_id: str = Field("demo-org", description="Tenant org id (provenance subject)")
-    input_record_ids: List[str] = Field(default_factory=list)
+DEMO_ORG_ID = "demo-org"
 
 
-@router.post("/carbon/scope2/provenance")
-async def calc_scope2_provenance(req: Scope2ProvenanceRequest):
-    """Scope 2 location-based emissions with a signed W3C PROV-O graph.
+async def resolve_org_user(authorization: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    """Resolve (org_id, user_id) from a Bearer JWT, or (None, None) for demo.
 
-    Deterministic (pure Python, principle #1), versioned CEA factor with
-    citation (principle #2), Ed25519-signed provenance (principle #3). Returns
-    the calculated value plus the signed graph and a self-verification flag.
-    Raises 400 if no factor matches (never substitutes a default).
+    Returns the caller's real org so signed calculations can be persisted with
+    correct tenancy. Unauthenticated/demo callers get (None, None) — the graph
+    is still signed under the demo subject but NOT persisted (no tenant).
     """
-    from app.calculator import FactorNotFoundError, scope2_location_based, sign_result
-    from app.prov import verify_signed_provenance
+    if not authorization:
+        return None, None
+    token = authorization.replace("Bearer ", "").strip()
+    if not token:
+        return None, None
+    if token == settings.SUPABASE_SERVICE_KEY:
+        return None, None  # internal service call, no tenant context
+    try:
+        import jwt as pyjwt
+
+        payload = pyjwt.decode(token, options={"verify_signature": False})
+        user_id = payload.get("sub")
+    except Exception:  # noqa: BLE001
+        return None, None
+    if not user_id:
+        return None, None
+    try:
+        sb = get_supabase_admin()
+        profile = (
+            sb.table("profiles")
+            .select("org_id")
+            .eq("id", user_id)
+            .single()
+            .execute()
+        )
+        org_id = (profile.data or {}).get("org_id")
+    except Exception:  # noqa: BLE001
+        return None, user_id
+    return org_id, user_id
+
+
+def _persist_signed_result(
+    result, signed, calc_id, org_id, user_id, jurisdiction=None, framework_tags=None
+) -> bool:
+    """Persist a signed calculation when a real org context exists."""
+    if not org_id:
+        return False
+    from app.calculator import persist_calculation
 
     try:
-        result = scope2_location_based(
-            req.kwh,
-            grid_region=req.grid_region,
-            state=req.state,
-            input_record_ids=req.input_record_ids,
+        sb = get_supabase_admin()
+        return persist_calculation(
+            sb,
+            result=result,
+            signed=signed,
+            calculation_id=calc_id,
+            org_id=org_id,
+            user_id=user_id,
+            jurisdiction=jurisdiction,
+            framework_tags=framework_tags,
         )
-    except FactorNotFoundError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:  # noqa: BLE001
+        return False
 
-    calc_id, signed = sign_result(result, org_id=req.org_id)
-    return {
+
+def _ledger_append_calculation(
+    org_id: str, calc_id: str, signed, result, jurisdiction=None, framework_tags=None
+) -> None:
+    """Background task: append the signed calculation to the Merkle ledger.
+
+    Runs out of band so it never slows the submit response (NFR). The leaf
+    commits to ``canonical_sha256`` + signature, so any later mutation of the
+    stored calculation or provenance row breaks the inclusion proof.
+    """
+    from app.ledger import append_event
+
+    try:
+        sb = get_supabase_admin()
+        append_event(
+            sb,
+            org_id=org_id,
+            event_type="calculation.signed",
+            ref_table="calculations",
+            ref_pk=calc_id,
+            payload={
+                "calculation_id": calc_id,
+                "canonical_sha256": signed.canonical_sha256,
+                "signature_b64": signed.signature_b64,
+                "value": str(result.value),
+                "unit": result.unit,
+                "scope": result.scope,
+                "factor_id": result.factor_id,
+                "factor_version": result.factor_version,
+                "jurisdiction": jurisdiction,
+                "framework_tags": framework_tags or [],
+            },
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _persist_and_anchor(
+    background_tasks, result, signed, calc_id, org_id, user_id, jurisdiction=None
+) -> bool:
+    """Persist a signed calc and schedule an async ledger append on success."""
+    framework_tags = None
+    if jurisdiction:
+        from app.calculator.provenance import _datapoint_key
+        from app.jurisdiction_frameworks import framework_tags as _ft
+
+        framework_tags = _ft(_datapoint_key(result), jurisdiction) or None
+    persisted = _persist_signed_result(
+        result, signed, calc_id, org_id, user_id, jurisdiction, framework_tags
+    )
+    if persisted and org_id:
+        background_tasks.add_task(
+            _ledger_append_calculation,
+            org_id,
+            calc_id,
+            signed,
+            result,
+            jurisdiction,
+            framework_tags,
+        )
+    return persisted
+
+
+def _provenance_response(
+    result, signed, calc_id, persisted, verified, jurisdiction=None
+) -> dict:
+    resp = {
         "calculation_id": calc_id,
         "scope": result.scope,
         "value_tco2e": str(result.value),
@@ -550,8 +648,152 @@ async def calc_scope2_provenance(req: Scope2ProvenanceRequest):
             "citation_url": result.factor_citation,
         },
         "provenance": signed.to_dict(),
-        "verified": verify_signed_provenance(signed),
+        "verified": verified,
+        "persisted": persisted,
     }
+    if jurisdiction:
+        resp["jurisdiction"] = jurisdiction
+    return resp
+
+
+class Scope2ProvenanceRequest(BaseModel):
+    kwh: float = Field(..., ge=0, description="Purchased electricity in kWh")
+    jurisdiction: str = Field("IN", description="IN (CEA) | AU (NGA)")
+    grid_region: Optional[str] = Field(None, description="NR | ER | WR | SR | NER (IN only)")
+    state: Optional[str] = Field(None, description="IN state code or AU state/territory")
+    input_record_ids: List[str] = Field(default_factory=list)
+
+
+@router.post("/carbon/scope2/provenance")
+async def calc_scope2_provenance(
+    req: Scope2ProvenanceRequest,
+    background_tasks: BackgroundTasks,
+    authorization: Optional[str] = Header(None),
+):
+    """Scope 2 location-based emissions with a signed W3C PROV-O graph.
+
+    Deterministic (pure Python, principle #1), versioned CEA factor with
+    citation (principle #2), Ed25519-signed provenance (principle #3). When the
+    caller is authenticated the signed calculation is persisted under their org
+    (``calculations`` + ``provenance_records``); demo callers get the signed
+    graph without persistence. Raises 400 if no factor matches.
+    """
+    from app.calculator import FactorNotFoundError, scope2_location_based, sign_result
+    from app.prov import verify_signed_provenance
+
+    org_id, user_id = await resolve_org_user(authorization)
+
+    try:
+        result = scope2_location_based(
+            req.kwh,
+            jurisdiction=req.jurisdiction,
+            grid_region=req.grid_region,
+            state=req.state,
+            input_record_ids=req.input_record_ids,
+        )
+    except FactorNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    calc_id, signed = sign_result(
+        result, org_id=org_id or DEMO_ORG_ID, jurisdiction=req.jurisdiction
+    )
+    persisted = _persist_and_anchor(
+        background_tasks, result, signed, calc_id, org_id, user_id, req.jurisdiction
+    )
+    return _provenance_response(
+        result, signed, calc_id, persisted, verify_signed_provenance(signed),
+        jurisdiction=req.jurisdiction,
+    )
+
+
+class Scope1ProvenanceRequest(BaseModel):
+    fuel_type: str = Field(..., description="Stationary/mobile combustion fuel type")
+    quantity: float = Field(..., ge=0)
+    jurisdiction: str = Field("IN", description="IN | AU (provenance tag)")
+    input_record_ids: List[str] = Field(default_factory=list)
+
+
+@router.post("/carbon/scope1/provenance")
+async def calc_scope1_provenance(
+    req: Scope1ProvenanceRequest,
+    background_tasks: BackgroundTasks,
+    authorization: Optional[str] = Header(None),
+):
+    """Scope 1 combustion emissions with a signed W3C PROV-O graph."""
+    from app.calculator import (
+        FactorNotFoundError,
+        scope1_stationary_combustion,
+        sign_result,
+    )
+    from app.prov import verify_signed_provenance
+
+    org_id, user_id = await resolve_org_user(authorization)
+
+    try:
+        result = scope1_stationary_combustion(
+            req.fuel_type,
+            req.quantity,
+            input_record_ids=req.input_record_ids,
+        )
+    except FactorNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    calc_id, signed = sign_result(
+        result, org_id=org_id or DEMO_ORG_ID, jurisdiction=req.jurisdiction
+    )
+    persisted = _persist_and_anchor(
+        background_tasks, result, signed, calc_id, org_id, user_id, req.jurisdiction
+    )
+    return _provenance_response(
+        result, signed, calc_id, persisted, verify_signed_provenance(signed),
+        jurisdiction=req.jurisdiction,
+    )
+
+
+class Scope3ProvenanceRequest(BaseModel):
+    category: str = Field(..., description="Scope 3 category key")
+    quantity: float = Field(..., ge=0)
+    jurisdiction: str = Field("IN", description="IN | AU (provenance tag)")
+    input_record_ids: List[str] = Field(default_factory=list)
+
+
+@router.post("/carbon/scope3/provenance")
+async def calc_scope3_provenance(
+    req: Scope3ProvenanceRequest,
+    background_tasks: BackgroundTasks,
+    authorization: Optional[str] = Header(None),
+):
+    """Scope 3 emissions with a signed W3C PROV-O graph."""
+    from app.calculator import FactorNotFoundError, scope3_category, sign_result
+    from app.prov import verify_signed_provenance
+
+    org_id, user_id = await resolve_org_user(authorization)
+
+    try:
+        result = scope3_category(
+            req.category,
+            req.quantity,
+            input_record_ids=req.input_record_ids,
+        )
+    except FactorNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    calc_id, signed = sign_result(
+        result, org_id=org_id or DEMO_ORG_ID, jurisdiction=req.jurisdiction
+    )
+    persisted = _persist_and_anchor(
+        background_tasks, result, signed, calc_id, org_id, user_id, req.jurisdiction
+    )
+    return _provenance_response(
+        result, signed, calc_id, persisted, verify_signed_provenance(signed),
+        jurisdiction=req.jurisdiction,
+    )
 
 
 @router.post("/carbon/scope3")
@@ -573,7 +815,7 @@ async def carbon_summary(req: CarbonSummaryRequest):
         if "error" not in result:
             scope1_total += result["total_tco2e"]
             scope1_details.append(result)
-    
+
     scope2_total = 0
     scope2_details = []
     for entry in req.scope2_entries:
@@ -584,7 +826,7 @@ async def carbon_summary(req: CarbonSummaryRequest):
         )
         scope2_total += result["total_tco2e"]
         scope2_details.append(result)
-    
+
     scope3_total = 0
     scope3_details = []
     for entry in req.scope3_entries:
@@ -592,9 +834,9 @@ async def carbon_summary(req: CarbonSummaryRequest):
         if "error" not in result:
             scope3_total += result["total_tco2e"]
             scope3_details.append(result)
-    
+
     total_emissions = scope1_total + scope2_total + scope3_total
-    
+
     summary = {
         "financial_year": req.financial_year,
         "scope_1": {"total_tco2e": round(scope1_total, 2), "details": scope1_details},
@@ -602,10 +844,10 @@ async def carbon_summary(req: CarbonSummaryRequest):
         "scope_3": {"total_tco2e": round(scope3_total, 2), "details": scope3_details},
         "total_emissions_tco2e": round(total_emissions, 2),
     }
-    
+
     if req.revenue_crores and req.revenue_crores > 0:
         summary["ghg_intensity"] = calculate_ghg_intensity(total_emissions, req.revenue_crores)
-    
+
     # BRSR disclosure mapping
     summary["brsr_mapping"] = {
         "C.P6.GHG.1": round(scope1_total, 2),
@@ -613,7 +855,7 @@ async def carbon_summary(req: CarbonSummaryRequest):
         "C.P6.GHG.3": round(scope3_total, 2),
         "total_scope_1_2": round(scope1_total + scope2_total, 2),
     }
-    
+
     return summary
 
 
@@ -621,11 +863,11 @@ async def carbon_summary(req: CarbonSummaryRequest):
 async def get_emission_factors():
     """Get all available emission factors for reference."""
     return {
-        "stationary_combustion": {k: {"unit": v["unit"], "total_factor": v["co2"] + v["ch4"]*28 + v["n2o"]*265} 
+        "stationary_combustion": {k: {"unit": v["unit"], "total_factor": v["co2"] + v["ch4"]*28 + v["n2o"]*265}
                                   for k, v in STATIONARY_COMBUSTION_FACTORS.items()},
-        "mobile_combustion": {k: {"unit": v["unit"], "total_factor": v["co2"] + v["ch4"]*28 + v["n2o"]*265} 
+        "mobile_combustion": {k: {"unit": v["unit"], "total_factor": v["co2"] + v["ch4"]*28 + v["n2o"]*265}
                              for k, v in MOBILE_COMBUSTION_FACTORS.items()},
-        "scope_3_categories": {k: {"unit": v["unit"], "factor": v["factor"], "source": v["source"]} 
+        "scope_3_categories": {k: {"unit": v["unit"], "factor": v["factor"], "source": v["source"]}
                               for k, v in SCOPE_3_FACTORS.items()},
         "grid_factors": CEA_GRID_EMISSION_FACTORS,
         "pat_sectors": list(PAT_SECTOR_BENCHMARKS.keys()),
@@ -655,23 +897,23 @@ class ActionPlanGenerateRequest(BaseModel):
 async def generate_action_plan(req: ActionPlanGenerateRequest, authorization: str = Header(...)):
     """Generate AI-powered action plan from gap analysis."""
     supabase = get_supabase_admin()
-    
+
     # Get gap analysis data
     if req.report_id:
         report = supabase.table("reports").select("extracted_data").eq("id", req.report_id).single().execute()
         if not report.data:
             raise HTTPException(status_code=404, detail="Report not found")
-        
+
         extracted_data = report.data.get("extracted_data", {})
         gap_analysis = extracted_data.get("gap_analysis", {})
     else:
         # Generate from manual entries
         entries = supabase.table("brsr_entries").select("*").eq("financial_year", req.financial_year).execute()
         filled_ids = {e["datapoint_id"] for e in (entries.data or [])}
-        
+
         missing_essential = [d for d in BRSR_DATAPOINTS if d["mandatory"] and d["id"] not in filled_ids]
         missing_leadership = [d for d in BRSR_DATAPOINTS if d.get("indicator_type") == "leadership" and d["id"] not in filled_ids]
-        
+
         gap_analysis = {
             "total_datapoints": len(BRSR_DATAPOINTS),
             "filled_datapoints": len(filled_ids),
@@ -682,10 +924,10 @@ async def generate_action_plan(req: ActionPlanGenerateRequest, authorization: st
             "completion_percent": round((len(filled_ids) / len(BRSR_DATAPOINTS)) * 100, 1),
         }
         extracted_data = {}
-    
+
     # Generate action plan
     actions = generate_action_plan_from_gaps(gap_analysis, extracted_data, req.sector)
-    
+
     return {
         "financial_year": req.financial_year,
         "sector": req.sector,
@@ -705,9 +947,9 @@ async def generate_action_plan(req: ActionPlanGenerateRequest, authorization: st
 async def get_action_plans(financial_year: str, authorization: str = Header(...)):
     """Get saved action plans for a financial year."""
     supabase = get_supabase_admin()
-    
+
     result = supabase.table("action_plans").select("*").eq("financial_year", financial_year).order("priority").execute()
-    
+
     return {"financial_year": financial_year, "plans": result.data or []}
 
 
@@ -720,12 +962,12 @@ class UpdateActionPlanRequest(BaseModel):
 async def update_action_plan(plan_id: str, req: UpdateActionPlanRequest, authorization: str = Header(...)):
     """Update action plan status."""
     supabase = get_supabase_admin()
-    
+
     update_data = {"status": req.status}
     if req.status == "completed":
         update_data["completed_at"] = datetime.utcnow().isoformat()
         update_data["completion_notes"] = req.completion_notes
-    
+
     result = supabase.table("action_plans").update(update_data).eq("id", plan_id).execute()
     return {"status": "updated", "plan": result.data}
 
@@ -738,13 +980,13 @@ async def update_action_plan(plan_id: str, req: UpdateActionPlanRequest, authori
 async def get_calendar_events(financial_year: Optional[str] = None, authorization: str = Header(...)):
     """Get compliance calendar events."""
     supabase = get_supabase_admin()
-    
+
     query = supabase.table("compliance_events").select("*").order("due_date")
     if financial_year:
         query = query.eq("financial_year", financial_year)
-    
+
     result = query.execute()
-    
+
     return {"events": result.data or []}
 
 
@@ -755,7 +997,7 @@ async def get_sebi_deadlines(financial_year: str = "FY2024-25"):
     # FY2024-25 → April 2024 to March 2025, deadlines in Q2/Q3 FY next year
     fy_part = financial_year.replace("FY", "").split("-")[0]
     fy_start_year = int(fy_part) if len(fy_part) == 4 else int(fy_part) + 2000
-    
+
     deadlines = []
     for event in SEBI_COMPLIANCE_CALENDAR:
         if event["month"]:
@@ -764,7 +1006,7 @@ async def get_sebi_deadlines(financial_year: str = "FY2024-25"):
             due_date = f"{deadline_year}-{event['month']:02d}-{event['day']:02d}"
         else:
             due_date = None
-        
+
         deadlines.append({
             "title": event["title"],
             "description": event["description"],
@@ -773,7 +1015,7 @@ async def get_sebi_deadlines(financial_year: str = "FY2024-25"):
             "recurring": event["recurring"],
             "applies_to": event["applies_to"],
         })
-    
+
     return {"financial_year": financial_year, "deadlines": deadlines}
 
 
@@ -790,7 +1032,7 @@ class CreateCalendarEventRequest(BaseModel):
 async def create_calendar_event(req: CreateCalendarEventRequest, authorization: str = Header(...)):
     """Create a custom compliance calendar event."""
     supabase = get_supabase_admin()
-    
+
     event_data = {
         "title": req.title,
         "description": req.description,
@@ -799,7 +1041,7 @@ async def create_calendar_event(req: CreateCalendarEventRequest, authorization: 
         "financial_year": req.financial_year,
         "reminder_days": req.reminder_days,
     }
-    
+
     result = supabase.table("compliance_events").insert(event_data).execute()
     return {"status": "created", "event": result.data}
 
@@ -818,14 +1060,14 @@ class GenerateReportRequest(BaseModel):
 async def generate_report(req: GenerateReportRequest, authorization: str = Header(...)):
     """Generate a BRSR format report from collected data."""
     supabase = get_supabase_admin()
-    
+
     # Get all entries for the financial year
     entries_result = supabase.table("brsr_entries").select("*").eq("financial_year", req.financial_year).execute()
     entries = entries_result.data or []
-    
+
     if not entries:
         raise HTTPException(status_code=400, detail="No data entries found for this financial year. Please enter data first.")
-    
+
     # Organize entries by section/subsection
     organized = {"section_a": {}, "section_b": {}, "section_c": {}}
     for entry in entries:
@@ -836,7 +1078,7 @@ async def generate_report(req: GenerateReportRequest, authorization: str = Heade
                 "source": entry["source"],
                 "verified": entry.get("verified", False),
             }
-    
+
     # Build BRSR report structure
     report_content = {
         "report_type": req.report_type,
@@ -856,7 +1098,7 @@ async def generate_report(req: GenerateReportRequest, authorization: str = Heade
         },
         "compliance_status": _get_compliance_status(organized, req.report_type),
     }
-    
+
     # Save generated report metadata
     report_record = {
         "financial_year": req.financial_year,
@@ -866,9 +1108,9 @@ async def generate_report(req: GenerateReportRequest, authorization: str = Heade
         "format": req.format,
         "status": "draft",
     }
-    
+
     save_result = supabase.table("generated_reports").insert(report_record).execute()
-    
+
     return {
         "status": "generated",
         "report_id": save_result.data[0]["id"] if save_result.data else None,
@@ -880,11 +1122,11 @@ async def generate_report(req: GenerateReportRequest, authorization: str = Heade
 async def get_generated_reports(financial_year: str, authorization: str = Header(...)):
     """Get all generated reports for a financial year."""
     supabase = get_supabase_admin()
-    
+
     result = supabase.table("generated_reports").select("*").eq(
         "financial_year", financial_year
     ).order("created_at", desc=True).execute()
-    
+
     return {"reports": result.data or []}
 
 
@@ -896,7 +1138,7 @@ async def get_generated_reports(financial_year: str, authorization: str = Header
 async def get_materiality(financial_year: str, authorization: str = Header(...)):
     """Get materiality assessment for a financial year."""
     supabase = get_supabase_admin()
-    
+
     result = supabase.table("materiality_topics").select("*").eq("financial_year", financial_year).execute()
     return {"financial_year": financial_year, "topics": result.data or []}
 
@@ -916,7 +1158,7 @@ class MaterialityTopicRequest(BaseModel):
 async def add_materiality_topic(req: MaterialityTopicRequest, authorization: str = Header(...)):
     """Add a materiality topic assessment."""
     supabase = get_supabase_admin()
-    
+
     topic_data = {
         "financial_year": req.financial_year,
         "topic": req.topic,
@@ -927,7 +1169,7 @@ async def add_materiality_topic(req: MaterialityTopicRequest, authorization: str
         "brsr_principles": req.brsr_principles,
         "description": req.description,
     }
-    
+
     result = supabase.table("materiality_topics").insert(topic_data).execute()
     return {"status": "created", "topic": result.data}
 
@@ -940,14 +1182,14 @@ async def add_materiality_topic(req: MaterialityTopicRequest, authorization: str
 async def get_all_datapoints(section: Optional[str] = None, mandatory_only: bool = False, core_only: bool = False):
     """Get BRSR datapoints reference list."""
     filtered = BRSR_DATAPOINTS
-    
+
     if section:
         filtered = [d for d in filtered if d["section"] == section]
     if mandatory_only:
         filtered = [d for d in filtered if d["mandatory"]]
     if core_only:
         filtered = [d for d in filtered if d.get("core")]
-    
+
     return {
         "total": len(filtered),
         "datapoints": filtered,
@@ -959,7 +1201,7 @@ async def get_datapoints_by_principle(principle: str):
     """Get datapoints for a specific NGRBC principle (P1-P9)."""
     principle_upper = principle.upper()
     filtered = [d for d in BRSR_DATAPOINTS if d.get("id", "").startswith(f"C.{principle_upper}")]
-    
+
     return {
         "principle": principle_upper,
         "name": NGRBC_PRINCIPLES.get(principle_upper, {}).get("name", ""),
@@ -982,14 +1224,14 @@ def _get_compliance_status(organized: dict, report_type: str) -> dict:
         relevant = [d for d in BRSR_DATAPOINTS if d["mandatory"] and d.get("indicator_type") == "essential"][:40]
     else:
         relevant = [d for d in BRSR_DATAPOINTS if d["mandatory"]]
-    
+
     filled_ids = set()
     for section_data in organized.values():
         filled_ids.update(section_data.keys())
-    
+
     covered = [d for d in relevant if d["id"] in filled_ids]
     missing = [d for d in relevant if d["id"] not in filled_ids]
-    
+
     return {
         "report_type": report_type,
         "required_datapoints": len(relevant),
@@ -1011,11 +1253,11 @@ async def board_dashboard(financial_year: str = "FY2025-26", authorization: str 
     from supabase import create_client as create_supabase_client
     settings = get_settings()
     supabase = create_supabase_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-    
+
     user_id = authorization.replace("Bearer ", "") if authorization else None
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    
+
     # Get all entries for this user/FY
     try:
         entries_resp = supabase.table("brsr_entries").select("datapoint_id, value, verified").eq(
@@ -1024,7 +1266,7 @@ async def board_dashboard(financial_year: str = "FY2025-26", authorization: str 
         entries = entries_resp.data or []
     except Exception:
         entries = []
-    
+
     # Get reports for this user
     try:
         reports_resp = supabase.table("reports").select("id, status, created_at, company_name").eq(
@@ -1033,27 +1275,27 @@ async def board_dashboard(financial_year: str = "FY2025-26", authorization: str 
         reports = reports_resp.data or []
     except Exception:
         reports = []
-    
+
     # Calculate completion
     total_required = 216  # BRSR Full has 216 datapoints
     filled = len([e for e in entries if e.get("value") and not e["datapoint_id"].startswith("CARBON_")])
     verified = len([e for e in entries if e.get("verified")])
     ai_extracted = len([r for r in reports if r.get("status") == "completed"])
-    
+
     completion_pct = round((filled / total_required) * 100, 1) if total_required > 0 else 0
     verification_pct = round((verified / max(filled, 1)) * 100, 1)
-    
+
     # Section progress (A: 1-60, B: 61-120, C: 121-216)
     section_a_total, section_b_total, section_c_total = 60, 60, 96
     section_a_filled = len([e for e in entries if e.get("datapoint_id", "").startswith("A.")])
     section_b_filled = len([e for e in entries if e.get("datapoint_id", "").startswith("B.")])
     section_c_filled = len([e for e in entries if e.get("datapoint_id", "").startswith("C.")])
-    
+
     # Compliance score based on mandatory fields
     mandatory_datapoints = [d for d in BRSR_DATAPOINTS if d.get("mandatory")]
     mandatory_filled = len([e for e in entries if any(d["id"] == e["datapoint_id"] for d in mandatory_datapoints)])
     compliance_score = round((mandatory_filled / max(len(mandatory_datapoints), 1)) * 100, 1)
-    
+
     # Upcoming deadlines from SEBI calendar
     from datetime import datetime as dt
     upcoming = []
@@ -1071,7 +1313,7 @@ async def board_dashboard(financial_year: str = "FY2025-26", authorization: str 
         except:
             pass
     upcoming = sorted(upcoming, key=lambda x: x["due_date"])[:5]
-    
+
     # Filing readiness
     blockers = []
     if completion_pct < 80:
@@ -1080,7 +1322,7 @@ async def board_dashboard(financial_year: str = "FY2025-26", authorization: str 
         blockers.append(f"Only {verification_pct}% verified (recommended ≥50%)")
     if section_c_filled < 20:
         blockers.append("Section C (Principles) needs more disclosure")
-    
+
     return {
         "financial_year": financial_year,
         "compliance_score": compliance_score,
@@ -1134,15 +1376,15 @@ async def delete_report(report_id: str, authorization: str = Header(None)):
     from supabase import create_client as create_supabase_client
     settings = get_settings()
     supabase = create_supabase_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-    
+
     user_id = authorization.replace("Bearer ", "") if authorization else None
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    
+
     # Verify ownership
     report = supabase.table("reports").select("id, user_id").eq("id", report_id).single().execute()
     if not report.data or report.data.get("user_id") != user_id:
         raise HTTPException(status_code=404, detail="Report not found")
-    
+
     supabase.table("reports").delete().eq("id", report_id).execute()
     return {"status": "deleted"}

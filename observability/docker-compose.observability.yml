@@ -1,0 +1,43 @@
+# Local observability stack for FileBRSR.
+#
+# Prometheus scrapes the backend's /metrics endpoint; Grafana auto-provisions
+# the datasource + the FileBRSR dashboard. This file is SEPARATE from the
+# production compose so the deploy pipeline is unaffected.
+#
+# Usage (with the backend running locally on host port 8000):
+#   docker compose -f observability/docker-compose.observability.yml up
+#   Grafana  → http://localhost:3001  (admin / admin)
+#   Prometheus → http://localhost:9090
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "${PROM_PORT:-9090}:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:

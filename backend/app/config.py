@@ -25,10 +25,13 @@ class Settings(BaseSettings):
     DATA_REGION: str = "ap-south-1"
 
     # ─── Provenance signing (principle #3) ───────────────────────────────
-    # Prod: delegate to AWS KMS (ap-south-1) via PROV_SIGNING_KMS_KEY_ID.
-    # Dev/CI: base64 32-byte Ed25519 seed in PROV_SIGNING_KEY_B64.
-    # Neither set → ephemeral key (non-reproducible; dev only).
+    # Prod: KMS envelope — PROV_SIGNING_KMS_KEY_ID encrypts a 32-byte Ed25519
+    # seed, stored base64 in PROV_SIGNING_KEY_CIPHERTEXT_B64; decrypted at boot
+    # via kms.Decrypt → in-process LocalEd25519Signer (KMS can't sign Ed25519).
+    # Dev/CI: plaintext base64 seed in PROV_SIGNING_KEY_B64.
+    # Neither set → ephemeral key (non-reproducible; refused in production).
     PROV_SIGNING_KMS_KEY_ID: str = ""
+    PROV_SIGNING_KEY_CIPHERTEXT_B64: str = ""
     PROV_SIGNING_KEY_B64: str = ""
     PROV_SIGNING_KEY_ID: str = "local-dev"
 

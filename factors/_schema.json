@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://filebrsr.dev/schemas/factor-file/v1",
-  "title": "Indian emission-factor data file",
+  "title": "Emission-factor data file",
   "description": "Envelope for one source × edition of emission factors. Loaded by backend/app/factors_india/_registry.py. The validator there is hand-rolled (no jsonschema dependency), so this file is canonical documentation rather than enforced. Keep them in sync.",
   "type": "object",
   "required": ["metadata", "factors"],
@@ -12,6 +12,11 @@
       "required": ["source", "version", "vintage", "citation_url", "published_on"],
       "additionalProperties": false,
       "properties": {
+        "jurisdiction": {
+          "type": "string",
+          "enum": ["IN", "AU"],
+          "description": "ISO 3166-1 alpha-2 country the factors apply to. Defaults to 'IN' when omitted (legacy CEA files)."
+        },
         "source": {
           "type": "string",
           "description": "Human-readable source name, e.g. 'CEA CO2 Baseline Database v20 (June 2025)'."
@@ -72,7 +77,7 @@
           },
           "state": {
             "type": ["string", "null"],
-            "description": "ISO 3166-2:IN state code (e.g. 'MH', 'TN', 'GJ') when regional_specificity == 'state'."
+            "description": "Sub-national code: ISO 3166-2:IN state (e.g. 'MH', 'TN', 'GJ') or an Australian state/territory ('NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT') when regional_specificity == 'state'."
           },
           "regional_specificity": {
             "type": "string",

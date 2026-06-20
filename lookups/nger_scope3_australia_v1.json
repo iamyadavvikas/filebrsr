@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "jurisdiction": "AU",
+    "version": "nger_scope3_australia_v1",
+    "source": "ANZSIC commodity classes + NGA 2024 Scope 3 (indirect) emission factors + GHG Protocol Scope 3 Standard Annex A",
+    "published_on": "2024-08-01",
+    "notes": "PLACEHOLDER seed mapping for the Australian Scope 3 spend-based path, parallel to lookups/hsn_scope3_v1.json (India/HSN). Keys are ANZSIC-style commodity prefixes a ledger line maps onto; each routes to a GHG Protocol Scope 3 category. Australia reports indirect emissions under NGER and AASB S2 ¶29(a); replace the placeholder set with the full NGA 2024 Scope 3 factor tables (and a fuller ANZSIC schedule) before GA. Lines that match no prefix get classification_confidence='unmapped' and route to a human queue."
+  },
+  "entries": [
+    {"anzsic_prefix": "0600", "description": "Coal mining — black/brown coal (stationary fuel)", "scope": 1, "scope3_category": null, "emission_basis": "quantity", "_placeholder": true},
+    {"anzsic_prefix": "0700", "description": "Oil and gas extraction — diesel, petrol, LPG, natural gas", "scope": 1, "scope3_category": null, "emission_basis": "quantity", "_placeholder": true},
+    {"anzsic_prefix": "2640", "description": "Electricity supply (purchased electricity)", "scope": 2, "scope3_category": null, "emission_basis": "quantity", "_placeholder": true},
+
+    {"anzsic_prefix": "1500", "description": "Pulp, paper & converted paper products — office paper consumables", "scope": 3, "scope3_category": "1_purchased_goods_services", "emission_basis": "spend", "_placeholder": true},
+    {"anzsic_prefix": "2400", "description": "Computer, electronic & optical equipment (capex)", "scope": 3, "scope3_category": "2_capital_goods", "emission_basis": "spend", "_placeholder": true},
+    {"anzsic_prefix": "2810", "description": "Motor vehicles & parts (capex)", "scope": 3, "scope3_category": "2_capital_goods", "emission_basis": "spend", "_placeholder": true},
+
+    {"anzsic_prefix": "4400", "description": "Accommodation — hotels (business travel)", "scope": 3, "scope3_category": "6_business_travel", "emission_basis": "spend", "_placeholder": true},
+    {"anzsic_prefix": "4900", "description": "Air & space transport — business travel", "scope": 3, "scope3_category": "6_business_travel", "emission_basis": "spend", "_placeholder": true},
+    {"anzsic_prefix": "4610", "description": "Road freight transport (upstream)", "scope": 3, "scope3_category": "4_upstream_transport", "emission_basis": "spend", "_placeholder": true},
+    {"anzsic_prefix": "4720", "description": "Rail freight transport (upstream)", "scope": 3, "scope3_category": "4_upstream_transport", "emission_basis": "spend", "_placeholder": true},
+    {"anzsic_prefix": "6200", "description": "Finance & insurance services", "scope": 3, "scope3_category": "1_purchased_goods_services", "emission_basis": "spend", "_placeholder": true},
+    {"anzsic_prefix": "7000", "description": "Professional, scientific & technical services (IT, consulting, software)", "scope": 3, "scope3_category": "1_purchased_goods_services", "emission_basis": "spend", "_placeholder": true},
+    {"anzsic_prefix": "7300", "description": "Building cleaning, pest control & other support services", "scope": 3, "scope3_category": "1_purchased_goods_services", "emission_basis": "spend", "_placeholder": true},
+    {"anzsic_prefix": "2900", "description": "Repair & maintenance services", "scope": 3, "scope3_category": "1_purchased_goods_services", "emission_basis": "spend", "_placeholder": true},
+    {"anzsic_prefix": "2810", "description": "Waste collection, treatment & disposal services", "scope": 3, "scope3_category": "5_waste_in_operations", "emission_basis": "spend", "_placeholder": true}
+  ]
+}

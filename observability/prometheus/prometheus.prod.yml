@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: filebrsr-backend
+    metrics_path: /metrics
+    static_configs:
+      # In production, Prometheus and the backend share the compose network,
+      # so it scrapes the backend service directly by its DNS name.
+      - targets: ["backend:8000"]
+        labels:
+          service: backend

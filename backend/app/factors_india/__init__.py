@@ -45,16 +45,18 @@ __all__ = [
     "IndiaFactor",
     "FactorNotFound",
     "FactorFileError",
+    "get_factor",
     "get_india_factor",
     "reset_cache",
 ]
 
 
-# Slice 1 only supports this exact combination. Adding new combos means
-# dropping a JSON file under factors/ AND adding it here — the explicit
-# allow-list catches typos in caller arguments and gives clean error messages.
-_SUPPORTED_COMBOS: frozenset[tuple[int, str, str]] = frozenset({
-    (2, "electricity_purchased", "location_based"),
+# Supported (jurisdiction, scope, category, method) combinations. Adding a new
+# combo means dropping a JSON file under factors/ AND adding it here — the
+# explicit allow-list catches typos in caller arguments and gives clean errors.
+_SUPPORTED_COMBOS: frozenset[tuple[str, int, str, str]] = frozenset({
+    ("IN", 2, "electricity_purchased", "location_based"),
+    ("AU", 2, "electricity_purchased", "location_based"),
 })
 
 
@@ -79,6 +81,7 @@ class IndiaFactor:
     vintage: tuple[str, str]
     uncertainty: dict[str, Any] | None
     is_placeholder: bool
+    jurisdiction: str = "IN"
 
 
 class FactorNotFound(LookupError):
@@ -96,6 +99,7 @@ def _from_record(rec: FactorRecord) -> IndiaFactor:
         vintage=rec.vintage,
         uncertainty=rec.uncertainty,
         is_placeholder=rec.is_placeholder,
+        jurisdiction=rec.jurisdiction,
     )
 
 
@@ -108,64 +112,81 @@ def get_india_factor(
     state: str | None = None,
     reporting_period: tuple[str, str] | None = None,
 ) -> IndiaFactor:
-    """Look up the most-specific Indian emission factor for the request.
+    """Back-compat shim: India-only lookup (``get_factor("IN", ...)``)."""
+    return get_factor(
+        jurisdiction="IN",
+        scope=scope,
+        category=category,
+        method=method,
+        grid_region=grid_region,
+        state=state,
+        reporting_period=reporting_period,
+    )
 
-    Selection (most-specific first):
 
-    1. ``state`` provided AND a state-level row exists → return state factor.
-       (Slice 1 has no state rows; ready for SLDCs in slice 2.)
-    2. ``grid_region`` ∈ {NR, ER, WR, SR, NER} AND a regional row exists →
-       return regional factor.
-    3. National (all-India weighted) row.
+def get_factor(
+    *,
+    jurisdiction: str = "IN",
+    scope: int,
+    category: str,
+    method: str,
+    grid_region: str | None = None,
+    state: str | None = None,
+    reporting_period: tuple[str, str] | None = None,
+) -> IndiaFactor:
+    """Look up the most-specific emission factor for the request.
+
+    Selection (most-specific first): ``state`` → ``grid_region`` (IN grids) →
+    national, within the requested ``jurisdiction`` (``"IN"`` or ``"AU"``).
 
     Parameters
     ----------
+    jurisdiction
+        ISO 3166-1 alpha-2 country. ``"IN"`` (India / CEA) or ``"AU"``
+        (Australia / NGA). Defaults to ``"IN"``.
     scope, category, method
-        GHG Protocol scope (1/2/3), stable category key, and method.
-        Slice 1 only supports ``(2, "electricity_purchased", "location_based")``;
-        anything else raises :class:`FactorNotFound`.
+        GHG Protocol scope (1/2/3), stable category key, and method. Only
+        ``(jurisdiction, 2, "electricity_purchased", "location_based")`` is
+        supported today; anything else raises :class:`FactorNotFound`.
     grid_region
-        Indian electricity grid region per CEA convention: ``NR``, ``ER``,
-        ``WR``, ``SR``, ``NER``. ``None`` falls back to all-India.
+        Indian electricity grid region (``NR``/``ER``/``WR``/``SR``/``NER``);
+        ignored for AU which uses state-level rows.
     state
-        ISO 3166-2:IN state code (e.g. ``"MH"``). ``None`` falls back to
-        grid region / national. Slice 1 has no state overrides.
+        Sub-national code: ISO 3166-2:IN (e.g. ``"MH"``) or an Australian
+        state/territory (``"NSW"``, ``"VIC"``, ``"QLD"``, …).
     reporting_period
-        ``(from_iso, to_iso)`` pair. Pick the loaded edition whose
-        ``vintage`` covers ``from_iso``. Slice 1 only loads CEA v20
-        (vintage = FY2024-25); periods outside that range raise
-        :class:`FactorNotFound`.
+        ``(from_iso, to_iso)``; the edition whose ``vintage`` covers
+        ``from_iso`` is selected.
 
     Raises
     ------
     FactorNotFound
-        If no row matches, or the requested combo is outside the slice's
-        supported set.
+        If no row matches, or the combo is outside the supported set.
     """
-    combo = (scope, category, method)
+    combo = (jurisdiction, scope, category, method)
     if combo not in _SUPPORTED_COMBOS:
         raise FactorNotFound(
-            f"factors-india slice 1 does not support "
+            f"unsupported factor request jurisdiction={jurisdiction!r}, "
             f"scope={scope!r}, category={category!r}, method={method!r}. "
-            f"Supported: {sorted(_SUPPORTED_COMBOS)}. "
-            f"Future slices will add Scope 1 (IPCC AR6), Scope 3 (DEFRA), "
-            f"market-based Scope 2 (CEA portfolio), and BEE PAT sector benchmarks."
+            f"Supported: {sorted(_SUPPORTED_COMBOS)}."
         )
 
     records = load_all_factors()
     candidates = [
         r for r in records
-        if r.scope == scope and r.category == category and r.method == method
+        if r.jurisdiction == jurisdiction
+        and r.scope == scope
+        and r.category == category
+        and r.method == method
     ]
     if not candidates:
         raise FactorNotFound(
-            f"no factors loaded for scope={scope}, category={category!r}, "
-            f"method={method!r} — is factors/ populated?"
+            f"no factors loaded for jurisdiction={jurisdiction}, scope={scope}, "
+            f"category={category!r}, method={method!r} — is factors/ populated?"
         )
 
-    # Vintage filter (slice 1: single edition, but written so multi-edition
-    # files Just Work in slice 2). Use the period start to choose; an edition
-    # covers the period if start ∈ [vintage_from, vintage_to].
+    # Vintage filter (multi-edition aware). An edition covers the period if
+    # period start ∈ [vintage_from, vintage_to].
     if reporting_period is not None:
         start = reporting_period[0]
         in_vintage = [
@@ -198,7 +219,7 @@ def get_india_factor(
         return _from_record(national_rows[0])
 
     raise FactorNotFound(
-        f"no national fallback for scope={scope}, category={category!r}, "
-        f"method={method!r} after region/state filters "
+        f"no national fallback for jurisdiction={jurisdiction}, scope={scope}, "
+        f"category={category!r}, method={method!r} after region/state filters "
         f"(grid_region={grid_region!r}, state={state!r})"
     )

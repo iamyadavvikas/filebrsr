@@ -7,16 +7,17 @@ PROV-O graph with an **Ed25519** key and verifies those signatures.
 
 Key sourcing (in priority order):
 
-1. **Cloud KMS (prod)** — when ``PROV_SIGNING_KMS_KEY_ID`` is set, signing is
-   delegated to AWS KMS in ``ap-south-1`` (see :class:`KmsSigner`). The
-   private key never leaves the HSM. *Phase-1 ships the interface + a clear
-   ``NotImplementedError``; the boto3 wiring lands with the residency
-   migration.*
+1. **KMS envelope (prod)** — when ``PROV_SIGNING_KMS_KEY_ID`` and
+   ``PROV_SIGNING_KEY_CIPHERTEXT_B64`` are set, the KMS-encrypted 32-byte
+   Ed25519 seed is decrypted once at boot via ``kms.Decrypt`` (ap-south-1) and
+   loaded into an in-process :class:`LocalEd25519Signer`. KMS cannot natively
+   sign Ed25519, so we use it only to guard the seed at rest; the plaintext
+   seed exists only in memory. ``key_id`` is the KMS key id.
 2. **Local key (dev/CI)** — a base64-encoded 32-byte Ed25519 seed in
    ``PROV_SIGNING_KEY_B64``. Use only for local development.
 3. **Ephemeral (fallback)** — if neither is configured, an in-memory key is
    generated and a loud warning logged. Signatures are NOT reproducible
-   across restarts; never use in prod.
+   across restarts; **refused when ENVIRONMENT=production**.
 
 The DSC (eMudhra/Sify) browser-side dual signature is a separate, later layer
 (Phase 5) — this module provides the server-side Ed25519 half.
@@ -75,6 +76,14 @@ class LocalEd25519Signer(Signer):
         return cls(Ed25519PrivateKey.from_private_bytes(seed), key_id)
 
     @classmethod
+    def from_seed_bytes(cls, seed: bytes, key_id: str) -> "LocalEd25519Signer":
+        if len(seed) != 32:
+            raise SigningError(
+                f"Ed25519 seed must be 32 bytes, got {len(seed)} bytes"
+            )
+        return cls(Ed25519PrivateKey.from_private_bytes(seed), key_id)
+
+    @classmethod
     def ephemeral(cls) -> "LocalEd25519Signer":
         logger.warning(
             "PROV: no signing key configured — generating EPHEMERAL Ed25519 key. "
@@ -95,20 +104,22 @@ class LocalEd25519Signer(Signer):
         return base64.b64encode(raw).decode("ascii")
 
 
-class KmsSigner(Signer):
-    """Delegates signing to AWS KMS (ap-south-1). Wiring lands with residency."""
+def _decrypt_kms_seed(ciphertext_b64: str, kms_key_id: str, region: str) -> bytes:
+    """Decrypt a KMS-encrypted Ed25519 seed (envelope at rest, sign in memory)."""
+    try:
+        ciphertext = base64.b64decode(ciphertext_b64)
+    except Exception as exc:  # noqa: BLE001
+        raise SigningError(
+            f"PROV_SIGNING_KEY_CIPHERTEXT_B64 is not valid base64: {exc}"
+        ) from exc
+    try:
+        import boto3
 
-    def __init__(self, kms_key_id: str) -> None:
-        self.key_id = kms_key_id
-
-    def sign(self, message: bytes) -> bytes:  # pragma: no cover - Phase 5
-        raise NotImplementedError(
-            "KMS signing not wired yet. Configure PROV_SIGNING_KEY_B64 for local "
-            "dev, or complete the boto3 KMS integration (residency migration)."
-        )
-
-    def public_key_b64(self) -> str:  # pragma: no cover - Phase 5
-        raise NotImplementedError
+        kms = boto3.client("kms", region_name=region)
+        resp = kms.decrypt(CiphertextBlob=ciphertext, KeyId=kms_key_id)
+        return resp["Plaintext"]
+    except Exception as exc:  # noqa: BLE001
+        raise SigningError(f"KMS decrypt of provenance seed failed: {exc}") from exc
 
 
 _signer_lock = threading.Lock()
@@ -139,13 +150,35 @@ def _build_signer() -> Signer:
     from app.config import get_settings
 
     settings = get_settings()
+    is_production = (getattr(settings, "ENVIRONMENT", "") or "").lower() == "production"
     kms_key_id = getattr(settings, "PROV_SIGNING_KMS_KEY_ID", "") or ""
-    if kms_key_id:
-        return KmsSigner(kms_key_id)
+    ciphertext_b64 = getattr(settings, "PROV_SIGNING_KEY_CIPHERTEXT_B64", "") or ""
+    region = getattr(settings, "DATA_REGION", "ap-south-1") or "ap-south-1"
+
+    # 1. KMS envelope — decrypt the seed once, sign in memory.
+    if kms_key_id and ciphertext_b64:
+        seed = _decrypt_kms_seed(ciphertext_b64, kms_key_id, region)
+        logger.info("PROV: signing key loaded via KMS envelope (key_id=%s)", kms_key_id)
+        return LocalEd25519Signer.from_seed_bytes(seed, key_id=kms_key_id)
+
+    # 2. Local plaintext seed (dev/CI).
     seed_b64 = getattr(settings, "PROV_SIGNING_KEY_B64", "") or ""
     key_id = getattr(settings, "PROV_SIGNING_KEY_ID", "") or "local-dev"
     if seed_b64:
+        if is_production:
+            logger.warning(
+                "PROV: using PLAINTEXT PROV_SIGNING_KEY_B64 in production — "
+                "prefer KMS envelope (PROV_SIGNING_KMS_KEY_ID + ciphertext)."
+            )
         return LocalEd25519Signer.from_seed_b64(seed_b64, key_id)
+
+    # 3. Ephemeral — never in production.
+    if is_production:
+        raise SigningError(
+            "No provenance signing key configured in production. Set "
+            "PROV_SIGNING_KMS_KEY_ID + PROV_SIGNING_KEY_CIPHERTEXT_B64 (KMS "
+            "envelope) or PROV_SIGNING_KEY_B64 (plaintext seed)."
+        )
     return LocalEd25519Signer.ephemeral()
 
 

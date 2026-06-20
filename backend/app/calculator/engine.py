@@ -32,16 +32,20 @@ from app.carbon_calculator import (
     SCOPE_3_FACTORS,
     STATIONARY_COMBUSTION_FACTORS,
 )
-from app.factors_india import FactorNotFound, get_india_factor
+from app.factors_india import FactorNotFound, get_factor
 
 # Valid CEA grid regions. An unknown region must NOT silently fall back to the
 # national factor (principle #2: never substitute) — it raises instead.
 _VALID_GRID_REGIONS = {"NR", "ER", "WR", "SR", "NER"}
 
+# Source slug per jurisdiction, used to build the factor_id provenance handle.
+_GRID_SOURCE_SLUG = {"IN": "cea", "AU": "nga"}
+
 
 def scope2_location_based(
     kwh,
     *,
+    jurisdiction: str = "IN",
     grid_region: str | None = None,
     state: str | None = None,
     reporting_period: tuple[str, str] | None = None,
@@ -50,17 +54,25 @@ def scope2_location_based(
 ) -> CalculationResult:
     """Scope 2 location-based emissions from purchased electricity (kWh).
 
-    Uses the versioned CEA factor (tCO2/MWh). Raises
-    :class:`FactorNotFoundError` if no factor matches — never substitutes.
+    Uses the versioned grid factor for ``jurisdiction`` (``"IN"`` → CEA,
+    ``"AU"`` → NGA). Raises :class:`FactorNotFoundError` if no factor matches
+    — never substitutes.
     """
     qty = require_non_negative(to_decimal(kwh, field_name="kwh"), field_name="kwh")
-    if grid_region is not None and grid_region not in _VALID_GRID_REGIONS:
+    # Grid-region codes are India-specific (CEA). For other jurisdictions the
+    # region dimension is state-based, so only validate against CEA for IN.
+    if (
+        jurisdiction == "IN"
+        and grid_region is not None
+        and grid_region not in _VALID_GRID_REGIONS
+    ):
         raise FactorNotFoundError(
             f"Unknown grid_region '{grid_region}'; expected one of "
             f"{sorted(_VALID_GRID_REGIONS)} or None for national"
         )
     try:
-        factor = get_india_factor(
+        factor = get_factor(
+            jurisdiction=jurisdiction,
             scope=2,
             category="electricity_purchased",
             method="location_based",
@@ -71,10 +83,11 @@ def scope2_location_based(
     except FactorNotFound as exc:
         raise FactorNotFoundError(str(exc)) from exc
 
-    # CEA factor is tCO2/MWh; inputs are kWh.
+    # Grid factor is tCO2(-e)/MWh; inputs are kWh.
     mwh = qty / Decimal("1000")
     value = quantize_emissions(mwh * to_decimal(factor.value, field_name="factor"))
     region_key = (grid_region or state or "national").lower()
+    source_slug = _GRID_SOURCE_SLUG.get(jurisdiction, jurisdiction.lower())
 
     return CalculationResult(
         scope=2,
@@ -82,7 +95,7 @@ def scope2_location_based(
         method="location_based",
         value=value,
         unit="tCO2e",
-        factor_id=f"cea/{region_key}",
+        factor_id=f"{source_slug}/{region_key}",
         factor_version=factor.version,
         factor_source=factor.source,
         factor_citation=factor.citation_url,

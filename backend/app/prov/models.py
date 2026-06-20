@@ -40,6 +40,8 @@ class CalculationProvenanceInput:
     factor_citation: str | None = None
     uncertainty: dict[str, Any] | None = None
     agent_run_id: str | None = None
+    jurisdiction: str | None = None
+    framework_tags: list[str] | None = None
     software_agent: str = SOFTWARE_AGENT
     software_agent_version: str = SOFTWARE_AGENT_VERSION
 
