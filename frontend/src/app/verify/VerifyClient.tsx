@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { ShieldCheck, ShieldAlert, Search, Loader2, FileDown } from "lucide-react";
@@ -36,9 +36,7 @@ export default function VerifyClient() {
 
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  async function handleVerify(e: React.FormEvent) {
-    e.preventDefault();
-    const calcId = id.trim();
+  async function runVerify(calcId: string) {
     if (!calcId) return;
     setLoading(true);
     setError(null);
@@ -63,6 +61,23 @@ export default function VerifyClient() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Support shareable deep-links: /verify?id=<calculation_id> prefills the
+  // field and verifies automatically (used by the "Verify" badge/links
+  // surfaced elsewhere in the app).
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get("id");
+    if (param) {
+      setId(param);
+      void runVerify(param);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault();
+    await runVerify(id.trim());
   }
 
   const pass = result?.verified === true;

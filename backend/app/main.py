@@ -29,6 +29,7 @@ if _settings.SENTRY_DSN:
     )
     logger.info("Sentry initialized for %s", _settings.ENVIRONMENT)
 from app.billing import router as billing_router
+from app.api_keys import router as api_keys_router
 from app.brsr_datapoints import BRSR_DATAPOINTS, analyze_gaps_v2, get_datapoints_stats, get_esrs_mapped_datapoints
 from app.brsr_framework import BRSR_FRAMEWORK, get_core_fields, get_mandatory_fields
 from app.excel_import import router as excel_import_router
@@ -141,6 +142,7 @@ app.include_router(sebi_pdf_router)
 app.include_router(trends_router)
 app.include_router(tally_router)
 app.include_router(verify_router)
+app.include_router(api_keys_router)
 
 app.add_middleware(
     CORSMiddleware,

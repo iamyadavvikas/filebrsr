@@ -9,12 +9,17 @@ Provides:
 """
 
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import HTTPException, Header
+
+from fastapi import APIRouter, Header, HTTPException
+from pydantic import BaseModel, Field
 
 from app.config import get_settings
+
+logger = logging.getLogger("filebrsr.api_keys")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -136,3 +141,163 @@ async def check_feature_access(api_key_data: dict, feature: str) -> None:
             status_code=403,
             detail=f"Feature '{feature}' not available on {tier} tier. Upgrade for access.",
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# MANAGEMENT API (self-serve key CRUD from the dashboard)
+# ═══════════════════════════════════════════════════════════════════════
+
+router = APIRouter(prefix="/api/keys", tags=["api-keys"])
+
+# Map a user's billing plan to the API tier its keys get.
+_PLAN_TO_TIER = {
+    "free": "free",
+    "starter": "free",
+    "pro": "pro",
+    "growth": "pro",
+    "professional": "pro",
+    "enterprise": "enterprise",
+    "scale": "enterprise",
+}
+
+
+async def _require_user_id(authorization: Optional[str]) -> str:
+    """Resolve the authenticated Supabase user_id from a Bearer JWT."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = authorization[len("Bearer "):].strip()
+    if not token or token in ("guest", "undefined", "null"):
+        raise HTTPException(status_code=401, detail="Invalid auth token")
+    if token == get_settings().SUPABASE_SERVICE_KEY:
+        raise HTTPException(status_code=401, detail="Service key not permitted here")
+    try:
+        import jwt as pyjwt
+
+        payload = pyjwt.decode(token, options={"verify_signature": False})
+        uid = payload.get("sub")
+        if not uid or uid == "guest":
+            raise HTTPException(status_code=401, detail="Invalid JWT payload")
+        return uid
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=401, detail=f"Could not decode JWT: {e}")
+
+
+def _supabase():
+    from supabase import create_client
+
+    settings = get_settings()
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+
+
+class CreateKeyRequest(BaseModel):
+    name: str = Field(default="API key", max_length=80)
+
+
+@router.get("")
+async def list_keys(authorization: Optional[str] = Header(default=None)):
+    """List the caller's API keys (metadata only — never the raw key)."""
+    user_id = await _require_user_id(authorization)
+    sb = _supabase()
+
+    rows = (
+        sb.table("api_keys")
+        .select("id, name, key_prefix, tier, active, last_used_at, created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    keys = rows.data or []
+
+    # Attach today's usage + the tier's daily limit for each key.
+    today = datetime.now(timezone.utc).date().isoformat()
+    for k in keys:
+        usage = (
+            sb.table("api_usage")
+            .select("request_count")
+            .eq("key_id", k["id"])
+            .eq("date", today)
+            .execute()
+        )
+        k["usage_today"] = usage.data[0]["request_count"] if usage.data else 0
+        k["daily_limit"] = API_TIERS.get(k.get("tier", "free"), API_TIERS["free"])["requests_per_day"]
+    return {"keys": keys}
+
+
+@router.post("")
+async def create_key(
+    req: CreateKeyRequest,
+    authorization: Optional[str] = Header(default=None),
+):
+    """Generate a new API key. The raw key is returned ONCE and never stored."""
+    user_id = await _require_user_id(authorization)
+    sb = _supabase()
+
+    # Derive tier + org from the caller's profile.
+    profile = (
+        sb.table("profiles")
+        .select("plan, org_id")
+        .eq("id", user_id)
+        .single()
+        .execute()
+    )
+    plan = (profile.data or {}).get("plan", "free")
+    org_id = (profile.data or {}).get("org_id")
+    tier = _PLAN_TO_TIER.get(plan, "free")
+
+    raw_key = generate_api_key()
+    key_hash = hash_api_key(raw_key)
+    # Show enough of the key to recognise it later, e.g. "fbrsr_1a2b3c4d…".
+    key_prefix = raw_key[:14] + "…"
+
+    inserted = (
+        sb.table("api_keys")
+        .insert({
+            "user_id": user_id,
+            "org_id": org_id,
+            "name": req.name.strip() or "API key",
+            "key_prefix": key_prefix,
+            "key_hash": key_hash,
+            "tier": tier,
+            "active": True,
+        })
+        .execute()
+    )
+    record = (inserted.data or [{}])[0]
+    logger.info("API key created: user=%s tier=%s id=%s", user_id, tier, record.get("id"))
+
+    return {
+        "id": record.get("id"),
+        "name": record.get("name"),
+        "tier": tier,
+        "key_prefix": key_prefix,
+        # Returned exactly once. The client must copy it now.
+        "api_key": raw_key,
+        "daily_limit": API_TIERS.get(tier, API_TIERS["free"])["requests_per_day"],
+    }
+
+
+@router.delete("/{key_id}")
+async def revoke_key(
+    key_id: str,
+    authorization: Optional[str] = Header(default=None),
+):
+    """Revoke (deactivate) one of the caller's API keys."""
+    user_id = await _require_user_id(authorization)
+    sb = _supabase()
+
+    existing = (
+        sb.table("api_keys")
+        .select("id")
+        .eq("id", key_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    sb.table("api_keys").update({"active": False}).eq("id", key_id).eq("user_id", user_id).execute()
+    logger.info("API key revoked: user=%s id=%s", user_id, key_id)
+    return {"status": "revoked", "id": key_id}
+
