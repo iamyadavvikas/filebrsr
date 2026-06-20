@@ -69,17 +69,9 @@ const valueTable = [
 ];
 
 const platformFeatures = [
-  { title: "Supply Chain ESG Ratings", desc: "Rate and monitor sustainability across your entire supplier base. Auto-scoring aligned to SEBI BRSR.", color: "#059669" },
-  { title: "AI-Powered BRSR Filing", desc: "Upload any sustainability report — AI extracts all 337 BRSR datapoints (279 Essential + 58 Leadership) across 9 NGRBC Principles in minutes.", color: "#E8B931" },
-  { title: "Carbon Calculator & Tracking", desc: "Scope 1/2/3 emissions from BRSR data with India-specific factors. Year-over-year reduction tracking. Carbon market integration coming 2027.", color: "#0891B2" },
-  { title: "Verifiable Carbon Certificates", desc: "Sign any emissions result with a tamper-evident Ed25519 certificate. Anyone can independently verify it — no login needed. MRV-ready for assurance and the carbon market.", color: "#0D9488" },
-  { title: "ESG Badges & Scorecards", desc: "Score-based Platinum/Gold/Silver/Bronze medals. Public badges suppliers showcase to win business.", color: "#7C3AED" },
-  { title: "Supplier Self-Assessment", desc: "Invite suppliers to complete BRSR-aligned ESG questionnaires. No signup needed. Auto-scored with instant results.", color: "#2563EB" },
-  { title: "Multi-Framework Compliance", desc: "One assessment maps to BRSR, GRI, CDP, TCFD, SASB, UN SDGs & ESRS. Single platform for all frameworks.", color: "#DC2626" },
-  { title: "XBRL Filing Generation", desc: "Auto-generate XBRL-formatted filings ready for BSE/NSE submission. Validated output, zero manual tagging.", color: "#4F46E5" },
-  { title: "Workflow Approvals", desc: "Maker-checker workflows for data entry, report approval, and corrective action plans. Full audit trail.", color: "#0D9488" },
-  { title: "Developer API & Integrations", desc: "Self-serve API keys to pull scores, emissions and filings into your own systems. Foundation for SAP/ERP and data-warehouse integrations.", color: "#1D4ED8" },
-  { title: "Regulatory Tracker", desc: "Track compliance with PAT scheme, EPR, POSH, LODR, Companies Act 135, and environmental clearances.", color: "#B45309" },
+  { title: "Value-Chain ESG Ratings", desc: "Invite your suppliers, auto-score them against SEBI BRSR, and answer Section A.V value-chain disclosure with evidence — not estimates.", color: "#059669" },
+  { title: "AI-Powered BRSR Filing", desc: "Upload any sustainability report — AI extracts all 337 BRSR datapoints (279 Essential + 58 Leadership) across 9 NGRBC Principles in minutes, then generates XBRL for BSE/NSE.", color: "#E8B931" },
+  { title: "Carbon & Verifiable Certificates", desc: "Scope 1 & 2 free with India-specific factors; full Scope 3 on paid plans, each signed with a tamper-evident certificate anyone can verify — MRV-ready for the 2027 carbon market.", color: "#0891B2" },
 ];
 
 const faqs = [
@@ -279,7 +271,7 @@ export default function HomePage() {
                 style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", background: "rgba(255,255,255,0.7)", color: "#059669", padding: "8px 18px", borderRadius: 24, border: "1px solid rgba(16,185,129,0.25)", boxShadow: "0 4px 16px rgba(16,185,129,0.08)", animationDelay: "0ms", animationFillMode: "both" }}
               >
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", display: "inline-block", animation: "pulse 2s infinite" }} />
-                Supply Chain ESG · BRSR Automation · Carbon Market
+                Built for SEBI&apos;s BRSR value-chain disclosure
               </div>
 
               <h1 className="fade-up" style={{ color: "#0F172A", fontSize: "clamp(36px, 5vw, 62px)", fontWeight: 800, lineHeight: 1.07, marginBottom: 24, letterSpacing: -2, animationDelay: "80ms", animationFillMode: "both" }}>
@@ -608,11 +600,11 @@ export default function HomePage() {
                 FULL PLATFORM
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 14 }}>
-                Everything you need. One connected system.
+                Three pillars. One connected system.
               </h2>
             </Reveal>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {platformFeatures.map((p, i) => (
                 <Reveal key={p.title} delay={(i % 3) * 80}>
                   <div
@@ -626,6 +618,17 @@ export default function HomePage() {
                 </Reveal>
               ))}
             </div>
+
+            <Reveal delay={240} className="text-center mt-10">
+              <Link
+                href="/platform"
+                className="inline-flex items-center gap-1.5"
+                style={{ fontSize: 14, fontWeight: 600, color: "var(--primary-light)" }}
+              >
+                See all platform capabilities
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </Link>
+            </Reveal>
           </div>
         </section>
 
@@ -766,9 +769,10 @@ export default function HomePage() {
                   Today&apos;s verified carbon data becomes tomorrow&apos;s credits
                 </h2>
                 <p style={{ fontSize: 15, color: "#475569", maxWidth: 560, margin: "0 auto 24px", lineHeight: 1.7 }}>
-                  You already track Scope 1, 2 &amp; 3 emissions with signed, verifiable certificates.
-                  When India&apos;s Carbon Credit Trading Scheme (CCTS) goes live, those verified
-                  reductions become tradeable credits — and FileBRSR is built to be the transaction layer.
+                  You&apos;re already tracking emissions with India-specific factors &mdash; and on paid
+                  plans, each result carries a signed, verifiable certificate. When India&apos;s Carbon
+                  Credit Trading Scheme (CCTS) goes live, those verified reductions become tradeable
+                  credits &mdash; and FileBRSR is built to be the transaction layer.
                 </p>
                 <Link
                   href="/platform/carbon"
