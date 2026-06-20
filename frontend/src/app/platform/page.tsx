@@ -9,7 +9,14 @@ export default async function PlatformPage() {
 
   // Guests can view the Overview in trial mode (no redirect to data-entry)
   if (!user) {
-    return <PlatformOverview userId="guest" initialReports={[]} userProfile={null} />;
+    return (
+      <PlatformOverview
+        userId="guest"
+        initialReports={[]}
+        userProfile={null}
+        onboardingCompleted={true}
+      />
+    );
   }
 
   // Fetch reports server-side using admin client (bypasses RLS)
@@ -26,7 +33,9 @@ export default async function PlatformPage() {
   try {
     const { data } = await admin
       .from("profiles")
-      .select("plan, credits_remaining, extractions_this_month, month_reset_at, company_name")
+      .select(
+        "plan, credits_remaining, extractions_this_month, month_reset_at, company_name, onboarding_completed"
+      )
       .eq("id", user.id)
       .single();
     profile = data;
@@ -44,5 +53,18 @@ export default async function PlatformPage() {
     }
   }
 
-  return <PlatformOverview userId={user.id} initialReports={reports || []} userProfile={profile} />;
+  // If the column is missing or the user is brand new, treat onboarding as
+  // pending (show the wizard); otherwise respect the stored flag.
+  const onboardingCompleted = Boolean(
+    (profile as { onboarding_completed?: boolean } | null)?.onboarding_completed
+  );
+
+  return (
+    <PlatformOverview
+      userId={user.id}
+      initialReports={reports || []}
+      userProfile={profile}
+      onboardingCompleted={onboardingCompleted}
+    />
+  );
 }

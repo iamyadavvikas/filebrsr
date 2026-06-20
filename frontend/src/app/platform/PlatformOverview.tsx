@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import UpgradeNudge from "./UpgradeNudge";
+import OnboardingWizard from "./OnboardingWizard";
 
 interface UserProfile {
   plan: string | null;
@@ -33,6 +34,7 @@ interface OverviewProps {
   userId: string;
   initialReports: ExtractionReport[];
   userProfile: UserProfile | null;
+  onboardingCompleted: boolean;
 }
 
 interface ExtractionReport {
@@ -46,12 +48,21 @@ interface ExtractionReport {
   financial_year?: string | null;
 }
 
-export default function PlatformOverview({ userId, initialReports, userProfile }: OverviewProps) {
+export default function PlatformOverview({
+  userId,
+  initialReports,
+  userProfile,
+  onboardingCompleted,
+}: OverviewProps) {
   const [financialYear, setFinancialYear] = useState("FY2025-26");
   const [, setLoading] = useState(true);
   const [reports, setReports] = useState<ExtractionReport[]>(initialReports);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  // Show the first-run wizard for authenticated users who haven't finished it.
+  const [showOnboarding, setShowOnboarding] = useState(
+    userId !== "guest" && !onboardingCompleted
+  );
 
   const [stats, setStats] = useState({
     completion: 0,
@@ -167,6 +178,9 @@ export default function PlatformOverview({ userId, initialReports, userProfile }
 
   return (
     <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
+      {showOnboarding && (
+        <OnboardingWizard userId={userId} onComplete={() => setShowOnboarding(false)} />
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-3">
         <div>

@@ -12,6 +12,9 @@ import {
   Info,
   Save,
   CheckCircle2,
+  ShieldCheck,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -163,6 +166,10 @@ export default function CarbonClient() {
   const [calcError, setCalcError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Verifiable certificate (signed Scope-2 calculation) state
+  const [certifying, setCertifying] = useState(false);
+  const [certError, setCertError] = useState("");
+  const [verifyId, setVerifyId] = useState<string | null>(null);
 
   // Load saved data on mount
   useEffect(() => {
@@ -228,6 +235,69 @@ export default function CarbonClient() {
       setTimeout(() => setSaved(false), 3000);
     } catch {}
     setSaving(false);
+  }
+
+  // Sign the total Scope-2 result with an Ed25519 provenance certificate and
+  // publish it so anyone can verify it at /verify?id=<calculation_id>.
+  async function generateCertificate() {
+    setCertifying(true);
+    setCertError("");
+    try {
+      const totalMwh = scope2Entries.reduce((sum, e) => sum + (e.quantity || 0), 0);
+      if (totalMwh <= 0) {
+        setCertError("Enter a Scope 2 electricity figure before generating a certificate.");
+        setCertifying(false);
+        return;
+      }
+
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setCertError("Please sign in to generate a verifiable certificate.");
+        setCertifying(false);
+        return;
+      }
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      };
+
+      const signRes = await fetch("/backend/api/platform/carbon/scope2/provenance", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ kwh: totalMwh * 1000, jurisdiction: "IN" }),
+      });
+      if (!signRes.ok) {
+        const text = await signRes.text();
+        setCertError(`Signing failed (${signRes.status}): ${text.slice(0, 200)}`);
+        setCertifying(false);
+        return;
+      }
+      const signed = await signRes.json();
+      const calcId: string | undefined = signed.calculation_id;
+      if (!calcId) {
+        setCertError("Signing succeeded but no calculation id was returned.");
+        setCertifying(false);
+        return;
+      }
+
+      const pubRes = await fetch("/backend/api/platform/carbon/publish", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ calculation_id: calcId, published: true }),
+      });
+      if (!pubRes.ok) {
+        const text = await pubRes.text();
+        setCertError(`Publish failed (${pubRes.status}): ${text.slice(0, 200)}`);
+        setCertifying(false);
+        return;
+      }
+
+      setVerifyId(calcId);
+    } catch (err) {
+      setCertError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    setCertifying(false);
   }
 
   async function calculateAll() {
@@ -653,6 +723,40 @@ export default function CarbonClient() {
                   <span className="font-bold text-emerald-700">{results.brsr_mapping.total_scope_1_2} tCO2e</span>
                 </div>
               </div>
+            </div>
+            {/* Verifiable certificate (signed Scope-2) */}
+            <div className="mt-6 pt-4 border-t border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3">
+                <div className="flex items-start gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-800">Cryptographically verifiable</p>
+                    <p className="text-xs text-emerald-700/80">
+                      Sign your Scope 2 result with a tamper-evident certificate anyone can verify — no login needed.
+                    </p>
+                  </div>
+                </div>
+                {verifyId ? (
+                  <a
+                    href={`/verify?id=${encodeURIComponent(verifyId)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 shrink-0"
+                  >
+                    <ExternalLink className="w-4 h-4" /> View verification
+                  </a>
+                ) : (
+                  <button
+                    onClick={generateCertificate}
+                    disabled={certifying}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 shrink-0"
+                  >
+                    {certifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                    {certifying ? "Signing…" : "Generate certificate"}
+                  </button>
+                )}
+              </div>
+              {certError && <p className="text-xs text-red-600 mt-2">{certError}</p>}
             </div>
           </div>
         )}
