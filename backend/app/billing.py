@@ -95,6 +95,26 @@ PLANS = {
 }
 
 
+# Ordered access tiers for server-side entitlement gating. Higher rank = more
+# access. Legacy plans map onto their nearest modern equivalent.
+PLAN_RANK = {
+    "free": 0,
+    "starter": 1,        # legacy entry tier
+    "growth": 2,
+    "professional": 2,   # legacy equivalent of Growth
+    "scale": 3,
+    "enterprise": 4,
+}
+
+
+def plan_meets(plan: str | None, minimum: str) -> bool:
+    """True when ``plan`` is at least the ``minimum`` access tier.
+
+    Unknown or missing plans are treated as free (rank 0).
+    """
+    return PLAN_RANK.get(plan or "free", 0) >= PLAN_RANK.get(minimum, 0)
+
+
 class CreateSubscriptionRequest(BaseModel):
     plan: str
     billing_period: str = "yearly"  # monthly or yearly

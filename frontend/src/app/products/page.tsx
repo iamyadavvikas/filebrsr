@@ -53,7 +53,7 @@ const products = [
       "BRSR Section A.V aligned questionnaire",
       "Auto-scoring: Environment, Social, Governance",
       "Real-time dashboard with all supplier scores",
-      "Platinum/Gold/Silver/Bronze badge system",
+      "Score-based Platinum/Gold/Silver/Bronze badge system",
     ],
     cta: "Assess Suppliers Free",
   },
@@ -66,7 +66,7 @@ const products = [
     href: "/platform",
     free: false,
     features: [
-      "AI extracts 140+ BRSR indicators from PDF in 60s",
+      "AI extracts 140+ BRSR indicators from PDF in minutes",
       "Data entry with SEBI template alignment",
       "Gap analysis & section-wise scoring",
       "XBRL filing generation for BSE/NSE",
