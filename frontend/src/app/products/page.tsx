@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Calculator, FileInput, Network, BarChart3, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Calculator, FileInput, Network, BarChart3, ShieldCheck, ArrowRight, CheckCircle2 } from "lucide-react";
 
 const products = [
   {
@@ -74,6 +74,23 @@ const products = [
       "Board-ready ESG dashboards",
     ],
     cta: "Try BRSR Platform",
+  },
+  {
+    id: "verified-carbon-ledger",
+    title: "Verified Carbon Ledger",
+    subtitle: "Tamper-evident MRV for audit-grade disclosures",
+    icon: ShieldCheck,
+    color: "#6366F1",
+    href: "/verify",
+    free: true,
+    features: [
+      "Every disclosed number signed with an Ed25519 certificate",
+      "Append-only ledger — figures can't be edited after publishing",
+      "One-click public verification — no login required",
+      "Traceable to its emission-factor source with citations",
+      "Download an auditor evidence bundle for assurance & CCTS",
+    ],
+    cta: "Verify a Disclosure",
   },
 ];
 

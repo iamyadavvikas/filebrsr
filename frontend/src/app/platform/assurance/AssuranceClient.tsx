@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   ShieldCheck,
   FileDown,
@@ -146,6 +147,20 @@ export default function AssuranceClient() {
   const [lineageBatch, setLineageBatch] = useState<string | null>(null);
   const [verifies, setVerifies] = useState<Record<number, VerifyState>>({});
   const profilesRef = useRef<ProfileMeta[]>([]);
+  const supabaseRef = useRef(createClient());
+
+  // authenticated fetch — the assurance ledger is org-scoped (persisted on
+  // Supabase), so every data call carries the caller's bearer token.
+  const authFetch = useCallback(async (path: string, init?: RequestInit) => {
+    const {
+      data: { session },
+    } = await supabaseRef.current.auth.getSession();
+    const token = session?.access_token ?? "";
+    return fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
+    });
+  }, []);
 
   // live clock for the status bar
   useEffect(() => {
@@ -186,27 +201,41 @@ export default function AssuranceClient() {
       setVerifies({});
       setLineageBatch(null);
       const region = regionFor(profileCode);
-      Promise.all([
-        fetch(`${API_BASE}/api/assurance/report?profile=${profileCode}`).then((r) =>
-          r.ok ? r.json() : Promise.reject(r.status)
-        ),
-        fetch(`${API_BASE}/api/assurance/ledger?region=${region}`).then((r) =>
-          r.ok ? r.json() : Promise.reject(r.status)
-        ),
-        fetch(`${API_BASE}/api/assurance/provenance?region=${region}`).then((r) =>
-          r.ok ? r.json() : Promise.reject(r.status)
-        ),
-      ])
-        .then(([rep, led, pv]) => {
+      (async () => {
+        try {
+          // The ledger is real + persisted per org. If this org has nothing yet,
+          // seed a genuine supplier-signed chain through the verified ingest path.
+          let led = await authFetch(`/api/assurance/ledger?region=${region}`).then((r) =>
+            r.ok ? r.json() : Promise.reject(r.status)
+          );
+          if (!led || (led.size ?? 0) === 0) {
+            await authFetch(`/api/assurance/demo/seed?region=${region}`, {
+              method: "POST",
+            }).then((r) => (r.ok ? r.json() : null));
+            led = await authFetch(`/api/assurance/ledger?region=${region}`).then((r) =>
+              r.ok ? r.json() : Promise.reject(r.status)
+            );
+          }
+          const [rep, pv] = await Promise.all([
+            authFetch(`/api/assurance/report?profile=${profileCode}&region=${region}`).then(
+              (r) => (r.ok ? r.json() : Promise.reject(r.status))
+            ),
+            authFetch(`/api/assurance/provenance?region=${region}`).then((r) =>
+              r.ok ? r.json() : Promise.reject(r.status)
+            ),
+          ]);
           setReport(rep);
           setLedger(led);
           setProv(pv);
           setOnline(true);
-        })
-        .catch(() => setOnline(false))
-        .finally(() => setLoading(false));
+        } catch {
+          setOnline(false);
+        } finally {
+          setLoading(false);
+        }
+      })();
     },
-    [regionFor]
+    [authFetch, regionFor]
   );
 
   useEffect(() => {
@@ -219,19 +248,18 @@ export default function AssuranceClient() {
       setLineageBatch(batchId);
       const region = regionFor(active);
       const qs = batchId ? `&batch_id=${encodeURIComponent(batchId)}` : "";
-      fetch(`${API_BASE}/api/assurance/provenance?region=${region}${qs}`)
+      authFetch(`/api/assurance/provenance?region=${region}${qs}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
         .then(setProv)
         .catch(() => {});
     },
-    [active, regionFor]
+    [active, regionFor, authFetch]
   );
 
   const verifyRow = useCallback(
     (leafIndex: number) => {
       setVerifies((v) => ({ ...v, [leafIndex]: { status: "loading" } }));
-      const region = regionFor(active);
-      fetch(`${API_BASE}/api/assurance/verify/${leafIndex}?region=${region}`)
+      authFetch(`/api/assurance/verify/${leafIndex}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
         .then((d) =>
           setVerifies((v) => ({
@@ -243,7 +271,7 @@ export default function AssuranceClient() {
           setVerifies((v) => ({ ...v, [leafIndex]: { status: "invalid" } }))
         );
     },
-    [active, regionFor]
+    [authFetch]
   );
 
   const selectorProfiles =
