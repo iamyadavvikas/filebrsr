@@ -77,12 +77,12 @@ const platformFeatures = [
 const faqs = [
   { q: "What is FileBRSR?", a: "FileBRSR is India's Supply Chain ESG + BRSR Automation + Carbon platform. We help listed companies assess suppliers, automate BRSR filing, track emissions, and prepare for India's carbon credit market — all in one connected system." },
   { q: "Who needs this?", a: "SEBI requires the top 1,000 listed companies to file BRSR, and is phasing in value-chain ESG disclosure (BRSR Section A.V) — currently on an assess-or-explain basis, expanding over time. Value-chain partners are those cumulatively making up ~75% of purchases/sales by value, so this still pulls in 50,000+ suppliers. FileBRSR serves both sides — enterprises assessing suppliers, and SMEs proving compliance." },
-  { q: "How is this different from consultants?", a: "Consultants charge ₹5–15L/year, take months, use Excel, and provide no standardized scoring. FileBRSR automates the entire process — assessment, scoring, gap analysis, and filing — starting free for 5 suppliers." },
+  { q: "How is this different from consultants?", a: "Consultants charge ₹5–15L/year, take months, use Excel, and provide no standardized scoring. FileBRSR automates assessment, scoring, gap analysis and filing — starting free for 5 suppliers. For BRSR Core Reasonable Assurance, our sales-led Assurance-Ready plan adds hands-on support and evidence packs rather than leaving you to do it alone." },
   { q: "How do supplier assessments work?", a: "Enterprise users add suppliers and send invite links. Suppliers complete a 20-question ESG questionnaire (no signup needed). Scores are auto-calculated across Environment (40%), Social (35%) & Governance (25%). First 5 suppliers free, unlimited on paid plans." },
   { q: "What are FileBRSR badges?", a: "Based on their ESG assessment score, suppliers earn Platinum (85+), Gold (70+), Silver (55+), or Bronze (40+) badges. These are publicly shareable to attract new business." },
   { q: "How does the carbon market work?", a: "Today, FileBRSR calculates Scope 1 & 2 emissions free, plus a preview of up to 3 Scope 3 categories, all with India-specific factors. Paid plans unlock full Scope 3 (all 15 categories) with tamper-evident signed certificates. When India's CCTS goes live in 2027, verified reductions from your supply chain become tradeable carbon credits on our marketplace." },
   { q: "Does it support BRSR filing?", a: "Yes. Upload any sustainability PDF and AI extracts all 337 BRSR datapoints (Essential + Leadership) in minutes. Includes gap analysis, scoring, XBRL generation, and multi-framework mapping (GRI, CDP, TCFD, SASB)." },
-  { q: "What's the pricing model?", a: "Free tier includes 5 supplier assessments, the Scope 1 & 2 carbon calculator with a 3-category Scope 3 preview, and 3 AI extractions. Growth plan at ₹49,999/year adds unlimited extractions, 25 suppliers, and full Scope 3 with signed certificates. Scale at ₹1,99,999/year unlocks unlimited suppliers, XBRL filing, and audit trail." },
+  { q: "What's the pricing model?", a: "Free tier includes 5 supplier assessments, the Scope 1 & 2 carbon calculator with a 3-category Scope 3 preview, and 3 AI extractions. Growth at ₹49,999/year is the self-serve plan for listed companies — unlimited extractions, 25 suppliers, and full Scope 3 with signed certificates. For top-250 companies facing BRSR Core Reasonable Assurance, the sales-led Assurance-Ready plan (from ₹2,00,000/year) adds unlimited suppliers, XBRL filing, audit trail, evidence packs and a dedicated ESG analyst — a fraction of a ₹5–15L consultant assurance engagement." },
 ];
 
 /* ═══════════════════════════════════════════════════════════════
@@ -288,13 +288,13 @@ export default function HomePage() {
 
               <div className="flex flex-col sm:flex-row items-center gap-4 justify-center fade-up" style={{ animationDelay: "240ms", animationFillMode: "both" }}>
                 <Link
-                  href="/platform/data-entry"
+                  href="/demo"
                   className="btn-accent group relative overflow-hidden"
                   style={{ fontSize: 15, fontWeight: 700, padding: "16px 36px", borderRadius: 14, background: "linear-gradient(120deg, #10B981, #06B6D4)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 10px 30px rgba(16,185,129,0.32)" }}
                 >
                   <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)" }} />
                   <span className="relative inline-flex items-center gap-2">
-                    Start your BRSR assessment free
+                    See AI extraction in action — no login
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                   </span>
                 </Link>
@@ -354,7 +354,7 @@ export default function HomePage() {
                         <span className="w-3 h-3 rounded-full" style={{ background: "#FBBF24" }} />
                         <span className="w-3 h-3 rounded-full" style={{ background: "#34D399" }} />
                         <span className="ml-3 text-xs font-medium" style={{ color: "#94A3B8" }}>Supplier ESG Dashboard</span>
-                        <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>Live</span>
+                        <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(100,116,139,0.12)", color: "#64748B" }}>Sample data</span>
                       </div>
 
                       <div className="p-5 md:p-6">
@@ -464,11 +464,15 @@ export default function HomePage() {
           <div className="max-w-5xl mx-auto">
             <Reveal className="text-center mb-10">
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
-                THE PAIN — THREE LAYERS
+                THE PAIN — STARTING WITH YOURS
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 16 }}>
-                Three stakeholders. Three pain points.
+                The compliance head&apos;s problem first — then everyone they depend on.
               </h2>
+              <p className="text-muted mx-auto" style={{ fontSize: 15, maxWidth: 620, lineHeight: 1.7 }}>
+                If you own BRSR at a top-250 listed company, the value-chain question lands on your desk.
+                Your suppliers and filing teams feel it too — but you answer to SEBI first.
+              </p>
             </Reveal>
 
             {/* Tab toggle */}
@@ -632,7 +636,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ═══ MOAT: VERIFIABLE ASSURANCE LEDGER ═══ */}
+        {/* ═══ MOAT: FILL ONCE, PROVE TO EVERY BUYER ═══ */}
         <section className="relative overflow-hidden" style={{ padding: "80px 28px", background: "linear-gradient(135deg, #0F172A 0%, #0B3B2E 100%)" }}>
           <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
           <div className="relative max-w-5xl mx-auto">
@@ -641,26 +645,28 @@ export default function HomePage() {
                 WHY FILEBRSR WINS
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 14, color: "#fff" }}>
-                Every number is independently verifiable.
+                Fill once, prove to every buyer.
               </h2>
-              <p style={{ fontSize: 15, color: "#CBD5E1", maxWidth: 660, margin: "0 auto", lineHeight: 1.75 }}>
-                Anyone can open a published FileBRSR figure&apos;s certificate and confirm it themselves —
-                no login, no trust required. That auditable proof, not a lower invoice, is the moat.
+              <p style={{ fontSize: 15, color: "#CBD5E1", maxWidth: 680, margin: "0 auto", lineHeight: 1.75 }}>
+                When a listed company invites a supplier, that supplier completes their ESG and emissions
+                profile <strong style={{ color: "#fff" }}>once</strong> — and reuses the same scored profile for
+                every other buyer that asks. Each invite pulls another company onto the shared network, so the
+                data compounds with every assessment.
               </p>
             </Reveal>
 
             <Reveal delay={120} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 text-left">
               <div className="rounded-xl p-6" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#34D399" }}>SIGNED AT SOURCE</p>
-                <p className="text-sm" style={{ color: "#E2E8F0", lineHeight: 1.7 }}>When a calculation is published, its value, emission factor and method are signed with an Ed25519 key. The signature travels with the number.</p>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#34D399" }}>FILL ONCE, REUSE EVERYWHERE</p>
+                <p className="text-sm" style={{ color: "#E2E8F0", lineHeight: 1.7 }}>A supplier accepts a buyer&apos;s invite, completes one ESG assessment, and shares the same verified scorecard and badge with every buyer that requests it — no re-filling Excel for each.</p>
               </div>
               <div className="rounded-xl p-6" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#34D399" }}>PUBLICLY CHECKABLE</p>
-                <p className="text-sm" style={{ color: "#E2E8F0", lineHeight: 1.7 }}>Anyone re-canonicalises the record and re-verifies the signature at /verify — getting a PASS/FAIL and the full factor lineage, with no account.</p>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#34D399" }}>BENCHMARKED AGAINST PEERS</p>
+                <p className="text-sm" style={{ color: "#E2E8F0", lineHeight: 1.7 }}>Every completed assessment feeds sector benchmarks. Buyers see where a supplier ranks against its peers, and suppliers see how they compare — an advantage that grows as the dataset accumulates.</p>
               </div>
               <div className="rounded-xl p-6" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#34D399" }}>AUDIT-READY</p>
-                <p className="text-sm" style={{ color: "#E2E8F0", lineHeight: 1.7 }}>Download an auditor evidence bundle for any published figure — tamper-evident MRV that stands up to assurance review.</p>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#34D399" }}>PROOF LAYER UNDERNEATH</p>
+                <p className="text-sm" style={{ color: "#E2E8F0", lineHeight: 1.7 }}>Beneath the network, every published figure is signed at source and independently checkable at /verify — so a reused number is also a <em>verifiable</em> one, with no account needed.</p>
               </div>
             </Reveal>
 
@@ -672,7 +678,7 @@ export default function HomePage() {
               >
                 <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)" }} />
                 <span className="relative inline-flex items-center gap-2">
-                  Verify a disclosure yourself
+                  See the proof layer — verify a disclosure
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </span>
               </Link>
@@ -688,9 +694,9 @@ export default function HomePage() {
                 PRICING
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 14 }}>
-                Replace ₹15L consultants with one platform
+                Start free. Go assurance-ready when SEBI requires it.
               </h2>
-              <p className="text-muted" style={{ fontSize: 15, maxWidth: 640, margin: "0 auto" }}>Indian companies pay ₹5–15 lakhs to consultants who take 4–8 weeks with Excel sheets. FileBRSR automates everything — supply chain ESG, BRSR filing, carbon tracking — starting free.</p>
+              <p className="text-muted" style={{ fontSize: 15, maxWidth: 660, margin: "0 auto" }}>Free and Growth are the self-serve on-ramp — map your datapoints and assess suppliers in minutes. When you face BRSR Core Reasonable Assurance, the sales-led Assurance-Ready plan adds hands-on support, for a fraction of a ₹5–15L consultant engagement.</p>
             </Reveal>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -719,16 +725,15 @@ export default function HomePage() {
                 </ul>
               </div>
               <div className="bg-card rounded-2xl border border-border p-7 card-hover">
-                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">SCALE</p>
-                <h3 className="text-3xl font-bold mb-1">₹1,99,999<span className="text-base font-normal text-muted">/yr</span></h3>
-                <p className="text-sm text-muted mb-6">For large enterprises</p>
+                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">ASSURANCE-READY</p>
+                <h3 className="text-3xl font-bold mb-1">From ₹2,00,000<span className="text-base font-normal text-muted">/yr</span></h3>
+                <p className="text-sm text-muted mb-6">Sales-led, for top-250 assurance</p>
                 <ul className="space-y-2.5 text-sm text-gray-600">
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Unlimited suppliers</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> XBRL filing generation</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Audit trail & compliance</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> NIFTY 50 benchmarks</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 5 team members</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> PDF + XBRL-JSON export</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Everything in Growth</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Unlimited suppliers + XBRL filing</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Reasonable-assurance evidence packs</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Audit trail & compliance log</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Dedicated ESG analyst & onboarding</li>
                 </ul>
               </div>
               <div className="bg-card rounded-2xl border border-border p-7 card-hover">

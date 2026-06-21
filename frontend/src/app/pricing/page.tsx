@@ -79,25 +79,25 @@ const plans = [
     ctaBg: "linear-gradient(120deg, #10B981, #06B6D4)", ctaColor: "white", ctaBorder: "none",
   },
   {
-    key: "scale",
-    name: "Scale",
-    price: "₹1,99,999",
+    key: "assurance",
+    name: "Assurance-Ready",
+    price: "From ₹2,00,000",
     period: "/year",
-    monthlyEquiv: "₹16,667/month",
-    desc: "For enterprises with large supply chains",
-    reports: "Unlimited suppliers + XBRL filing + audit",
+    monthlyEquiv: "A fraction of a ₹5–15L consultant assurance engagement",
+    desc: "Sales-led, for top-250 companies facing BRSR Core Reasonable Assurance",
+    reports: "Hands-on assurance support + unlimited suppliers",
     features: [
       "Everything in Growth +",
       "Unlimited supplier assessments",
       "XBRL filing generation",
+      "Reasonable-assurance evidence packs",
       "Audit trail & compliance log",
-      "Supplier-side dashboard (coming soon)",
+      "Dedicated ESG analyst & onboarding",
       "10 users",
-      "Dedicated account manager",
     ],
-    cta: "Subscribe",
+    cta: "Talk to sales",
     popular: false,
-    ctaBg: "white", ctaColor: "#1B4D3E", ctaBorder: "1px solid #E5E7DF",
+    ctaBg: "linear-gradient(120deg, #10B981, #06B6D4)", ctaColor: "white", ctaBorder: "none",
   },
   {
     key: "enterprise",
@@ -122,19 +122,19 @@ const plans = [
 ];
 
 const comparisonData = [
-  { feature: "AI BRSR extractions", free: "3 (one-time)", growth: "Unlimited", scale: "Unlimited", enterprise: "Unlimited" },
-  { feature: "Supplier assessments", free: "5", growth: "25", scale: "Unlimited", enterprise: "Unlimited" },
-  { feature: "Carbon calculator", free: "Scope 1 & 2 (Scope 3 preview)", growth: "Full Scope 3 + signed certificates", scale: "Full Scope 3 + signed certificates", enterprise: "Full Scope 3 + signed certificates" },
-  { feature: "ESG scorecard & badge", free: "✓", growth: "✓", scale: "✓", enterprise: "✓" },
-  { feature: "Gap analysis", free: "Basic", growth: "Full", scale: "Full", enterprise: "Full" },
-  { feature: "Multi-framework mapping", free: "—", growth: "✓", scale: "✓", enterprise: "✓" },
-  { feature: "NIFTY 50 benchmarks", free: "—", growth: "✓", scale: "✓", enterprise: "✓" },
-  { feature: "XBRL filing", free: "—", growth: "Export only", scale: "Full generation", enterprise: "Full generation" },
-  { feature: "Supplier dashboard", free: "—", growth: "—", scale: "✓", enterprise: "✓" },
-  { feature: "Audit trail", free: "—", growth: "—", scale: "✓", enterprise: "✓" },
-  { feature: "API access", free: "—", growth: "—", scale: "—", enterprise: "✓" },
-  { feature: "Users", free: "1", growth: "5", scale: "10", enterprise: "Unlimited (SSO)" },
-  { feature: "Support", free: "Community", growth: "Priority email", scale: "Dedicated AM", enterprise: "Dedicated + SLA" },
+  { feature: "AI BRSR extractions", free: "3 (one-time)", growth: "Unlimited", assurance: "Unlimited", enterprise: "Unlimited" },
+  { feature: "Supplier assessments", free: "5", growth: "25", assurance: "Unlimited", enterprise: "Unlimited" },
+  { feature: "Carbon calculator", free: "Scope 1 & 2 (Scope 3 preview)", growth: "Full Scope 3 + signed certificates", assurance: "Full Scope 3 + signed certificates", enterprise: "Full Scope 3 + signed certificates" },
+  { feature: "ESG scorecard & badge", free: "✓", growth: "✓", assurance: "✓", enterprise: "✓" },
+  { feature: "Gap analysis", free: "Basic", growth: "Full", assurance: "Full", enterprise: "Full" },
+  { feature: "Multi-framework mapping", free: "—", growth: "✓", assurance: "✓", enterprise: "✓" },
+  { feature: "NIFTY 50 benchmarks", free: "—", growth: "✓", assurance: "✓", enterprise: "✓" },
+  { feature: "XBRL filing", free: "—", growth: "Export only", assurance: "Full generation", enterprise: "Full generation" },
+  { feature: "Reasonable-assurance evidence packs", free: "—", growth: "—", assurance: "✓", enterprise: "✓" },
+  { feature: "Audit trail", free: "—", growth: "—", assurance: "✓", enterprise: "✓" },
+  { feature: "API access", free: "—", growth: "—", assurance: "—", enterprise: "✓" },
+  { feature: "Users", free: "1", growth: "5", assurance: "10", enterprise: "Unlimited (SSO)" },
+  { feature: "Support", free: "Community", growth: "Priority email", assurance: "Dedicated ESG analyst", enterprise: "Dedicated + SLA" },
 ];
 
 export default function PricingPage() {
@@ -145,8 +145,9 @@ export default function PricingPage() {
       window.location.href = "/platform/supply-chain";
       return;
     }
-    if (planKey === "enterprise") {
-      window.location.href = "mailto:sales@filebrsr.com?subject=Enterprise%20Plan%20Inquiry";
+    if (planKey === "enterprise" || planKey === "assurance") {
+      const subject = planKey === "assurance" ? "Assurance-Ready Plan Inquiry" : "Enterprise Plan Inquiry";
+      window.location.href = `mailto:sales@filebrsr.com?subject=${encodeURIComponent(subject)}`;
       return;
     }
 
@@ -162,7 +163,7 @@ export default function PricingPage() {
         return;
       }
 
-      const isSubscription = planKey === "growth" || planKey === "scale";
+      const isSubscription = planKey === "growth";
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const endpoint = isSubscription
         ? `${backendUrl}/api/billing/create-subscription`
@@ -253,8 +254,8 @@ export default function PricingPage() {
                 with one platform
               </span>
             </h1>
-            <p className="fade-up" style={{ fontSize: 17, maxWidth: 540, margin: "0 auto 8px", lineHeight: 1.7, color: "#475569", animationDelay: "160ms", animationFillMode: "both" }}>
-              Companies pay ₹5-15 lakhs annually for manual BRSR compilation. FileBRSR does it in seconds.
+            <p className="fade-up" style={{ fontSize: 17, maxWidth: 560, margin: "0 auto 8px", lineHeight: 1.7, color: "#475569", animationDelay: "160ms", animationFillMode: "both" }}>
+              Start free for data prep and supplier assessments. When you need BRSR Core Reasonable Assurance, the sales-led Assurance-Ready plan gives you hands-on support — at a fraction of a ₹5–15L consultant engagement.
             </p>
             <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-6 fade-up" style={{ fontSize: 13, color: "#64748B", animationDelay: "240ms", animationFillMode: "both" }}>
               <span>✓ No credit card for free tier</span>
@@ -350,7 +351,7 @@ export default function PricingPage() {
                     <th style={{ padding: "14px 16px", textAlign: "left", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Feature</th>
                     <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Free</th>
                     <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>Growth</th>
-                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Scale</th>
+                    <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Assurance-Ready</th>
                     <th style={{ padding: "14px 16px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>Enterprise</th>
                   </tr>
                 </thead>
@@ -360,7 +361,7 @@ export default function PricingPage() {
                       <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 500, color: "var(--foreground)" }}>{row.feature}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.free}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", fontWeight: 600, color: "var(--primary)" }}>{row.growth}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.scale}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.assurance}</td>
                       <td style={{ padding: "12px 16px", fontSize: 13, textAlign: "center", color: "var(--muted)" }}>{row.enterprise}</td>
                     </tr>
                   ))}
