@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import { CheckCircle, Leaf, ChevronRight, ChevronLeft } from "lucide-react";
+import { trackEvent } from "@/lib/posthog";
 
 interface Question {
   id: string;
@@ -64,6 +65,7 @@ export default function AssessmentForm({ paramsPromise }: { paramsPromise: Promi
       } else {
         setResult(result);
         setSubmitted(true);
+        trackEvent("supplier_activated", { assessment_id: id, risk_level: result.risk_level });
       }
     } catch {
       setError("Submission failed");

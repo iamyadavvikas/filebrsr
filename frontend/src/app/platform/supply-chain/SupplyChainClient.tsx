@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Search, Plus, AlertTriangle, CheckCircle, X, Send, Copy, ExternalLink, RefreshCw, Award, Upload } from "lucide-react";
+import { trackEvent } from "@/lib/posthog";
 
 interface Supplier {
   id: string;
@@ -76,8 +77,10 @@ export default function SupplyChainClient() {
         body: JSON.stringify({ supplier_id: supplier.id }),
       });
       const data = await res.json();
-      if (data.invite_url) setInviteUrl(data.invite_url);
-      else setInviteUrl("error:" + (data.error || "Failed"));
+      if (data.invite_url) {
+        setInviteUrl(data.invite_url);
+        trackEvent("supplier_invite_generated", { supplier_id: supplier.id, industry: supplier.industry });
+      } else setInviteUrl("error:" + (data.error || "Failed"));
     } catch {
       setInviteUrl("error:Network error");
     } finally {
