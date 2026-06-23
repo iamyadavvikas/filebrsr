@@ -1,7 +1,7 @@
 # FileBRSR
 
 ESG / BRSR compliance SaaS for Indian listed companies. Upload an annual report → AI extracts the
-~1,000 BRSR datapoints SEBI requires, scores compliance, generates the filing PDF/XBRL, and
+337 BRSR datapoints SEBI requires, scores compliance, generates the filing PDF/XBRL, and
 benchmarks against NIFTY 50 peers.
 
 Live: <https://www.filebrsr.com>
@@ -31,7 +31,7 @@ Live: <https://www.filebrsr.com>
 
 | User flow | Outcome |
 |---|---|
-| Upload a PDF annual report | AI pulls all ~1,000 BRSR datapoints (Sections A/B/C, principles P1–P9) |
+| Upload a PDF annual report | AI pulls all 337 BRSR datapoints (Sections A/B/C, principles P1–P9) |
 | Review / edit extracted data | Side-by-side editor with confidence scores and source page references |
 | Score compliance | Coverage %, gap analysis, mandatory vs. core vs. leadership splits |
 | Benchmark | Compare against NIFTY 50 sector benchmarks |
@@ -637,7 +637,7 @@ See full breakdown earlier in this session, summary here:
 | **BRSR** | Business Responsibility & Sustainability Report — SEBI-mandated ESG disclosure for top 1,000 listed Indian companies |
 | **Section A/B/C** | BRSR document structure: A = general, B = management & process, C = principle-wise (P1–P9) |
 | **P1–P9** | NGRBC principles (Ethics, Sustainability, Employees, Stakeholders, Human rights, Environment, Public policy, Inclusive growth, Customers) |
-| **Datapoint** | One disclosure field; ~1,000 across the BRSR form |
+| **Datapoint** | One disclosure field; 337 across the BRSR form |
 | **Core vs. Leadership** | Mandatory minimum (Core) vs. aspirational extra disclosures (Leadership) |
 | **XBRL** | eXtensible Business Reporting Language — structured filing format SEBI accepts |
 | **ESRS / GRI / TCFD** | Other ESG reporting frameworks we cross-map BRSR fields to |

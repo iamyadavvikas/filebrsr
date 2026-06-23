@@ -15,8 +15,17 @@ import {
   ShieldCheck,
   ExternalLink,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+// Free tier may preview up to this many Scope 3 categories on-screen; the rest
+// (all 15 categories + signed certificates) require Growth+ (enforced server-side
+// with a 402). Keep in sync with FREE_SCOPE3_PREVIEW_LIMIT in router_platform.py.
+const FREE_SCOPE3_PREVIEW_LIMIT = 3;
+const PAID_TIERS = ["growth", "scale", "enterprise", "professional"];
+const SCOPE3_UPGRADE_COPY =
+  "The Free plan includes a preview of up to 3 Scope 3 categories. Upgrade to Growth for all 15 categories with tamper-evident signed certificates.";
 
 // Emission Factor Organizations
 const EMISSION_FACTOR_ORGS = [
@@ -170,11 +179,34 @@ export default function CarbonClient() {
   const [certifying, setCertifying] = useState(false);
   const [certError, setCertError] = useState("");
   const [verifyId, setVerifyId] = useState<string | null>(null);
+  // Plan / Scope 3 entitlement gating
+  const [userPlan, setUserPlan] = useState<string>("free");
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const isPaid = PAID_TIERS.includes(userPlan);
 
   // Load saved data on mount
   useEffect(() => {
     loadSavedData();
   }, [financialYear]);
+
+  // Resolve the caller's plan once so we can show the upgrade wall before the
+  // backend 402 (and still fall back to catching the 402 gracefully).
+  useEffect(() => {
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return; // unauthenticated => free default
+        const res = await fetch("/backend/api/billing/subscription", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.plan) setUserPlan(data.plan);
+        }
+      } catch {}
+    })();
+  }, []);
 
   async function loadSavedData() {
     try {
@@ -268,6 +300,11 @@ export default function CarbonClient() {
         body: JSON.stringify({ kwh: totalMwh * 1000, jurisdiction: "IN" }),
       });
       if (!signRes.ok) {
+        if (signRes.status === 402) {
+          setShowUpgrade(true);
+          setCertifying(false);
+          return;
+        }
         const text = await signRes.text();
         setCertError(`Signing failed (${signRes.status}): ${text.slice(0, 200)}`);
         setCertifying(false);
@@ -324,6 +361,9 @@ export default function CarbonClient() {
       });
       if (res.ok) {
         setResults(await res.json());
+      } else if (res.status === 402) {
+        // Server-side Scope 3 entitlement gate — render the upgrade wall.
+        setShowUpgrade(true);
       } else {
         const text = await res.text();
         setCalcError(`Calculation failed (${res.status}): ${text.slice(0, 200)}`);
@@ -339,6 +379,10 @@ export default function CarbonClient() {
   }
 
   function addScope3Entry() {
+    if (!isPaid && scope3Entries.length >= FREE_SCOPE3_PREVIEW_LIMIT) {
+      setShowUpgrade(true);
+      return;
+    }
     setScope3Entries([...scope3Entries, { id: Date.now().toString(), type: "business_travel_air_domestic", quantity: 0 }]);
   }
 
@@ -609,6 +653,12 @@ export default function CarbonClient() {
             >
               <Plus className="w-4 h-4" /> Add source
             </button>
+            {!isPaid && (
+              <p className="flex items-center gap-1.5 text-xs text-gray-400">
+                <Lock className="w-3 h-3" /> Free plan previews up to {FREE_SCOPE3_PREVIEW_LIMIT} Scope 3 categories.{" "}
+                <a href="/pricing" className="text-emerald-600 hover:text-emerald-700 font-medium">Upgrade for all 15 + signed certificates.</a>
+              </p>
+            )}
           </div>
         </div>
 
@@ -761,6 +811,41 @@ export default function CarbonClient() {
           </div>
         )}
       </div>
+
+      {/* Scope 3 upgrade wall */}
+      {showUpgrade && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowUpgrade(false)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <Lock className="w-5 h-5 text-emerald-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Unlock full Scope 3</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-5">{SCOPE3_UPGRADE_COPY}</p>
+            <div className="flex gap-3">
+              <a
+                href="/pricing"
+                className="flex-1 text-center py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700"
+              >
+                View plans
+              </a>
+              <button
+                onClick={() => setShowUpgrade(false)}
+                className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

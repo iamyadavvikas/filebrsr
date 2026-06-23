@@ -67,12 +67,13 @@ async def test_scope1_and_scope3_provenance_demo_paths():
     assert r1.status_code == 200
     assert r1.json()["verified"] is True
 
-    # An unknown Scope 3 category must 400 (never substitute a factor).
+    # Scope 3 signing/persistence is a paid differentiator (Growth+). A demo /
+    # free caller is gated with 402 before any factor lookup runs.
     r3 = await _post(
         "/api/platform/carbon/scope3/provenance",
         {"category": "definitely_not_a_category", "quantity": 10},
     )
-    assert r3.status_code == 400
+    assert r3.status_code == 402
 
 
 # ─── authenticated path: persists + schedules ledger anchor ────────────────

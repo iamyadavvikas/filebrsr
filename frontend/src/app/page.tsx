@@ -41,7 +41,7 @@ const painPoints = {
     icon: "📋",
     color: "#7C3AED",
     pains: [
-      { problem: "140+ mandatory indicators to fill", detail: "98 Essential (mandatory) + 42 Leadership across 9 NGRBC Principles" },
+      { problem: "337 datapoints to fill", detail: "279 Essential + 58 Leadership across 9 NGRBC Principles" },
       { problem: "Data scattered across departments", detail: "HR has social data, ops has environmental, legal has governance" },
       { problem: "Manual compilation takes 4–8 weeks", detail: "Consultants charge ₹5–15L per company per year" },
       { problem: "Gap analysis is guesswork", detail: "\"Are we compliant?\" — no one knows until audit" },
@@ -62,35 +62,27 @@ const timeline = [
 const valueTable = [
   { pain: "How to assess 500 suppliers?", who: "Enterprise compliance", solution: "One-click invite → auto-scored questionnaire", value: "Months → minutes" },
   { pain: "I fill 10 different ESG forms", who: "Supplier / SME", solution: "Fill once → shareable badge", value: "One assessment, prove to all" },
-  { pain: "BRSR filing costs ₹15L", who: "Listed company", solution: "AI extracts all 140 BRSR indicators from PDF", value: "₹15L → ₹49,999/yr" },
+  { pain: "BRSR filing costs ₹15L", who: "Listed company", solution: "AI extracts all 337 BRSR datapoints from PDF", value: "₹15L → ₹49,999/yr" },
   { pain: "We reduce emissions but can't monetize", who: "Net Zero teams", solution: "Carbon calculator + tracking (CCTS marketplace 2027)", value: "Visibility now, revenue later" },
   { pain: "Are we compliant?", who: "Board / CFO", solution: "Instant gap analysis + scoring", value: "Real-time visibility" },
   { pain: "Show your process to auditors", who: "Assurance team", solution: "Structured audit trail", value: "Audit-ready from day 1" },
 ];
 
 const platformFeatures = [
-  { title: "Supply Chain ESG Ratings", desc: "Rate and monitor sustainability across your entire supplier base. Auto-scoring aligned to SEBI BRSR.", color: "#059669" },
-  { title: "AI-Powered BRSR Filing", desc: "Upload any sustainability report — AI extracts all 140 BRSR indicators (98 Essential + 42 Leadership) across 9 NGRBC Principles in 60 seconds.", color: "#E8B931" },
-  { title: "Carbon Calculator & Tracking", desc: "Scope 1/2/3 emissions from BRSR data with India-specific factors. Year-over-year reduction tracking. Carbon market integration coming 2027.", color: "#0891B2" },
-  { title: "Verifiable Carbon Certificates", desc: "Sign any emissions result with a tamper-evident Ed25519 certificate. Anyone can independently verify it — no login needed. MRV-ready for assurance and the carbon market.", color: "#0D9488" },
-  { title: "ESG Badges & Scorecards", desc: "Industry-wide percentile rankings. Platinum/Gold/Silver/Bronze medals. Public badges suppliers showcase to win business.", color: "#7C3AED" },
-  { title: "Supplier Self-Assessment", desc: "Invite suppliers to complete BRSR-aligned ESG questionnaires. No signup needed. Auto-scored with instant results.", color: "#2563EB" },
-  { title: "Multi-Framework Compliance", desc: "One assessment maps to BRSR, GRI, CDP, TCFD, SASB, UN SDGs & ESRS. Single platform for all frameworks.", color: "#DC2626" },
-  { title: "XBRL Filing Generation", desc: "Auto-generate XBRL-formatted filings ready for BSE/NSE submission. Validated output, zero manual tagging.", color: "#4F46E5" },
-  { title: "Workflow Approvals", desc: "Maker-checker workflows for data entry, report approval, and corrective action plans. Full audit trail.", color: "#0D9488" },
-  { title: "Developer API & Integrations", desc: "Self-serve API keys to pull scores, emissions and filings into your own systems. Foundation for SAP/ERP and data-warehouse integrations.", color: "#1D4ED8" },
-  { title: "Regulatory Tracker", desc: "Track compliance with PAT scheme, EPR, POSH, LODR, Companies Act 135, and environmental clearances.", color: "#B45309" },
+  { title: "Value-Chain ESG Ratings", desc: "Invite your suppliers, auto-score them against SEBI BRSR, and answer Section A.V value-chain disclosure with evidence — not estimates.", color: "#059669" },
+  { title: "AI-Powered BRSR Filing", desc: "Upload any sustainability report — AI extracts all 337 BRSR datapoints (279 Essential + 58 Leadership) across 9 NGRBC Principles in minutes, then generates XBRL for BSE/NSE.", color: "#E8B931" },
+  { title: "Carbon & Verifiable Certificates", desc: "Scope 1 & 2 free with India-specific factors; full Scope 3 on paid plans, each signed with a tamper-evident certificate anyone can verify — MRV-ready for the 2027 carbon market.", color: "#0891B2" },
 ];
 
 const faqs = [
   { q: "What is FileBRSR?", a: "FileBRSR is India's Supply Chain ESG + BRSR Automation + Carbon platform. We help listed companies assess suppliers, automate BRSR filing, track emissions, and prepare for India's carbon credit market — all in one connected system." },
   { q: "Who needs this?", a: "SEBI requires the top 1,000 listed companies to file BRSR, and is phasing in value-chain ESG disclosure (BRSR Section A.V) — currently on an assess-or-explain basis, expanding over time. Value-chain partners are those cumulatively making up ~75% of purchases/sales by value, so this still pulls in 50,000+ suppliers. FileBRSR serves both sides — enterprises assessing suppliers, and SMEs proving compliance." },
-  { q: "How is this different from consultants?", a: "Consultants charge ₹5–15L/year, take months, use Excel, and provide no standardized scoring. FileBRSR automates the entire process — assessment, scoring, gap analysis, and filing — starting free for 5 suppliers." },
+  { q: "How is this different from consultants?", a: "Consultants charge ₹5–15L/year, take months, use Excel, and provide no standardized scoring. FileBRSR automates assessment, scoring, gap analysis and filing — starting free for 5 suppliers. For BRSR Core Reasonable Assurance, our sales-led Assurance-Ready plan adds hands-on support and evidence packs rather than leaving you to do it alone." },
   { q: "How do supplier assessments work?", a: "Enterprise users add suppliers and send invite links. Suppliers complete a 20-question ESG questionnaire (no signup needed). Scores are auto-calculated across Environment (40%), Social (35%) & Governance (25%). First 5 suppliers free, unlimited on paid plans." },
-  { q: "What are FileBRSR badges?", a: "Based on assessment scores and industry percentile ranking, suppliers earn Platinum (top 1%), Gold (top 5%), Silver (top 15%), or Bronze (top 35%) badges. These are publicly shareable to attract new business." },
-  { q: "How does the carbon market work?", a: "Today, FileBRSR calculates Scope 1 & 2 emissions free, and full Scope 3 on paid plans. When India's CCTS goes live in 2027, verified reductions from your supply chain become tradeable carbon credits on our marketplace." },
-  { q: "Does it support BRSR filing?", a: "Yes. Upload any sustainability PDF and AI extracts all 140 BRSR indicators (Essential + Leadership) in 60 seconds. Includes gap analysis, scoring, XBRL generation, and multi-framework mapping (GRI, CDP, TCFD, SASB)." },
-  { q: "What's the pricing model?", a: "Free tier includes 5 supplier assessments + Scope 1&2 carbon + 3 AI extractions. Growth plan at ₹49,999/year adds unlimited extractions, 25 suppliers, full Scope 3. Scale at ₹1,99,999/year unlocks unlimited suppliers, XBRL filing, and audit trail." },
+  { q: "What are FileBRSR badges?", a: "Based on their ESG assessment score, suppliers earn Platinum (85+), Gold (70+), Silver (55+), or Bronze (40+) badges. These are publicly shareable to attract new business." },
+  { q: "How does the carbon market work?", a: "Today, FileBRSR calculates Scope 1 & 2 emissions free, plus a preview of up to 3 Scope 3 categories, all with India-specific factors. Paid plans unlock full Scope 3 (all 15 categories) with tamper-evident signed certificates. When India's CCTS goes live in 2027, verified reductions from your supply chain become tradeable carbon credits on our marketplace." },
+  { q: "Does it support BRSR filing?", a: "Yes. Upload any sustainability PDF and AI extracts all 337 BRSR datapoints (Essential + Leadership) in minutes. Includes gap analysis, scoring, XBRL generation, and multi-framework mapping (GRI, CDP, TCFD, SASB)." },
+  { q: "What's the pricing model?", a: "Free tier includes 5 supplier assessments, the Scope 1 & 2 carbon calculator with a 3-category Scope 3 preview, and 3 AI extractions. Growth at ₹49,999/year is the self-serve plan for listed companies — unlimited extractions, 25 suppliers, and full Scope 3 with signed certificates. For top-250 companies facing BRSR Core Reasonable Assurance, the sales-led Assurance-Ready plan (from ₹2,00,000/year) adds unlimited suppliers, XBRL filing, audit trail, evidence packs and a dedicated ESG analyst — a fraction of a ₹5–15L consultant assurance engagement." },
 ];
 
 /* ═══════════════════════════════════════════════════════════════
@@ -279,39 +271,39 @@ export default function HomePage() {
                 style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", background: "rgba(255,255,255,0.7)", color: "#059669", padding: "8px 18px", borderRadius: 24, border: "1px solid rgba(16,185,129,0.25)", boxShadow: "0 4px 16px rgba(16,185,129,0.08)", animationDelay: "0ms", animationFillMode: "both" }}
               >
                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", display: "inline-block", animation: "pulse 2s infinite" }} />
-                Supply Chain ESG · BRSR Automation · Carbon Market
+                Built for SEBI&apos;s BRSR value-chain disclosure
               </div>
 
               <h1 className="fade-up" style={{ color: "#0F172A", fontSize: "clamp(36px, 5vw, 62px)", fontWeight: 800, lineHeight: 1.07, marginBottom: 24, letterSpacing: -2, animationDelay: "80ms", animationFillMode: "both" }}>
-                Rate your entire supply chain<br />for ESG risk.{" "}
+                Answer SEBI&apos;s value-chain ESG question{" "}
                 <span className="gradient-text" style={{ backgroundImage: "linear-gradient(110deg, #10B981 0%, #06B6D4 45%, #6366F1 100%)" }}>
-                  Auto-file BRSR. Track carbon.
+                  in days, not months.
                 </span>
               </h1>
 
               <p className="fade-up" style={{ fontSize: 18, fontWeight: 400, color: "#475569", maxWidth: 720, lineHeight: 1.75, margin: "0 auto 40px", animationDelay: "160ms", animationFillMode: "both" }}>
-                The only platform where listed companies assess 100K+ suppliers, automate BRSR filing in 60 seconds,
-                and prepare for India&apos;s $35B carbon credit market — all in one place.
+                The platform where listed companies assess their value-chain suppliers for ESG risk
+                and automate BRSR filing in minutes — built for SEBI&apos;s value-chain disclosure.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 justify-center fade-up" style={{ animationDelay: "240ms", animationFillMode: "both" }}>
+              <div className="flex flex-col sm:flex-row items-center gap-4 justify-center fade-up" style={{ animationDelay: "240ms", animationFillMode: "both" }}>
                 <Link
-                  href="/platform/supply-chain"
+                  href="/demo"
                   className="btn-accent group relative overflow-hidden"
                   style={{ fontSize: 15, fontWeight: 700, padding: "16px 36px", borderRadius: 14, background: "linear-gradient(120deg, #10B981, #06B6D4)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 10px 30px rgba(16,185,129,0.32)" }}
                 >
                   <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)" }} />
                   <span className="relative inline-flex items-center gap-2">
-                    Assess Your Suppliers Free
+                    See AI extraction in action — no login
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                   </span>
                 </Link>
                 <Link
                   href="/platform"
-                  className="card-hover"
-                  style={{ fontSize: 15, fontWeight: 600, padding: "16px 36px", borderRadius: 14, background: "#fff", border: "1px solid #E2E8F0", color: "#0F172A", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 4px 14px rgba(15,23,42,0.05)" }}
+                  className="inline-flex items-center gap-1.5"
+                  style={{ fontSize: 15, fontWeight: 600, color: "#475569" }}
                 >
-                  Try BRSR Platform Free
+                  Explore the platform
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </Link>
               </div>
@@ -329,9 +321,9 @@ export default function HomePage() {
                 {[
                   { prefix: "", target: 1000, suffix: "+", comma: true, label: "Listed companies mandated", color: "#10B981" },
                   { prefix: "", target: 100, suffix: "K+", comma: false, label: "Suppliers need assessment", color: "#06B6D4" },
-                  { prefix: "", target: 140, suffix: "+", comma: false, label: "BRSR indicators mapped", color: "#6366F1" },
-                  { prefix: "", target: 60, suffix: "s", comma: false, label: "AI extraction time", color: "#8B5CF6" },
-                  { prefix: "$", target: 35, suffix: "B", comma: false, label: "India carbon market by 2030", color: "#F59E0B" },
+                  { prefix: "", target: 337, suffix: "", comma: false, label: "BRSR datapoints mapped", color: "#6366F1" },
+                  { prefix: "~", target: 1, suffix: " min", comma: false, label: "AI extraction time", color: "#8B5CF6" },
+                  { prefix: "Top ", target: 250, suffix: "", comma: false, label: "Face Reasonable Assurance FY2026-27", color: "#F59E0B" },
                 ].map((stat, i) => (
                   <CountUpStat
                     key={stat.label}
@@ -362,7 +354,7 @@ export default function HomePage() {
                         <span className="w-3 h-3 rounded-full" style={{ background: "#FBBF24" }} />
                         <span className="w-3 h-3 rounded-full" style={{ background: "#34D399" }} />
                         <span className="ml-3 text-xs font-medium" style={{ color: "#94A3B8" }}>Supplier ESG Dashboard</span>
-                        <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>Live</span>
+                        <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(100,116,139,0.12)", color: "#64748B" }}>Sample data</span>
                       </div>
 
                       <div className="p-5 md:p-6">
@@ -383,10 +375,10 @@ export default function HomePage() {
                         {/* supplier rows */}
                         <div className="space-y-2.5">
                           {[
-                            { name: "Tata Steel Ltd", score: 86, grade: "A", c: "#10B981" },
-                            { name: "Reliance Polymers", score: 72, grade: "B", c: "#06B6D4" },
-                            { name: "Adani Logistics", score: 54, grade: "C", c: "#F59E0B" },
-                            { name: "Vendor #4821", score: 31, grade: "D", c: "#F43F5E" },
+                            { name: "Supplier — Steel · A", score: 86, grade: "A", c: "#10B981" },
+                            { name: "Supplier — Polymers · B", score: 72, grade: "B", c: "#06B6D4" },
+                            { name: "Supplier — Logistics · C", score: 54, grade: "C", c: "#F59E0B" },
+                            { name: "Vendor #4821 · D", score: 31, grade: "D", c: "#F43F5E" },
                           ].map((row, i) => (
                             <div key={row.name} className="flex items-center gap-3">
                               <p className="text-sm font-medium w-40 truncate" style={{ color: "#334155" }}>{row.name}</p>
@@ -472,11 +464,15 @@ export default function HomePage() {
           <div className="max-w-5xl mx-auto">
             <Reveal className="text-center mb-10">
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "var(--primary-light)", marginBottom: 10 }}>
-                THE PAIN — THREE LAYERS
+                THE PAIN — STARTING WITH YOURS
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 16 }}>
-                Three stakeholders. Three pain points.
+                The compliance head&apos;s problem first — then everyone they depend on.
               </h2>
+              <p className="text-muted mx-auto" style={{ fontSize: 15, maxWidth: 620, lineHeight: 1.7 }}>
+                If you own BRSR at a top-250 listed company, the value-chain question lands on your desk.
+                Your suppliers and filing teams feel it too — but you answer to SEBI first.
+              </p>
             </Reveal>
 
             {/* Tab toggle */}
@@ -608,11 +604,11 @@ export default function HomePage() {
                 FULL PLATFORM
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 14 }}>
-                Everything you need. One connected system.
+                Three pillars. One connected system.
               </h2>
             </Reveal>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {platformFeatures.map((p, i) => (
                 <Reveal key={p.title} delay={(i % 3) * 80}>
                   <div
@@ -626,6 +622,67 @@ export default function HomePage() {
                 </Reveal>
               ))}
             </div>
+
+            <Reveal delay={240} className="text-center mt-10">
+              <Link
+                href="/platform"
+                className="inline-flex items-center gap-1.5"
+                style={{ fontSize: 14, fontWeight: 600, color: "var(--primary-light)" }}
+              >
+                See all platform capabilities
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </Link>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ═══ MOAT: FILL ONCE, PROVE TO EVERY BUYER ═══ */}
+        <section className="relative overflow-hidden" style={{ padding: "80px 28px", background: "linear-gradient(135deg, #0F172A 0%, #0B3B2E 100%)" }}>
+          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+          <div className="relative max-w-5xl mx-auto">
+            <Reveal className="text-center mb-12">
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#34D399", marginBottom: 10 }}>
+                WHY FILEBRSR WINS
+              </p>
+              <h2 style={{ fontSize: "clamp(26px, 3.5vw, 38px)", fontWeight: 800, letterSpacing: -0.8, marginBottom: 14, color: "#fff" }}>
+                Fill once, prove to every buyer.
+              </h2>
+              <p style={{ fontSize: 15, color: "#CBD5E1", maxWidth: 680, margin: "0 auto", lineHeight: 1.75 }}>
+                When a listed company invites a supplier, that supplier completes their ESG and emissions
+                profile <strong style={{ color: "#fff" }}>once</strong> — and reuses the same scored profile for
+                every other buyer that asks. Each invite pulls another company onto the shared network, so the
+                data compounds with every assessment.
+              </p>
+            </Reveal>
+
+            <Reveal delay={120} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 text-left">
+              <div className="rounded-xl p-6" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#34D399" }}>FILL ONCE, REUSE EVERYWHERE</p>
+                <p className="text-sm" style={{ color: "#E2E8F0", lineHeight: 1.7 }}>A supplier accepts a buyer&apos;s invite, completes one ESG assessment, and shares the same verified scorecard and badge with every buyer that requests it — no re-filling Excel for each.</p>
+              </div>
+              <div className="rounded-xl p-6" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#34D399" }}>BENCHMARKED AGAINST PEERS</p>
+                <p className="text-sm" style={{ color: "#E2E8F0", lineHeight: 1.7 }}>Every completed assessment feeds sector benchmarks. Buyers see where a supplier ranks against its peers, and suppliers see how they compare — an advantage that grows as the dataset accumulates.</p>
+              </div>
+              <div className="rounded-xl p-6" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#34D399" }}>PROOF LAYER UNDERNEATH</p>
+                <p className="text-sm" style={{ color: "#E2E8F0", lineHeight: 1.7 }}>Beneath the network, every published figure is signed at source and independently checkable at /verify — so a reused number is also a <em>verifiable</em> one, with no account needed.</p>
+              </div>
+            </Reveal>
+
+            <div className="text-center">
+              <Link
+                href="/verify"
+                className="btn-accent group relative overflow-hidden"
+                style={{ fontSize: 15, fontWeight: 700, padding: "16px 32px", borderRadius: 14, background: "linear-gradient(120deg, #10B981, #06B6D4)", color: "#fff", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 10px 30px rgba(16,185,129,0.32)" }}
+              >
+                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)" }} />
+                <span className="relative inline-flex items-center gap-2">
+                  See the proof layer — verify a disclosure
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </span>
+              </Link>
+            </div>
           </div>
         </section>
 
@@ -637,9 +694,9 @@ export default function HomePage() {
                 PRICING
               </p>
               <h2 style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, letterSpacing: -0.5, marginBottom: 14 }}>
-                Replace ₹15L consultants with one platform
+                Start free. Go assurance-ready when SEBI requires it.
               </h2>
-              <p className="text-muted" style={{ fontSize: 15, maxWidth: 640, margin: "0 auto" }}>Indian companies pay ₹5–15 lakhs to consultants who take 4–8 weeks with Excel sheets. FileBRSR automates everything — supply chain ESG, BRSR filing, carbon tracking — starting free.</p>
+              <p className="text-muted" style={{ fontSize: 15, maxWidth: 660, margin: "0 auto" }}>Free and Growth are the self-serve on-ramp — map your datapoints and assess suppliers in minutes. When you face BRSR Core Reasonable Assurance, the sales-led Assurance-Ready plan adds hands-on support, for a fraction of a ₹5–15L consultant engagement.</p>
             </Reveal>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -649,12 +706,13 @@ export default function HomePage() {
                 <p className="text-sm text-muted mb-6">For suppliers & SMEs</p>
                 <ul className="space-y-2.5 text-sm text-gray-600">
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 5 supplier assessments</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Carbon Scope 1 & 2</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Carbon Scope 1 &amp; 2 + 3-category Scope 3 preview</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> ESG scorecard & badge</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 3 AI extractions (one-time)</li>
                 </ul>
               </div>
-              <div className="bg-card rounded-2xl border border-border p-7 card-hover">
+              <div className="bg-card rounded-2xl border-2 border-emerald-300 p-7 relative shadow-lg card-hover">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full">MOST POPULAR</div>
                 <p className="text-xs font-bold text-sky-600 uppercase tracking-wider mb-2">GROWTH</p>
                 <h3 className="text-3xl font-bold mb-1">₹49,999<span className="text-base font-normal text-muted">/yr</span></h3>
                 <p className="text-sm text-muted mb-6">For listed companies</p>
@@ -666,18 +724,16 @@ export default function HomePage() {
                   <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Multi-framework mapping</li>
                 </ul>
               </div>
-              <div className="bg-card rounded-2xl border-2 border-emerald-300 p-7 relative shadow-lg card-hover">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full">MOST POPULAR</div>
-                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">SCALE</p>
-                <h3 className="text-3xl font-bold mb-1">₹1,99,999<span className="text-base font-normal text-muted">/yr</span></h3>
-                <p className="text-sm text-muted mb-6">For large enterprises</p>
+              <div className="bg-card rounded-2xl border border-border p-7 card-hover">
+                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">ASSURANCE-READY</p>
+                <h3 className="text-3xl font-bold mb-1">From ₹2,00,000<span className="text-base font-normal text-muted">/yr</span></h3>
+                <p className="text-sm text-muted mb-6">Sales-led, for top-250 assurance</p>
                 <ul className="space-y-2.5 text-sm text-gray-600">
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Unlimited suppliers</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> XBRL filing generation</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Audit trail & compliance</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> NIFTY 50 benchmarks</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> 5 team members</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> PDF + XBRL-JSON export</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Everything in Growth</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Unlimited suppliers + XBRL filing</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Reasonable-assurance evidence packs</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Audit trail & compliance log</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span> Dedicated ESG analyst & onboarding</li>
                 </ul>
               </div>
               <div className="bg-card rounded-2xl border border-border p-7 card-hover">
@@ -705,65 +761,34 @@ export default function HomePage() {
 
 
 
-        {/* ═══ CARBON CREDIT MARKETPLACE ═══ */}
-        <section className="relative overflow-hidden" style={{ padding: "80px 28px", background: "linear-gradient(135deg, #ECFEFF 0%, #EFF6FF 50%, #F5F3FF 100%)" }}>
-          <div className="blob-wrap" style={{ top: "-120px", left: "-80px" }}>
-            <div className="blob" style={{ width: 360, height: 360, background: "radial-gradient(circle at 30% 30%, #22D3EE, #06B6D4)" }} />
-          </div>
-          <div className="blob-wrap" style={{ bottom: "-100px", right: "-90px" }}>
-            <div className="blob" style={{ width: 300, height: 300, background: "radial-gradient(circle at 30% 30%, #818CF8, #6366F1)", animationDelay: "-6s" }} />
-          </div>
-          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(15,23,42,0.04) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
-          <div className="relative max-w-4xl mx-auto text-center">
+        {/* ═══ WHERE WE'RE HEADED: CARBON MARKET TEASER ═══ */}
+        <section style={{ padding: "64px 28px" }}>
+          <div className="max-w-3xl mx-auto">
             <Reveal>
-              <div className="inline-flex items-center gap-2 mb-6 backdrop-blur-sm" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", background: "rgba(255,255,255,0.7)", color: "#0891B2", padding: "8px 18px", borderRadius: 24, border: "1px solid rgba(8,145,178,0.25)", boxShadow: "0 4px 16px rgba(8,145,178,0.08)" }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#06B6D4", display: "inline-block", animation: "pulse 2s infinite" }} />
-                COMING 2027
-              </div>
-
-              <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 800, color: "#0F172A", letterSpacing: -1, marginBottom: 20, lineHeight: 1.15 }}>
-                India&apos;s Carbon Credit<br />
-                <span className="gradient-text" style={{ backgroundImage: "linear-gradient(110deg, #06B6D4 0%, #0EA5E9 45%, #6366F1 100%)" }}>
-                  Marketplace
-                </span>
-              </h2>
-
-              <p style={{ fontSize: 16, color: "#475569", maxWidth: 600, margin: "0 auto 32px", lineHeight: 1.75 }}>
-                When India&apos;s Carbon Credit Trading Scheme (CCTS) goes live, FileBRSR becomes the transaction layer.
-                Your supply chain emission data becomes carbon credits. Your reductions become revenue.
-              </p>
-            </Reveal>
-
-            <Reveal delay={120} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 text-left">
-              <div className="rounded-xl p-5 card-hover" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(226,232,240,0.9)", boxShadow: "0 4px 14px rgba(15,23,42,0.04)" }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#0891B2" }}>TRACK</p>
-                <p className="text-sm font-medium" style={{ color: "#334155" }}>Scope 1, 2 & 3 emissions calculated from your BRSR data with India-specific factors (CEA, BEE, IPCC)</p>
-              </div>
-              <div className="rounded-xl p-5 card-hover" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(226,232,240,0.9)", boxShadow: "0 4px 14px rgba(15,23,42,0.04)" }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#0891B2" }}>VERIFY</p>
-                <p className="text-sm font-medium" style={{ color: "#334155" }}>Reductions cryptographically verified — auditor-checkable MRV. Signed, append-only, offline-provable. No manual audits.</p>
-                <span className="inline-flex items-center gap-1.5 mt-3" style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "#6366F1", background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)", padding: "4px 10px", borderRadius: 20 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#6366F1", display: "inline-block" }} />
-                  Powered by CarbonTrace
-                </span>
-              </div>
-              <div className="rounded-xl p-5 card-hover" style={{ background: "rgba(255,255,255,0.85)", border: "1px solid rgba(226,232,240,0.9)", boxShadow: "0 4px 14px rgba(15,23,42,0.04)" }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#0891B2" }}>TRADE</p>
-                <p className="text-sm font-medium" style={{ color: "#334155" }}>Generate carbon credits from verified supply chain reductions. Buy/sell on India&apos;s CCTS marketplace.</p>
+              <div className="relative overflow-hidden rounded-2xl text-center" style={{ background: "linear-gradient(135deg, #ECFEFF 0%, #EFF6FF 50%, #F5F3FF 100%)", border: "1px solid rgba(8,145,178,0.18)", padding: "40px 32px" }}>
+                <div className="inline-flex items-center gap-2 mb-5" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", background: "rgba(255,255,255,0.8)", color: "#0891B2", padding: "6px 14px", borderRadius: 24, border: "1px solid rgba(8,145,178,0.25)" }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#06B6D4", display: "inline-block", animation: "pulse 2s infinite" }} />
+                  WHERE WE&apos;RE HEADED · 2027
+                </div>
+                <h2 style={{ fontSize: "clamp(22px, 3vw, 30px)", fontWeight: 800, color: "#0F172A", letterSpacing: -0.6, marginBottom: 12, lineHeight: 1.2 }}>
+                  Today&apos;s verified carbon data becomes tomorrow&apos;s credits
+                </h2>
+                <p style={{ fontSize: 15, color: "#475569", maxWidth: 560, margin: "0 auto 24px", lineHeight: 1.7 }}>
+                  You&apos;re already tracking emissions with India-specific factors &mdash; and on paid
+                  plans, each result carries a signed, verifiable certificate. When India&apos;s Carbon
+                  Credit Trading Scheme (CCTS) goes live, those verified reductions become tradeable
+                  credits &mdash; and FileBRSR is built to be the transaction layer.
+                </p>
+                <Link
+                  href="/platform/carbon"
+                  className="inline-flex items-center gap-1.5"
+                  style={{ fontSize: 14, fontWeight: 600, color: "#0891B2" }}
+                >
+                  Start tracking carbon free
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </Link>
               </div>
             </Reveal>
-
-            <div className="inline-flex flex-col sm:flex-row items-center gap-4">
-              <Link
-                href="/platform/carbon"
-                className="btn-accent group relative overflow-hidden"
-                style={{ fontSize: 15, fontWeight: 700, padding: "16px 32px", borderRadius: 14, background: "linear-gradient(120deg, #06B6D4, #6366F1)", color: "#fff", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 10px 30px rgba(6,182,212,0.32)" }}
-              >
-                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out" style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)" }} />
-                <span className="relative">Start Tracking Carbon Now (Free)</span>
-              </Link>
-              <p className="text-xs" style={{ color: "#64748B" }}>$35B market opportunity by 2030</p>
-            </div>
           </div>
         </section>
 

@@ -21,7 +21,11 @@ import {
   Terminal,
 } from "lucide-react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Same-origin proxy: next.config.ts rewrites /backend/:path* -> ${BACKEND_URL}/:path*
+// (server-side, forwards the Authorization header). This is the convention the rest of
+// the app uses; a bare NEXT_PUBLIC_API_URL is undefined in prod and fell back to
+// http://localhost:8000, which the visitor's browser can't reach ("API offline").
+const API_BASE = "/backend";
 
 const STAGE_ORDER = ["ore", "concentrate", "smelter", "battery"] as const;
 const STAGE_META: Record<
