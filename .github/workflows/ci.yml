@@ -159,7 +159,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.prod.yml,nginx/nginx.conf,scripts/deploy.sh,scripts/rollback.sh,observability/prometheus/prometheus.prod.yml,observability/grafana/provisioning,observability/grafana/dashboards"
+          source: "docker-compose.prod.yml,nginx/nginx.conf,scripts/deploy.sh,scripts/rollback.sh,scripts/fetch-secrets.sh,observability/prometheus/prometheus.prod.yml,observability/grafana/provisioning,observability/grafana/dashboards"
           target: "/home/ec2-user/filebrsr/"
           strip_components: 0
           overwrite: true

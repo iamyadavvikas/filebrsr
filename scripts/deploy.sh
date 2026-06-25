@@ -29,13 +29,16 @@ echo "→ Pulling images"
 export TAG ECR_REGISTRY
 docker compose -f docker-compose.prod.yml pull frontend backend worker
 
-# 3. Persist TAG to .env so `docker compose` resolves variables on next restart
-#    (compose reads ./.env automatically)
-grep -v '^TAG=' .env 2>/dev/null > .env.tmp || true
+# 3. Fetch secrets from AWS Secrets Manager onto .env
+echo "→ Fetching secrets"
+AWS_REGION="${AWS_REGION:-ap-south-1}"
+"$(dirname "$0")/fetch-secrets.sh" > .env.tmp 2>/dev/null
+grep -v '^TAG=' .env 2>/dev/null >> .env.tmp || true
 grep -v '^ECR_REGISTRY=' .env.tmp > .env.tmp2 || true
 mv .env.tmp2 .env.tmp
 echo "TAG=$TAG"                   >> .env.tmp
 echo "ECR_REGISTRY=$ECR_REGISTRY" >> .env.tmp
+echo "AWS_REGION=$AWS_REGION"     >> .env.tmp
 mv .env.tmp .env
 
 # 4. Recreate containers (zero-downtime for nginx: it only restarts if config changed)
