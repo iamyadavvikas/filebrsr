@@ -68,7 +68,7 @@ const plans = [
       "25 supplier assessments",
       "Unlimited AI BRSR extractions",
       "Full Scope 3 carbon + signed certificates",
-      "Multi-framework mapping (GRI, CDP, TCFD, SASB)",
+      "Multi-framework mapping (GRI, CDP, TCFD, SASB, ESRS, ISSB)",
       "NIFTY 50 sector benchmarks",
       "PDF + XBRL-JSON export",
       "5 users",

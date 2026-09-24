@@ -70,7 +70,7 @@ const products = [
       "Data entry with SEBI template alignment",
       "Gap analysis & section-wise scoring",
       "XBRL filing generation for BSE/NSE",
-      "Multi-framework mapping (GRI, CDP, TCFD, SASB)",
+      "Multi-framework mapping (GRI, CDP, TCFD, SASB, ESRS, ISSB)",
       "Board-ready ESG dashboards",
     ],
     cta: "Try BRSR Platform",

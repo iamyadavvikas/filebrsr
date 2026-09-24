@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Shield, Clock, User, Filter, ChevronDown, ChevronRight, History, Lock, Search } from "lucide-react";
+import { getAccessToken } from "@/lib/supabase/token";
 
 interface AuditEntry {
   id: string;
@@ -70,12 +71,14 @@ export default function AuditClient({ userId }: { userId: string }) {
       if (filters.financial_year) params.set("financial_year", filters.financial_year);
       params.set("limit", "100");
 
+      const token = (await getAccessToken()) || userId;
+
       const [trailRes, summaryRes] = await Promise.all([
         fetch(`/backend/api/platform/audit/trail?${params}`, {
-          headers: { Authorization: `Bearer ${userId}` },
+          headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(`/backend/api/platform/audit/summary?financial_year=${filters.financial_year || ""}`, {
-          headers: { Authorization: `Bearer ${userId}` },
+          headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
 

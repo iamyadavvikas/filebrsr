@@ -11,6 +11,7 @@ import json
 import uuid
 import logging
 
+from app.auth import get_user_id_from_header as get_user_id
 from app.config import get_settings
 
 router = APIRouter(prefix="/api/platform", tags=["Advanced Platform"])
@@ -32,41 +33,6 @@ PLAN_SUPPLIER_LIMITS = {
 def get_supabase_admin():
     from supabase import create_client
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-
-
-async def get_user_id(authorization: str) -> str:
-    """Extract and verify user_id from Supabase JWT."""
-    token = authorization.replace("Bearer ", "")
-    if not token:
-        raise HTTPException(status_code=401, detail="Missing auth token")
-
-    import jwt as pyjwt
-
-    # If JWT secret is configured, verify the signature
-    jwt_secret = settings.SUPABASE_JWT_SECRET
-    if jwt_secret:
-        try:
-            payload = pyjwt.decode(
-                token,
-                jwt_secret,
-                algorithms=["HS256"],
-                audience="authenticated",
-            )
-            user_id = payload.get("sub")
-            if not user_id:
-                raise HTTPException(status_code=401, detail="Invalid token: no sub claim")
-            return user_id
-        except pyjwt.ExpiredSignatureError:
-            raise HTTPException(status_code=401, detail="Token expired")
-        except pyjwt.InvalidTokenError as e:
-            raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
-    else:
-        # Fallback: decode without verification (dev only)
-        try:
-            payload = pyjwt.decode(token, options={"verify_signature": False})
-            return payload.get("sub", token)
-        except Exception:
-            return token
 
 
 async def get_user_plan(user_id: str) -> str:

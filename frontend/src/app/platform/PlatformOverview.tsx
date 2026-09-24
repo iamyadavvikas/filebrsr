@@ -21,6 +21,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getAccessToken } from "@/lib/supabase/token";
 import UpgradeNudge from "./UpgradeNudge";
 import OnboardingWizard from "./OnboardingWizard";
 
@@ -159,7 +160,7 @@ export default function PlatformOverview({
       for (const id of selected) {
         await fetch(`/backend/api/platform/reports/${id}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${userId}` },
+          headers: { Authorization: `Bearer ${(await getAccessToken()) || userId}` },
         });
       }
       setReports((prev) => prev.filter((r) => !selected.has(r.id)));
