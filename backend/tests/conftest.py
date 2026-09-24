@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 # Set test env vars before importing app
 os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "test-service-key")
+os.environ.setdefault("SUPABASE_ANON_KEY", "")
 os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:3000")
 
 

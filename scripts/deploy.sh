@@ -109,6 +109,9 @@ docker compose -f docker-compose.prod.yml start certbot >/dev/null 2>&1 || true
 docker compose -f docker-compose.prod.yml exec nginx nginx -s reload || true
 
 # 7. Record the new live tag and prune old images
+if [[ -n "$PREV_TAG" ]]; then
+  echo "$PREV_TAG" > .previous_tag
+fi
 echo "$TAG" > .current_tag
 docker image prune -af --filter "until=168h" >/dev/null 2>&1 || true
 

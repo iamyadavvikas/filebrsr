@@ -25,6 +25,7 @@ from reportlab.platypus import (
 )
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
+from app.auth import get_user_id_from_header as get_user_id
 from app.config import get_settings
 from app.brsr_datapoints import BRSR_DATAPOINTS
 
@@ -40,23 +41,6 @@ MUTED = colors.HexColor("#6B7280")
 def get_supabase_admin():
     from supabase import create_client
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-
-
-async def get_user_id(authorization: str) -> str:
-    token = authorization.replace("Bearer ", "")
-    if not token:
-        raise HTTPException(status_code=401, detail="Missing auth token")
-    import jwt as pyjwt
-    jwt_secret = settings.SUPABASE_JWT_SECRET
-    if jwt_secret:
-        try:
-            payload = pyjwt.decode(token, jwt_secret, algorithms=["HS256"], audience="authenticated")
-            return payload.get("sub", "")
-        except pyjwt.InvalidTokenError:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    else:
-        payload = pyjwt.decode(token, options={"verify_signature": False})
-        return payload.get("sub", token)
 
 
 # Section structure for SEBI format

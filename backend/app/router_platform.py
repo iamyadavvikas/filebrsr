@@ -26,6 +26,7 @@ from app.carbon_calculator import (
     calculate_scope3_emissions,
     get_pat_compliance,
 )
+from app.auth import resolve_user_id
 from app.config import get_settings
 
 router = APIRouter(prefix="/api/platform", tags=["Platform"])
@@ -40,15 +41,8 @@ def get_supabase_admin():
 
 async def verify_auth(authorization: str = Header(...)) -> str:
     """Verify JWT and return user_id."""
-    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
-    if authorization == expected_token:
-        return "service_role"  # Internal service calls
-    # For user JWTs, decode with Supabase
-    # In production, verify JWT signature
-    token = authorization.replace("Bearer ", "")
-    if not token:
-        raise HTTPException(status_code=401, detail="Missing auth token")
-    return token  # Simplified; in prod, decode JWT to get user_id
+    token = authorization.replace("Bearer ", "") if authorization else ""
+    return resolve_user_id(token)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -524,13 +518,10 @@ async def resolve_org_user(authorization: Optional[str]) -> tuple[Optional[str],
     if token == settings.SUPABASE_SERVICE_KEY:
         return None, None  # internal service call, no tenant context
     try:
-        import jwt as pyjwt
-
-        payload = pyjwt.decode(token, options={"verify_signature": False})
-        user_id = payload.get("sub")
+        user_id = resolve_user_id(token)
     except Exception:  # noqa: BLE001
         return None, None
-    if not user_id:
+    if not user_id or user_id in ("guest", "undefined", "null", "service_role"):
         return None, None
     try:
         sb = get_supabase_admin()
@@ -565,13 +556,10 @@ async def resolve_caller_plan(authorization: Optional[str]) -> str:
     if not token or token == settings.SUPABASE_SERVICE_KEY:
         return "free"
     try:
-        import jwt as pyjwt
-
-        payload = pyjwt.decode(token, options={"verify_signature": False})
-        user_id = payload.get("sub")
+        user_id = resolve_user_id(token)
     except Exception:  # noqa: BLE001
         return "free"
-    if not user_id:
+    if not user_id or user_id in ("guest", "undefined", "null", "service_role"):
         return "free"
     try:
         sb = get_supabase_admin()

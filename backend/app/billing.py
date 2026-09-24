@@ -14,6 +14,7 @@ import logging
 from fastapi import APIRouter, Request, HTTPException, Header
 from pydantic import BaseModel
 
+from app.auth import resolve_user_id
 from app.config import get_settings
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
@@ -33,20 +34,10 @@ async def require_user_id(authorization: str | None) -> str:
     token = authorization[len("Bearer "):].strip()
     if not token or token in ("guest", "undefined", "null"):
         raise HTTPException(status_code=401, detail="Invalid auth token")
-    # Reject the service key — only end-user JWTs should hit billing
-    if token == get_settings().SUPABASE_SERVICE_KEY:
-        raise HTTPException(status_code=401, detail="Service key not permitted on billing endpoints")
-    try:
-        import jwt as pyjwt
-        payload = pyjwt.decode(token, options={"verify_signature": False})
-        uid = payload.get("sub")
-        if not uid or uid == "guest":
-            raise HTTPException(status_code=401, detail="Invalid JWT payload")
-        return uid
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Could not decode JWT: {e}")
+    user_id = resolve_user_id(token, allow_anon=False)
+    if not user_id or user_id in ("guest", "undefined", "null"):
+        raise HTTPException(status_code=401, detail="Invalid auth token")
+    return user_id
 
 # Razorpay Plan IDs - create these once via Razorpay Dashboard or API
 # These map to our internal plan names

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Edit3, Check, AlertTriangle, Sparkles } from "lucide-react";
+import { getAccessToken } from "@/lib/supabase/token";
 
 interface CorrectionWidgetProps {
   datapoint_id: string;
@@ -46,7 +47,7 @@ export default function CorrectionWidget({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${userId}`,
+          Authorization: `Bearer ${(await getAccessToken()) || userId}`,
         },
         body: JSON.stringify({
           report_id,
