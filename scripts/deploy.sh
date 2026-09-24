@@ -85,7 +85,24 @@ if [[ "$ok" != "1" ]]; then
   exit 1
 fi
 
-# 6. Record the new live tag and prune old images
+# 6. TLS renewal — non-fatal: app is already healthy; a failed renewal logs here
+#    and retries on the next deploy (certbot sidecar also retries every 12h).
+echo "→ Checking disk (certbot renew needs room to write new certs)"
+DISK_PCT="$(df -h / | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
+echo "   Root disk usage: ${DISK_PCT}%"
+if [[ "${DISK_PCT:-0}" -ge 85 ]]; then
+  echo "⚠ Disk ≥85% full — pruning docker to free space"
+  docker system prune -f >/dev/null 2>&1 || true
+  docker image prune -af --filter "until=48h" >/dev/null 2>&1 || true
+fi
+
+echo "→ Renewing Let's Encrypt certificate"
+docker compose -f docker-compose.prod.yml run --rm certbot renew --force-renewal \
+  && echo "   ✓ certificate renewed" \
+  || echo "⚠ certbot renew failed — cert unchanged; will retry next deploy (see CI log)"
+docker compose -f docker-compose.prod.yml exec nginx nginx -s reload || true
+
+# 7. Record the new live tag and prune old images
 echo "$TAG" > .current_tag
 docker image prune -af --filter "until=168h" >/dev/null 2>&1 || true
 
