@@ -97,9 +97,15 @@ if [[ "${DISK_PCT:-0}" -ge 85 ]]; then
 fi
 
 echo "→ Renewing Let's Encrypt certificate"
-docker compose -f docker-compose.prod.yml run --rm certbot renew --force-renewal \
+# Stop the certbot sidecar first: its entrypoint is a 12h loop, so a plain
+# `docker compose run certbot ...` would start a second infinite loop and
+# hang the deploy (and both instances fight over the letsencrypt lock).
+docker compose -f docker-compose.prod.yml stop certbot >/dev/null 2>&1 || true
+timeout 10m docker compose -f docker-compose.prod.yml run --rm \
+  --entrypoint certbot certbot renew --force-renewal -v \
   && echo "   ✓ certificate renewed" \
   || echo "⚠ certbot renew failed — cert unchanged; will retry next deploy (see CI log)"
+docker compose -f docker-compose.prod.yml start certbot >/dev/null 2>&1 || true
 docker compose -f docker-compose.prod.yml exec nginx nginx -s reload || true
 
 # 7. Record the new live tag and prune old images
