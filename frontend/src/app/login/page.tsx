@@ -1,11 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
+function nextUrl(next: string | null): string {
+  const base = `${window.location.origin}/auth/callback`;
+  return next ? `${base}?next=${encodeURIComponent(next)}` : base;
+}
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
   const [error, setError] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -19,7 +35,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: nextUrl(next),
       },
     });
     if (error) {
@@ -38,7 +54,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email: trimmed,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: nextUrl(next),
       },
     });
     setEmailLoading(false);

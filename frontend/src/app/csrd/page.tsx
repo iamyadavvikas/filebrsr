@@ -163,7 +163,7 @@ export default function CsrdPage() {
             </p>
             <div className="fade-up flex flex-col sm:flex-row gap-4 justify-center mt-10" style={{ animationDelay: "240ms", animationFillMode: "both" }}>
               <Link
-                href="/platform/csrd"
+                href="/csrd/workspace"
                 className="inline-flex items-center justify-center gap-2 px-7 py-3.5 text-white rounded-xl font-semibold transition-opacity hover:opacity-90"
                 style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)", boxShadow: "0 8px 24px rgba(37,99,235,0.3)" }}
               >
@@ -356,7 +356,7 @@ export default function CsrdPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/platform/csrd"
+                href="/csrd/workspace"
                 className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white text-gray-900 rounded-xl font-semibold hover:bg-gray-100 transition-colors"
               >
                 Open CSRD workspace <ArrowRight className="w-4 h-4" />

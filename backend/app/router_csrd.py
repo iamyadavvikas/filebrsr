@@ -4,11 +4,14 @@ double-materiality IRO register, and ESRS sustainability-statement export
 (Word / PDF).
 
 The static ESRS Set 1 registry lives in ``app/esrs_datapoints.py`` (keyed by
-the standards' own paragraph references). These endpoints persist the ORG's
-live assessment into ``esrs_entries`` / ``esrs_materiality`` /
-``esrs_reports`` (see supabase/migration_v23_esrs.sql). All endpoints require
-a verified Bearer JWT (see ``app.auth.resolve_user_id``) and scope every read
-and write to the caller's organisation.
+the standards' own paragraph references). Reference endpoints
+(``/standards``, ``/registry``, ``/coverage``) are **public** — they serve
+immutable regulatory data and power the logged-out demo workspace.
+
+Assessment CRUD persists the ORG's live assessment into ``esrs_entries`` /
+``esrs_materiality`` / ``esrs_reports`` (see supabase/migration_v23_esrs.sql).
+Those endpoints require a verified Bearer JWT (see ``app.auth.resolve_user_id``)
+and scope every read and write to the caller's organisation.
 """
 
 from __future__ import annotations
@@ -116,9 +119,8 @@ def _phase_for_year(phase_in: str, financial_year: str) -> bool:
 
 
 @router.get("/standards")
-async def list_standards(authorization: str = Header(...)):
-    """Standards with datapoint / DR counts (whole registry)."""
-    _user_id = await get_user_id(authorization)
+async def list_standards():
+    """Standards with datapoint / DR counts (whole registry). Public."""
     cs = coverage_stats()
     meta = []
     for std_id, m in ESRS_STANDARDS.items():
@@ -154,10 +156,8 @@ async def list_registry(
     requirement: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
-    authorization: str = Header(...),
 ):
-    """Paginated registry search with standard/DR/type/phase filters."""
-    _user_id = await get_user_id(authorization)
+    """Paginated registry search with standard/DR/type/phase filters. Public."""
     items = ESRS_DATAPOINTS if standard is None else by_standard(standard)
     if dr:
         items = [d for d in items if d["dr"] == dr]
@@ -180,9 +180,8 @@ async def list_registry(
 
 
 @router.get("/coverage")
-async def registry_coverage(authorization: str = Header(...)):
-    """Whole-registry coverage stats (standards, mandatory/voluntary, phase-ins)."""
-    _user_id = await get_user_id(authorization)
+async def registry_coverage():
+    """Whole-registry coverage stats (standards, mandatory/voluntary, phase-ins). Public."""
     return coverage_stats()
 
 

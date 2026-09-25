@@ -34,7 +34,6 @@ import {
   PieChart,
   Menu,
   X,
-  ScrollText,
 } from "lucide-react";
 
 const FOUNDER_EMAILS = [
@@ -89,7 +88,6 @@ const navGroups = [
     label: "Reporting & Filing",
     items: [
       { name: "Board Dashboard", href: "/platform/board", icon: PieChart },
-      { name: "CSRD / ESRS", href: "/platform/csrd", icon: ScrollText },
       { name: "XBRL Filing", href: "/platform/xbrl", icon: Code },
       { name: "Frameworks", href: "/platform/frameworks", icon: Layers },
       { name: "ESG Ratings", href: "/platform/esg-ratings", icon: Star },

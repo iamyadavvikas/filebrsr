@@ -218,9 +218,15 @@ async def test_registry_pagination_and_filters(client):
 
 
 @pytest.mark.asyncio
-async def test_registry_rejects_unauthenticated(client):
-    resp = await client.get("/api/platform/csrd/standards")
-    assert resp.status_code in (401, 422)
+async def test_registry_is_public(client):
+    """Reference data (standards, registry, coverage) needs no auth."""
+    for path in (
+        "/api/platform/csrd/standards",
+        "/api/platform/csrd/registry",
+        "/api/platform/csrd/coverage",
+    ):
+        resp = await client.get(path)
+        assert resp.status_code == 200, path
 
 
 @pytest.mark.asyncio
