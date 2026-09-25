@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Calculator, FileInput, Network, BarChart3, ShieldCheck, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Calculator, FileInput, Network, BarChart3, ShieldCheck, ArrowRight, CheckCircle2, ScrollText } from "lucide-react";
 
 const products = [
   {
@@ -74,6 +74,24 @@ const products = [
       "Board-ready ESG dashboards",
     ],
     cta: "Try BRSR Platform",
+  },
+  {
+    id: "csrd-platform",
+    title: "CSRD / ESRS Reporting",
+    subtitle: "Full EFRAG ESRS Set 1 — for EU-bound companies",
+    icon: ScrollText,
+    color: "#2563EB",
+    href: "/csrd",
+    free: false,
+    features: [
+      "Complete ESRS Set 1 datapoint registry (ESRS 2, E1–E5, S1–S4, G1)",
+      "Double-materiality assessment (impacts, risks & opportunities)",
+      "Year-by-year gap analysis with phase-in tracking (FY2025/26, <750 cohort)",
+      "SFDR, Pillar 3, Benchmark & EU Climate Law origins mapped",
+      "Word / PDF ESRS sustainability statement export",
+      "ISSB bridging for Indian groups consolidating into EU parents",
+    ],
+    cta: "Explore CSRD Platform",
   },
   {
     id: "verified-carbon-ledger",

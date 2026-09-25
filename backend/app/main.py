@@ -43,6 +43,7 @@ from app.nifty50_benchmarks import (
 from app.pdf_generator import generate_compliance_pdf
 from app.router_advanced import router as advanced_router
 from app.router_cron import router as cron_router
+from app.router_csrd import router as csrd_router
 from app.router_market import router as market_router
 from app.router_moat import router as moat_router
 from app.router_org import router as org_router
@@ -132,6 +133,7 @@ app.include_router(billing_router)
 app.include_router(v2_router)
 app.include_router(platform_router)
 app.include_router(advanced_router)
+app.include_router(csrd_router)
 app.include_router(org_router)
 app.include_router(moat_router)
 app.include_router(market_router)

@@ -1,12 +1,14 @@
 """Shared test fixtures."""
 import os
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 # Set test env vars before importing app
 os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "test-service-key")
 os.environ.setdefault("SUPABASE_ANON_KEY", "")
+os.environ["SUPABASE_JWT_SECRET"] = ""  # tests use the dev identity bridge, never a real secret
 os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:3000")
 
 
@@ -29,7 +31,8 @@ def mock_supabase():
 @pytest.fixture
 def client(mock_supabase):
     """FastAPI test client with mocked dependencies."""
-    from httpx import AsyncClient, ASGITransport
+    from httpx import ASGITransport, AsyncClient
+
     from app.main import app
 
     with patch("app.main.get_supabase_admin", return_value=mock_supabase):

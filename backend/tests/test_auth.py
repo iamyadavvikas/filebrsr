@@ -159,3 +159,69 @@ class TestHeaderHelper:
         with pytest.raises(HTTPException) as exc:
             asyncio.run(get_user_id_from_header(None))
         assert exc.value.status_code == 401
+
+
+class TestMessageStrings:
+    """Lock the 401 detail strings the frontend uses to branch behaviour.
+
+    The CSRD workspace treats a bare `"Invalid token"` (GoTrue remote path)
+    differently from strict-verify failures, so these messages must not
+    change silently.
+    """
+
+    def test_missing_token_message(self, settings):
+        with pytest.raises(HTTPException) as exc:
+            resolve_user_id("")
+        assert exc.value.status_code == 401
+        assert exc.value.detail == "Missing auth token"
+
+    def test_denied_identity_message(self, settings):
+        for token in ["guest", "undefined", "null"]:
+            with pytest.raises(HTTPException) as exc:
+                resolve_user_id(token)
+            assert exc.value.status_code == 401
+            assert exc.value.detail == "Invalid auth token"
+
+    def test_strict_expired_message(self, settings):
+        settings.SUPABASE_JWT_SECRET = FAKE_SECRET
+        token = pyjwt.encode(
+            {"sub": "u1", "aud": "authenticated", "role": "authenticated", "exp": 1},
+            FAKE_SECRET,
+            algorithm="HS256",
+        )
+        with pytest.raises(HTTPException) as exc:
+            resolve_user_id(token)
+        assert exc.value.status_code == 401
+        assert exc.value.detail == "Token expired"
+
+    def test_strict_invalid_message(self, settings):
+        settings.SUPABASE_JWT_SECRET = FAKE_SECRET
+        with pytest.raises(HTTPException) as exc:
+            resolve_user_id("not-a-jwt")
+        assert exc.value.status_code == 401
+        assert exc.value.detail.startswith("Invalid token:")
+
+    @pytest.mark.parametrize(
+        "behavior",
+        [
+            "raise",
+            "no-user",
+        ],
+    )
+    def test_remote_verify_error_is_bare_invalid_token(self, settings, monkeypatch, behavior):
+        settings.SUPABASE_ANON_KEY = FAKE_ANON
+
+        class _AuthStub:
+            def get_user(self, token):
+                if behavior == "raise":
+                    raise RuntimeError("go true down")
+                return type("Res", (), {"user": None})()
+
+        class _ClientStub:
+            auth = _AuthStub()
+
+        monkeypatch.setattr("supabase.create_client", lambda url, key: _ClientStub())
+        with pytest.raises(HTTPException) as exc:
+            resolve_user_id("some-session-token")
+        assert exc.value.status_code == 401
+        assert exc.value.detail == "Invalid token"
