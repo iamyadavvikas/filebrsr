@@ -104,6 +104,7 @@ class _Query:
             return _Resp(rows)
         if kind == "upsert":
             rows, on_conflict = rest
+            rows = rows if isinstance(rows, list) else [rows]
             keys = [k.strip() for k in (on_conflict or "id").split(",") if k.strip()]
             written = []
             for r in rows:
@@ -348,12 +349,7 @@ async def test_delete_entry(client, db):
 
 @pytest.mark.asyncio
 async def test_gap_analysis_readiness(client, db):
-    # seed: E1 partially handled, all E2 reported, rest untouched
-    entries = [
-        {"datapoint_id": d["id"], "status": "reported"} if d["standard"] == "E2"
-        else {"datapoint_id": d["id"], "status": "reported"}
-        for d in ESRS_DATAPOINTS[: len(_E1_DP) // 2]  # half of E1
-    ]
+    # seed: E2 fully reported, half of E1 reported, rest untouched
     entries = [
         {"datapoint_id": d["id"], "status": "reported"}
         for d in ESRS_DATAPOINTS
@@ -371,13 +367,102 @@ async def test_gap_analysis_readiness(client, db):
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["total_datapoints"] == 664
+    # FY2025 excludes the 12 FY2026 phase-in datapoints from the 664-registry
+    assert body["registry_datapoints"] == 664
+    assert body["total_datapoints"] == 652
+    assert body["has_material_iro"] is False
     e1 = next(s for s in body["standards"] if s["standard"] == "E1")
     e2 = next(s for s in body["standards"] if s["standard"] == "E2")
-    assert e1["handled"] == len(_E1_DP) // 2
-    assert e1["remaining"] == len(_E1_DP) - len(_E1_DP) // 2
-    assert e2["handled"] == e2["datapoints"]
-    assert body["effective_gap"] == 664 - (len(_E1_DP) // 2 + e2["datapoints"])
+    assert e2["handled"] == e2["datapoints"]  # all E2 in scope and reported
+    assert e1["handled"] <= len(_E1_DP) // 2
+    assert body["effective_gap"] == body["total_datapoints"] - body["handled"]
+    assert sum(s["handled"] for s in body["standards"]) == body["handled"]
+
+
+@pytest.mark.asyncio
+async def test_phase_in_scopes_the_gap_by_reporting_year(client, db):
+    """Phase-in datapoints count only once their FY applies (displayed == computed)."""
+    dp = "E4.E4-1.15"  # gated to FY2025 -> out of scope for FY2024 and before
+    await client.post(
+        "/api/platform/csrd/entries",
+        json={"financial_year": "FY2024", "entries": [{"datapoint_id": dp, "status": "reported"}]},
+        headers=_auth(),
+    )
+    await client.post(
+        "/api/platform/csrd/entries",
+        json={"financial_year": "FY2025", "entries": [{"datapoint_id": dp, "status": "reported"}]},
+        headers=_auth(),
+    )
+
+    # FY2024 scope: 664 - 3 (FY2025-gated) - 12 (FY2026-gated) = 649
+    for fy, total, handled in (("FY2024", 649, 0), ("FY2025", 652, 1)):
+        resp = await client.get(
+            "/api/platform/csrd/gap-analysis", params={"financial_year": fy}, headers=_auth()
+        )
+        body = resp.json()
+        assert body["total_datapoints"] == total, fy
+        e4 = next(s for s in body["standards"] if s["standard"] == "E4")
+        assert e4["handled"] == handled, fy
+
+
+@pytest.mark.asyncio
+async def test_not_material_requires_materiality_basis(client, db):
+    """not_material only closes a gap once the register backs it."""
+    dp = _E1_DP[0]
+    resp = await client.post(
+        "/api/platform/csrd/materiality",
+        json={
+            "financial_year": "FY2025",
+            "iro_type": "impact",
+            "standard": "E1",
+            "title": "Material climate impact",
+            "impact_materiality": 4.2,
+            "financial_materiality": 3.5,
+        },
+        headers=_auth(),
+    )
+    iro_id = resp.json()["iro"]["id"]
+
+    entry = await client.post(
+        "/api/platform/csrd/entries",
+        json={
+            "financial_year": "FY2025",
+            "entries": [{"datapoint_id": dp, "status": "not_material"}],
+        },
+        headers=_auth(),
+    )
+    entry_id = entry.json()["entries"][0]["id"]
+
+    gap = await client.get(
+        "/api/platform/csrd/gap-analysis", params={"financial_year": "FY2025"}, headers=_auth()
+    )
+    e1 = next(s for s in gap.json()["standards"] if s["standard"] == "E1")
+    assert e1["handled"] == 0  # not_material without an IRO doesn't close the gap
+
+    # linking the materiality basis closes it
+    await client.put(
+        f"/api/platform/csrd/entries/{entry_id}", json={"materiality_id": iro_id}, headers=_auth()
+    )
+    gap = await client.get(
+        "/api/platform/csrd/gap-analysis", params={"financial_year": "FY2025"}, headers=_auth()
+    )
+    e1 = next(s for s in gap.json()["standards"] if s["standard"] == "E1")
+    assert e1["handled"] == 1
+
+    # a year with no material IRO at all accepts not_material without a link
+    await client.post(
+        "/api/platform/csrd/entries",
+        json={
+            "financial_year": "FY2024",
+            "entries": [{"datapoint_id": _E1_DP[1], "status": "not_material"}],
+        },
+        headers=_auth(),
+    )
+    gap = await client.get(
+        "/api/platform/csrd/gap-analysis", params={"financial_year": "FY2024"}, headers=_auth()
+    )
+    e1 = next(s for s in gap.json()["standards"] if s["standard"] == "E1")
+    assert e1["handled"] == 1
 
 
 # ─── double materiality ────────────────────────────────────────────────────
@@ -432,6 +517,80 @@ async def test_iro_crud_and_material_threshold(client, db):
     body = resp.json()
     assert body["count"] == 1
     assert body["iro"][0]["id"] == iro_id
+
+
+@pytest.mark.asyncio
+async def test_delete_iro_detaches_linked_entries(client, db):
+    resp = await client.post(
+        "/api/platform/csrd/materiality",
+        json={
+            "financial_year": "FY2025",
+            "iro_type": "impact",
+            "standard": "E1",
+            "title": "Ships that unlink",
+            "impact_materiality": 4.0,
+        },
+        headers=_auth(),
+    )
+    iro_id = resp.json()["iro"]["id"]
+    await client.post(
+        "/api/platform/csrd/entries",
+        json={
+            "financial_year": "FY2025",
+            "entries": [
+                {"datapoint_id": _E1_DP[0], "status": "not_material", "materiality_id": iro_id}
+            ],
+        },
+        headers=_auth(),
+    )
+    assert db.tables["esrs_entries"][0]["materiality_id"] == iro_id
+
+    resp = await client.delete(f"/api/platform/csrd/materiality/{iro_id}", headers=_auth())
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] == iro_id
+    assert db.tables["esrs_materiality"] == []
+    assert db.tables["esrs_entries"][0]["materiality_id"] is None
+
+    resp = await client.delete("/api/platform/csrd/materiality/does-not-exist", headers=_auth())
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_scope_endpoints_and_value_chain_filter(client, db):
+    scope = await client.get("/api/platform/csrd/scope", headers=_auth())
+    assert scope.status_code == 200
+    assert scope.json()["value_chain_scope"] == ["own_operations", "upstream", "downstream"]
+
+    bad = await client.put(
+        "/api/platform/csrd/scope", json={"value_chain_scope": ["own_operations", "mars"]},
+        headers=_auth(),
+    )
+    assert bad.status_code == 400
+
+    ok = await client.put(
+        "/api/platform/csrd/scope", json={"value_chain_scope": ["own_operations"]},
+        headers=_auth(),
+    )
+    assert ok.status_code == 200
+    scope = await client.get("/api/platform/csrd/scope", headers=_auth())
+    assert scope.json()["value_chain_scope"] == ["own_operations"]
+
+    # value-chain registry filter: every row is "all", so boundaries keep all rows
+    reg = await client.get(
+        "/api/platform/csrd/registry", params={"value_chain": "downstream"}, headers=_auth()
+    )
+    assert reg.status_code == 200
+    assert reg.json()["total"] == 664
+
+    # scoped gap analysis matches the full-chain baseline when data is all-"all"
+    gap = await client.get(
+        "/api/platform/csrd/gap-analysis",
+        params={"financial_year": "FY2025", "value_chain": "own_operations"},
+        headers=_auth(),
+    )
+    assert gap.status_code == 200
+    assert gap.json()["total_datapoints"] == 652
+    assert gap.json()["value_chain_scope"] == ["own_operations"]
 
 
 # ─── report export ─────────────────────────────────────────────────────────

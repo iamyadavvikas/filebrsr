@@ -61,6 +61,8 @@ export interface GapSummary {
     remaining: number;
     status_counts: Record<string, number>;
   }>;
+  value_chain_scope?: string[];
+  has_material_iro?: boolean;
 }
 
 export interface IRO {
@@ -117,6 +119,17 @@ export const STATUS_LABELS: Record<string, string> = {
 };
 
 export const HANDLED = new Set(["reported", "assessed", "not_material", "not_applicable"]);
+
+export const VALUE_CHAIN_SEGMENTS = ["own_operations", "upstream", "downstream"] as const;
+export const FULL_SCOPE: string[] = [...VALUE_CHAIN_SEGMENTS];
+
+/** Whether a registry datapoint falls inside the org's declared value-chain scope. */
+export function segmentApplies(item: RegistryItem, scope: string[]): boolean {
+  const vc = item.value_chain;
+  if (!vc || vc === "all") return true;
+  if (vc === "upstream_downstream") return scope.includes("upstream") || scope.includes("downstream");
+  return scope.includes(vc);
+}
 
 const API = "/backend/api/platform/csrd";
 const CLOUD = "cloud";
@@ -263,16 +276,25 @@ export function computeGap(
   registry: RegistryItem[],
   entries: EntryRow[],
   standards: StandardMeta[],
-  financialYear: string
+  financialYear: string,
+  opts?: { valueChainScope?: string[]; iro?: IRO[] }
 ): GapSummary {
+  const scope = opts?.valueChainScope?.length ? opts.valueChainScope : FULL_SCOPE;
+  const hasMaterialIro = opts?.iro?.some((r) => r.material) ?? false;
   const byDp: Record<string, EntryRow> = {};
   for (const e of entries) byDp[e.datapoint_id] = e;
+  const inScope = registry.filter((d) => phaseForYear(d.phase_in, financialYear) && segmentApplies(d, scope));
   const rows = [];
   let handledTotal = 0;
   for (const std of standards) {
-    const dps = registry.filter((d) => d.standard === std.standard);
+    const dps = inScope.filter((d) => d.standard === std.standard);
     const statuses = dps.map((d) => byDp[d.id]?.status || "not_assessed");
-    const handled = statuses.filter((s) => HANDLED.has(s)).length;
+    const handled = dps.filter((d) => {
+      const s = byDp[d.id]?.status || "not_assessed";
+      if (!HANDLED.has(s)) return false;
+      if (s === "not_material" && hasMaterialIro) return Boolean(byDp[d.id]?.materiality_id);
+      return true;
+    }).length;
     handledTotal += handled;
     const counts: Record<string, number> = {};
     for (const s of statuses) counts[s] = (counts[s] || 0) + 1;
@@ -286,7 +308,7 @@ export function computeGap(
       status_counts: counts,
     });
   }
-  const total = registry.length;
+  const total = inScope.length;
   const coveragePct = total ? round2((handledTotal / total) * 100) : 0;
   return {
     financial_year: financialYear,
@@ -295,6 +317,8 @@ export function computeGap(
     effective_gap: total - handledTotal,
     coverage_pct: coveragePct,
     standards: rows,
+    value_chain_scope: scope,
+    has_material_iro: hasMaterialIro,
   };
 }
 
@@ -318,7 +342,7 @@ export async function saveEntry(financialYear: string, item: EntryRow): Promise<
       method: "POST",
       body: JSON.stringify({
         financial_year: financialYear,
-        entries: [{ datapoint_id: item.datapoint_id, status: item.status, value: item.value, evidence: item.evidence || null, notes: item.notes || null, source: item.source || "manual" }],
+        entries: [{ datapoint_id: item.datapoint_id, status: item.status, value: item.value, evidence: item.evidence || null, notes: item.notes || null, source: item.source || "manual", materiality_id: item.materiality_id || null }],
       }),
     });
     return;
@@ -408,6 +432,36 @@ export async function deleteIro(financialYear: string, id: string): Promise<void
   }
   const rows = readJson<IRO[]>(demoKey(financialYear, "iro"), []);
   writeJson(demoKey(financialYear, "iro"), rows.filter((r) => r.id !== id));
+  const entries = readJson<EntryRow[]>(demoKey(financialYear, "entries"), []);
+  writeJson(
+    demoKey(financialYear, "entries"),
+    entries.map((e) => (e.materiality_id === id ? { ...e, materiality_id: null } : e))
+  );
+}
+
+// ────────────────────────────────────────────────────────────── scope ─────
+
+const SCOPE_KEY = "csrd.demo.scope";
+
+/** The org's declared value-chain boundary (which segments it reports on). */
+export async function getScope(): Promise<string[]> {
+  if ((await detectMode()) === CLOUD) {
+    const data = await cloudJSON<{ value_chain_scope: string[] }>("/scope");
+    return data.value_chain_scope?.length ? data.value_chain_scope : FULL_SCOPE;
+  }
+  return readJson<string[]>(SCOPE_KEY, FULL_SCOPE);
+}
+
+export async function setScope(scope: string[]): Promise<string[]> {
+  if ((await detectMode()) === CLOUD) {
+    const data = await cloudJSON<{ value_chain_scope: string[] }>("/scope", {
+      method: "PUT",
+      body: JSON.stringify({ value_chain_scope: scope }),
+    });
+    return data.value_chain_scope;
+  }
+  writeJson(SCOPE_KEY, scope);
+  return scope;
 }
 
 // ────────────────────────────────────────────────────────────── reports ───
@@ -509,13 +563,18 @@ export async function seedDemo(financialYear: string): Promise<void> {
   seedFor("2", ["BP-1", "BP-2", "GOV-1", "GOV-3", "GOV-5", "SBM-1", "SBM-2", "MDR-P", "MDR-A", "MDR-M"], "assessed");
   seedFor("E1", ["E1-6"], "reported");
   seedFor("E5", ["E5-5"], "not_material");
-  writeJson(demoKey(financialYear, "entries"), sample);
 
   const iros: IRO[] = [
     { id: "demo-climate", financial_year: financialYear, iro_type: "impact", standard: "E1", title: "Scope 1 & 2 emissions from operations", description: "Operational energy use drives direct and energy-indirect GHG emissions.", severity: 4, likelihood: 5, impact_materiality: 4.2, financial_materiality: 3.5, material: true, status: "assessed" },
     { id: "demo-cbam", financial_year: financialYear, iro_type: "risk", standard: "E1", title: "CBAM exposure on exported product lines", description: "Carbon-border pricing raises landed cost for EU-bound exports.", severity: 3, likelihood: 4, impact_materiality: 3.2, financial_materiality: 4.0, material: true, status: "draft" },
     { id: "demo-water", financial_year: financialYear, iro_type: "opportunity", standard: "E3", title: "Water reuse at flagship plant", description: "Zero-discharge loop reduces intake risk and operating cost.", severity: 3, likelihood: 3, impact_materiality: 2.4, financial_materiality: 2.1, material: false, status: "draft" },
+    { id: "demo-circularity", financial_year: financialYear, iro_type: "opportunity", standard: "E5", title: "Post-consumer recycled input for packaging", description: "Recycled-content switch cut virgin resin use; below the materiality threshold for now.", severity: 2, likelihood: 3, impact_materiality: 1.8, financial_materiality: 2.2, material: false, status: "draft" },
   ];
   writeJson(demoKey(financialYear, "iro"), iros);
+
+  for (const e of sample) {
+    if (e.status === "not_material") e.materiality_id = "demo-circularity";
+  }
+  writeJson(demoKey(financialYear, "entries"), sample);
   writeJson(demoKey(financialYear, "reports"), []);
 }

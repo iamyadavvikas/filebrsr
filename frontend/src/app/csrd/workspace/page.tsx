@@ -33,6 +33,7 @@ import {
   downloadCloudReport,
   generateCloudReport,
   generateDemoArtifacts,
+  getScope,
   invalidateSession,
   listEntries,
   listIro,
@@ -40,6 +41,7 @@ import {
   resetEntries,
   saveEntry,
   seedDemo,
+  setScope,
   subscribeMode,
   updateIro,
   type CsrdMode,
@@ -52,6 +54,8 @@ import {
   STATUS_LABELS,
   STATUS_OPTIONS,
   HANDLED,
+  VALUE_CHAIN_SEGMENTS,
+  FULL_SCOPE,
 } from "@/lib/csrd/workspace";
 import { AuthSessionError } from "@/lib/supabase/session";
 import { createClient } from "@/lib/supabase/client";
@@ -97,6 +101,7 @@ function CsrdWorkspace() {
   const [ready, setReady] = useState(false);
   const [authExpired, setAuthExpired] = useState(false);
   const [toast, setToast] = useState<{ text: string; tone: "success" | "error" } | null>(null);
+  const [valueChainScope, setValueChainScope] = useState<string[]>(FULL_SCOPE);
 
   const notify = useCallback((msg: string | Error, ok = true) => {
     if (msg instanceof AuthSessionError) {
@@ -118,7 +123,21 @@ function CsrdWorkspace() {
         setMode("demo");
         setReady(true);
       });
+    getScope()
+      .then((scope) => setValueChainScope(scope.length ? scope : FULL_SCOPE))
+      .catch(() => {});
   }, []);
+
+  const toggleScope = async (seg: string) => {
+    const next = valueChainScope.includes(seg) ? valueChainScope.filter((s) => s !== seg) : [...valueChainScope, seg];
+    if (next.length === 0) return;
+    setValueChainScope(next);
+    try {
+      await setScope(next);
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
 
   useEffect(() => {
     const unsub = subscribeMode(async (m) => {
@@ -212,7 +231,25 @@ function CsrdWorkspace() {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">EU Sustainability Reporting</h1>
             <p className="text-sm text-slate-500 mt-1.5">Full EFRAG ESRS Set 1 — double materiality, phase-in-aware gap analysis, statement export.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 py-1.5 shadow-sm">
+              <span className="px-1 text-xs font-semibold text-slate-500" title="Value-chain boundary used by gap analysis">Scope</span>
+              {VALUE_CHAIN_SEGMENTS.map((seg) => {
+                const on = valueChainScope.includes(seg);
+                return (
+                  <button
+                    key={seg}
+                    onClick={() => toggleScope(seg)}
+                    className={`rounded-md px-2 py-1 text-[11px] font-bold transition-colors ${
+                      on ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                    }`}
+                    title={`${seg === "own_operations" ? "Own operations" : seg === "upstream" ? "Upstream" : "Downstream"} value chain`}
+                  >
+                    {seg === "own_operations" ? "Own ops" : seg === "upstream" ? "Upstream" : "Downstream"}
+                  </button>
+                );
+              })}
+            </div>
             <label className="text-xs font-semibold text-slate-500">FY</label>
             <select
               value={financialYear}
@@ -292,7 +329,7 @@ function CsrdWorkspace() {
           </div>
         ) : (
           <>
-            {tab === "overview" && <OverviewTab financialYear={financialYear} mode={mode} notify={notify} goToRegistry={() => changeTab("registry")} />}
+            {tab === "overview" && <OverviewTab financialYear={financialYear} mode={mode} notify={notify} goToRegistry={() => changeTab("registry")} valueChainScope={valueChainScope} />}
             {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} />}
             {tab === "materiality" && <MaterialityTab financialYear={financialYear} mode={mode} notify={notify} />}
             {tab === "reports" && <ReportsTab financialYear={financialYear} mode={mode} notify={notify} />}
@@ -312,11 +349,13 @@ function OverviewTab({
   mode,
   notify,
   goToRegistry,
+  valueChainScope,
 }: {
   financialYear: string;
   mode: CsrdMode;
   notify: (m: string | Error, ok?: boolean) => void;
   goToRegistry: () => void;
+  valueChainScope: string[];
 }) {
   const [gap, setGap] = useState<GapSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -325,19 +364,20 @@ function OverviewTab({
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [standardsMeta, reg, entries] = await Promise.all([
+      const [standardsMeta, reg, entries, iro] = await Promise.all([
         fetchStandards().catch(() => []),
         fullRegistry(),
         listEntries(financialYear),
+        listIro(financialYear).catch(() => [] as IRO[]),
       ]);
       setStandards(standardsMeta);
-      setGap(computeGap(reg, entries.entries, standardsMeta, financialYear));
+      setGap(computeGap(reg, entries.entries, standardsMeta, financialYear, { valueChainScope, iro }));
     } catch (e) {
       notify(e as Error);
     } finally {
       setLoading(false);
     }
-  }, [financialYear, notify]);
+  }, [financialYear, notify, valueChainScope]);
 
   useEffect(() => {
     load();
@@ -433,7 +473,7 @@ function OverviewTab({
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="font-bold text-slate-900">Readiness by standard</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Assessed datapoints (incl. not-material / not-applicable) vs the registry for {financialYear}.</p>
+            <p className="text-xs text-slate-400 mt-0.5">Assessed datapoints (incl. not-material / not-applicable) vs your in-scope registry for {financialYear}.</p>
           </div>
           <RefreshCw onClick={load} className="w-4 h-4 text-slate-400 hover:text-blue-600 cursor-pointer" />
         </div>
@@ -516,6 +556,8 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
   const [draftValue, setDraftValue] = useState("");
   const [draftEvidence, setDraftEvidence] = useState("");
   const [draftNotes, setDraftNotes] = useState("");
+  const [roster, setRoster] = useState<IRO[]>([]);
+  const [draftMaterialityId, setDraftMaterialityId] = useState("");
 
   const LIMIT = 25;
 
@@ -555,6 +597,18 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
     refreshEntries();
   }, [refreshEntries]);
 
+  const refreshIro = useCallback(async () => {
+    try {
+      setRoster(await listIro(financialYear));
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  }, [financialYear, notify]);
+
+  useEffect(() => {
+    refreshIro();
+  }, [refreshIro]);
+
   const pick = (item: RegistryItem) => {
     setSelected(item);
     const existing = entriesByDp[item.id];
@@ -562,12 +616,13 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
     setDraftValue(existing?.value == null ? "" : typeof existing.value === "object" ? JSON.stringify(existing.value) : String(existing.value));
     setDraftEvidence(existing?.evidence || "");
     setDraftNotes(existing?.notes || "");
+    setDraftMaterialityId(existing?.materiality_id || "");
   };
 
-  const persist = async (item: RegistryItem, status: string, value: unknown = null, evidence: string = "", notes: string = "") => {
+  const persist = async (item: RegistryItem, status: string, value: unknown = null, evidence: string = "", notes: string = "", materialityId: string = "") => {
     setSavingId(item.id);
     try {
-      await saveEntry(financialYear, { datapoint_id: item.id, status, value, evidence: evidence || null, notes: notes || null, source: "manual" });
+      await saveEntry(financialYear, { datapoint_id: item.id, status, value, evidence: evidence || null, notes: notes || null, source: "manual", materiality_id: materialityId || null });
       await refreshEntries();
       notify(`Saved ${item.id}`);
     } catch (e) {
@@ -587,8 +642,10 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
         value = draftValue;
       }
     }
-    await persist(selected, draftStatus, value, draftEvidence, draftNotes);
+    await persist(selected, draftStatus, value, draftEvidence, draftNotes, draftMaterialityId);
   };
+
+  const hasMaterialIro = roster.some((r) => r.material);
 
   return (
     <div className="space-y-4">
@@ -680,7 +737,7 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
                           <button
                             key={s}
                             disabled={saving}
-                            onClick={() => persist(item, s, entry?.value ?? null, entry?.evidence || "", entry?.notes || "")}
+                            onClick={() => persist(item, s, entry?.value ?? null, entry?.evidence || "", entry?.notes || "", s === "not_material" ? entry?.materiality_id || "" : "")}
                             className={`text-[10px] font-bold px-2 py-1 rounded-md transition-colors ${
                               entry?.status === s ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
                             } disabled:opacity-50`}
@@ -720,6 +777,23 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
                     <option key={s} value={s}>{STATUS_LABELS[s]}</option>
                   ))}
                 </select>
+
+                {draftStatus === "not_material" && (
+                  <div className="mt-4">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Linked IRO (basis for not-material)</label>
+                    <select value={draftMaterialityId} onChange={(e) => setDraftMaterialityId(e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">— no linked IRO —</option>
+                      {roster.map((r) => (
+                        <option key={r.id} value={r.id}>{r.title} ({r.standard === "2" ? "ESRS 2" : `ESRS ${r.standard}`} · {r.material ? "material" : "not material"})</option>
+                      ))}
+                    </select>
+                    {hasMaterialIro && !draftMaterialityId && (
+                      <p className="mt-1.5 text-[11px] rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-amber-700">
+                        A material IRO is registered — link a non-material IRO so this &quot;Not material&quot; flag counts toward readiness.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <label className="block mt-4 text-xs font-semibold text-slate-500 mb-1">Value</label>
                 <textarea

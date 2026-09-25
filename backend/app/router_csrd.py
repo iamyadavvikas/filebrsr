@@ -47,6 +47,36 @@ HANDLED_STATUSES = frozenset({"reported", "assessed", "not_material", "not_appli
 UNKNOWN_DP = "unknown_datapoint"
 DEFAULT_MATERIALITY_THRESHOLD = 3.0
 
+# Value-chain segments an undertaking can report on. The static registry marks
+# each datapoint with the segments it answers ("all" = every segment); the org
+# declares its own boundary in `esrs_profiles.value_chain_scope`, and gap
+# analysis only counts datapoints inside that boundary.
+VALUE_CHAIN_SEGMENTS = ("own_operations", "upstream", "downstream")
+
+
+def _value_chain_segments(dp: dict) -> set[str]:
+    """Segments a datapoint answers: "all" (the registry default) = all three."""
+    raw = (dp.get("value_chain") or "all").strip()
+    if raw == "all":
+        return set(VALUE_CHAIN_SEGMENTS)
+    parts = {p.strip() for p in raw.split(",") if p.strip()}
+    return parts if parts else set(VALUE_CHAIN_SEGMENTS)
+
+
+def _status_handled(status: str, materiality_id: Optional[str], has_material_iro: bool) -> bool:
+    """Whether an entry status closes the gap for its datapoint this year.
+
+    ``not_material`` only closes the gap once it has a materiality basis: the
+    entry must be linked to an IRO from the double-materiality register (the
+    row that shows the IRO is below threshold). Orgs that have declared no
+    material IRO for the year are exempt from that substantiation rule.
+    """
+    if status in ("reported", "assessed", "not_applicable"):
+        return True
+    if status == "not_material":
+        return not has_material_iro or bool(materiality_id)
+    return False
+
 
 def get_supabase_admin():
     from supabase import create_client
@@ -154,10 +184,11 @@ async def list_registry(
     phase_in: Optional[str] = None,
     data_type: Optional[str] = None,
     requirement: Optional[str] = None,
+    value_chain: Optional[str] = None,
     limit: int = 200,
     offset: int = 0,
 ):
-    """Paginated registry search with standard/DR/type/phase filters. Public."""
+    """Paginated registry search with standard/DR/type/phase/VC filters. Public."""
     items = ESRS_DATAPOINTS if standard is None else by_standard(standard)
     if dr:
         items = [d for d in items if d["dr"] == dr]
@@ -169,6 +200,9 @@ async def list_registry(
         items = [d for d in items if d["data_type"] == data_type]
     if requirement:
         items = [d for d in items if d["requirement"] == requirement]
+    if value_chain:
+        wanted = {p.strip() for p in value_chain.split(",") if p.strip()}
+        items = [d for d in items if _value_chain_segments(d) & wanted]
     total = len(items)
     page = items[offset : offset + limit]
     return {
@@ -337,14 +371,21 @@ async def delete_entry(entry_id: str, authorization: str = Header(...)):
 async def gap_analysis(
     org_id: Optional[str] = None,
     financial_year: Optional[str] = None,
+    value_chain: Optional[str] = None,
     authorization: str = Header(...),
 ):
-    """Readiness per ESRS standard against the full registry for a year.
+    """Readiness per ESRS standard for a year, honoring phase-in and scope.
 
-    A datapoint counts as "handled" when its entry status is one of
-    ``reported`` / ``assessed`` / ``not_material`` / ``not_applicable``.
-    ``effective_gap`` is the number of datapoints still in
-    ``not_assessed`` / ``in_progress``.
+    A datapoint is **in scope** for a year when its phase-in applies AND its
+    value-chain segments intersect the org's declared boundary (``value_chain``
+    query param beats the org profile; both default to the full value chain).
+    Only in-scope datapoints feed ``handled`` / ``remaining`` / ``coverage_pct``,
+    so phase-in and value-chain policies actually move the numbers instead of
+    being decorative.
+
+    A datapoint counts as handled when its entry status is ``reported`` /
+    ``assessed`` / ``not_applicable``, or ``not_material`` backed by the org's
+    double-materiality register (linked IRO) once the org has any material IRO.
     """
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
@@ -354,47 +395,101 @@ async def gap_analysis(
 
     result = (
         sb.table("esrs_entries")
-        .select("datapoint_id, status")
+        .select("datapoint_id, status, materiality_id")
         .eq("org_id", org_id)
         .eq("financial_year", financial_year)
         .execute()
     )
-    status_by_dp = {r["datapoint_id"]: r.get("status", "not_assessed") for r in (result.data or [])}
+    entries_map = {
+        r["datapoint_id"]: {
+            "status": r.get("status", "not_assessed"),
+            "materiality_id": r.get("materiality_id"),
+        }
+        for r in (result.data or [])
+    }
+
+    scope = _active_scope(sb, org_id, value_chain)
+    material_rows = (
+        sb.table("esrs_materiality")
+        .select("id")
+        .eq("org_id", org_id)
+        .eq("financial_year", financial_year)
+        .eq("material", True)
+        .execute()
+    )
+    has_material_iro = bool(material_rows.data)
 
     standards = []
     for std_id, m in ESRS_STANDARDS.items():
-        dps = by_standard(std_id)
-        in_scope = [d for d in dps if _phase_for_year(d["phase_in"], financial_year)]
-        statuses = [status_by_dp.get(d["id"], "not_assessed") for d in dps]
-        handled = sum(1 for s in statuses if s in HANDLED_STATUSES)
+        scoped = [
+            d
+            for d in by_standard(std_id)
+            if _phase_for_year(d["phase_in"], financial_year)
+            and bool(_value_chain_segments(d) & scope)
+        ]
+        handled = 0
+        statuses: dict[str, int] = {}
+        for d in scoped:
+            e = entries_map.get(d["id"], {"status": "not_assessed", "materiality_id": None})
+            if _status_handled(e["status"], e["materiality_id"], has_material_iro):
+                handled += 1
+            statuses[e["status"]] = statuses.get(e["status"], 0) + 1
         standards.append(
             {
                 "code": m["code"],
                 "standard": std_id,
                 "name": m["name"],
-                "datapoints": len(dps),
-                "in_scope_for_year": len(in_scope),
+                "datapoints": len(scoped),
+                "remaining": len(scoped) - handled,
                 "handled": handled,
-                "remaining": len(dps) - handled,
-                "status_counts": {
-                    s: statuses.count(s)
-                    for s in sorted(set(statuses))
-                },
+                "status_counts": {s: statuses[s] for s in sorted(statuses)},
             }
         )
 
+    in_scope_total = sum(s["datapoints"] for s in standards)
     handled_total = sum(s["handled"] for s in standards)
-    total = sum(s["datapoints"] for s in standards)
-    coverage_pct = round(handled_total / total * 100, 2) if total else 0.0
+    coverage_pct = round(handled_total / in_scope_total * 100, 2) if in_scope_total else 0.0
     return {
         "org_id": org_id,
         "financial_year": financial_year,
-        "total_datapoints": total,
+        "registry_datapoints": len(ESRS_DATAPOINTS),
+        "total_datapoints": in_scope_total,
+        "value_chain_scope": sorted(scope),
+        "has_material_iro": has_material_iro,
         "handled": handled_total,
-        "effective_gap": total - handled_total,
+        "effective_gap": in_scope_total - handled_total,
         "coverage_pct": coverage_pct,
         "standards": standards,
     }
+
+
+def _active_scope(sb, org_id: str, value_chain: Optional[str]) -> set[str]:
+    """Resolve the org's value-chain boundary for a gap analysis.
+
+    An explicit ``value_chain`` query param (comma-separated segments) wins;
+    otherwise the org profile (``esrs_profiles.value_chain_scope``) is used,
+    falling back to the full value chain when the profile is missing.
+    """
+    if value_chain:
+        wanted = set(VALUE_CHAIN_SEGMENTS) & {p.strip() for p in value_chain.split(",") if p.strip()}
+        if wanted:
+            return wanted
+    try:
+        res = (
+            sb.table("esrs_profiles")
+            .select("value_chain_scope")
+            .eq("org_id", org_id)
+            .maybe_single()
+            .execute()
+        )
+        stored = (res.data or {}).get("value_chain_scope")
+    except Exception:  # noqa: BLE001 - profile table may not exist yet
+        stored = None
+    if stored:
+        wanted = set(VALUE_CHAIN_SEGMENTS) & set(stored)
+        if wanted:
+            return wanted
+    return set(VALUE_CHAIN_SEGMENTS)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -521,6 +616,92 @@ async def update_iro(iro_id: str, req: IROUpdate, authorization: str = Header(..
         .execute()
     )
     return {"iro": (result.data or [{}])[0]}
+
+
+@router.delete("/materiality/{iro_id}")
+async def delete_iro(iro_id: str, authorization: str = Header(...)):
+    """Remove an IRO from the double-materiality register (org-scoped).
+
+    Also detaches the IRO from any datapoints linked to it, so a deleted IRO
+    never leaves dangling ``materiality_id`` references in ``esrs_entries``
+    (defence-in-depth on top of the FK's ``on delete set null``).
+    """
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    existing = (
+        sb.table("esrs_materiality")
+        .select("id")
+        .eq("id", iro_id)
+        .eq("org_id", org_id)
+        .maybe_single()
+        .execute()
+    )
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="IRO not found")
+    sb.table("esrs_materiality").delete().eq("id", iro_id).execute()
+    sb.table("esrs_entries").update({"materiality_id": None}).eq("materiality_id", iro_id).execute()
+    return {"deleted": iro_id}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ORG SCOPE (value-chain boundary for phase/scoped gap analysis)
+# ═══════════════════════════════════════════════════════════════════
+
+
+class ScopeUpdate(BaseModel):
+    value_chain_scope: list[str]
+
+
+@router.get("/scope")
+async def get_scope(org_id: Optional[str] = None, authorization: str = Header(...)):
+    """The org's declared value-chain boundary (defaults to the full chain)."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, org_id)
+    try:
+        res = (
+            sb.table("esrs_profiles")
+            .select("value_chain_scope")
+            .eq("org_id", org_id)
+            .maybe_single()
+            .execute()
+        )
+        stored = (res.data or {}).get("value_chain_scope")
+    except Exception:  # noqa: BLE001 - profile table may not exist yet
+        stored = None
+    scope = [s for s in (stored or []) if s in VALUE_CHAIN_SEGMENTS]
+    return {
+        "org_id": org_id,
+        "value_chain_scope": scope or list(VALUE_CHAIN_SEGMENTS),
+    }
+
+
+@router.put("/scope")
+async def set_scope(
+    req: ScopeUpdate, org_id: Optional[str] = None, authorization: str = Header(...)
+):
+    """Persist the org's value-chain boundary (deduped, subset of the three)."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, org_id)
+    if not req.value_chain_scope:
+        raise HTTPException(status_code=400, detail="value_chain_scope cannot be empty")
+    invalid = set(req.value_chain_scope) - set(VALUE_CHAIN_SEGMENTS)
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Invalid value chain segments: {', '.join(sorted(invalid))}. "
+                f"Allowed: {', '.join(VALUE_CHAIN_SEGMENTS)}"
+            ),
+        )
+    scope = list(dict.fromkeys(req.value_chain_scope))
+    result = sb.table("esrs_profiles").upsert(
+        {"org_id": org_id, "value_chain_scope": scope}, on_conflict="org_id"
+    ).execute()
+    row = (result.data or [{}])[0]
+    return {"org_id": org_id, "value_chain_scope": row.get("value_chain_scope") or scope}
 
 
 # ═══════════════════════════════════════════════════════════════════
