@@ -18,8 +18,8 @@ Resolution order (see :func:`resolve_user_id` for details):
 6. development/test         -> legacy unverified decode (dev bridge only)
 """
 
-import time
 import logging
+import time
 
 import jwt as pyjwt
 from fastapi import HTTPException
@@ -34,6 +34,13 @@ _VERIFIED_CACHE: dict[str, tuple[float, str]] = {}
 _CACHE_TTL_SECONDS = 300.0
 
 _DENIED_IDENTITIES = {"guest", "undefined", "null"}
+
+# Opaque guest-sandbox session tokens (see POST /platform/csrd/guest/session).
+# These are self-identifying reference tokens verified against the
+# ``esrs_guest_sessions`` table by the CSRD router's org resolver; they are
+# accepted verbatim here so the CSRD endpoints can scope to the session's own
+# sandbox org without a real Supabase user.
+GUEST_TOKEN_PREFIX = "guest_"
 
 
 def _deny(token: str) -> bool:
@@ -91,6 +98,13 @@ def resolve_user_id(token: str, *, allow_anon: bool = True) -> str:
         raise HTTPException(status_code=401, detail="Missing auth token")
     if _deny(token):
         raise HTTPException(status_code=401, detail="Invalid auth token")
+
+    # Guest sandbox tokens never go through JWT/anon verification: they are
+    # opaque reference tokens. Authenticity is enforced separately by the
+    # consuming router, which looks the token up in esrs_guest_sessions (so a
+    # forged guest_xxx value resolves to nothing and is rejected there).
+    if token.startswith(GUEST_TOKEN_PREFIX):
+        return token
 
     settings = get_settings()
     service_key = settings.SUPABASE_SERVICE_KEY

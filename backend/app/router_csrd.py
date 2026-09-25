@@ -19,14 +19,16 @@ from __future__ import annotations
 import io
 import json
 import logging
+import secrets
 import time
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.auth import GUEST_TOKEN_PREFIX
 from app.auth import get_user_id_from_header as get_user_id
 from app.config import get_settings
 from app.esef_arelle import apply_arelle
@@ -88,10 +90,56 @@ def get_supabase_admin():
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
 
+def _is_guest(user_id: str) -> bool:
+    """True when the identity is an opaque guest-sandbox session token."""
+    return user_id.startswith(GUEST_TOKEN_PREFIX)
+
+
+def _subject_id(user_id: str) -> str | None:
+    """Provenance user id for a row; guests have none (real profiles FK)."""
+    return None if _is_guest(user_id) else user_id
+
+
+def _resolve_guest_org(supabase, token: str) -> str:
+    """Map a guest session token to its sandbox org, validating liveness.
+
+    An expired or unknown token yields 401. The row is deleted on expiry so a
+    repeat call fails closed instead of silently recycling a dead workspace.
+    """
+    row = (
+        supabase.table("esrs_guest_sessions")
+        .select("org_id, expires_at")
+        .eq("token", token)
+        .maybe_single()
+        .execute()
+    )
+    if not row.data:
+        raise HTTPException(status_code=401, detail="Invalid or expired guest session")
+    raw_exp = row.data.get("expires_at")
+    try:
+        expires = datetime.fromisoformat(str(raw_exp).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        expires = datetime.min.replace(tzinfo=timezone.utc)
+    if expires <= datetime.now(timezone.utc):
+        supabase.table("esrs_guest_sessions").delete().eq("token", token).execute()
+        raise HTTPException(status_code=401, detail="Guest session expired")
+    return row.data["org_id"]
+
+
 def _resolve_org(supabase, user_id: str, org_id: Optional[str]) -> str:
     """Return the org to operate on, enforcing caller membership (403 otherwise)."""
     if user_id in ("service_role",):
         raise HTTPException(status_code=401, detail="Service key not permitted here")
+    if _is_guest(user_id):
+        if not get_settings().CSRD_GUEST_ENABLED:
+            raise HTTPException(status_code=403, detail="Guest workspace is disabled")
+        sandbox_org = _resolve_guest_org(supabase, user_id)
+        if org_id and org_id != sandbox_org:
+            raise HTTPException(
+                status_code=403,
+                detail="Guest sessions can only access their own sandbox workspace",
+            )
+        return sandbox_org
     if org_id:
         member = (
             supabase.table("org_members")
@@ -139,6 +187,212 @@ def _phase_for_year(phase_in: str, financial_year: str) -> bool:
     if phase_in == "3 years":
         return True  # <750-employee cohort; treated as always in-scope for a roadmap
     return True
+
+
+# ═══════════════════════════════════════════════════════════════════
+# GUEST SANDBOX (open-to-all exploration, no sign-in)
+# ═══════════════════════════════════════════════════════════════════
+
+GUEST_ORG_NAME = "Acme Sandbox Ltd."
+SESSION_GRACE_MINUTES = 5
+
+
+class SeedRequest(BaseModel):
+    financial_year: str = "FY2025"
+
+
+def _prune_expired_guests(sb) -> None:
+    """Delete expired guest sessions (cascades to their sandbox org + rows)."""
+    now = datetime.now(timezone.utc)
+    rows = sb.table("esrs_guest_sessions").select("token, expires_at").execute()
+    for r in rows.data or []:
+        try:
+            expires = datetime.fromisoformat(str(r.get("expires_at")).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            continue
+        if expires <= now:
+            sb.table("esrs_guest_sessions").delete().eq("token", r.get("token")).execute()
+
+
+def _guest_rate_ok(sb) -> bool:
+    """Rolling one-minute cap on guest session minting (abuse guard)."""
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=1)
+    rows = sb.table("esrs_guest_sessions").select("created_at").execute()
+    count = 0
+    for r in rows.data or []:
+        created = _parse_ts(r.get("created_at"))
+        if created is not None and created >= cutoff:
+            count += 1
+    return count < max(1, get_settings().CSRD_GUEST_RATE_MINUTE)
+
+
+def _parse_ts(raw) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+@router.post("/guest/session")
+async def create_guest_session():
+    """Mint a throwaway sandbox workspace for a logged-out visitor.
+
+    Returns an opaque bearer token backed by a fresh sandbox organisation
+    (``esrs_guest_sessions``). The token is passed as the ``Authorization``
+    Bearer credential on every CSRD call; the backend scopes every read and
+    write to the session's own org, so guests can explore the entire workflow
+    without any sign-in (and without touching another guest's data). Expired
+    sessions are pruned here so storage is bounded.
+    """
+    if not get_settings().CSRD_GUEST_ENABLED:
+        raise HTTPException(status_code=404, detail="Guest workspace is disabled")
+    sb = get_supabase_admin()
+    _prune_expired_guests(sb)
+    if not _guest_rate_ok(sb):
+        raise HTTPException(status_code=429, detail="Too many guest workspaces. Try again shortly.")
+    token = f"{GUEST_TOKEN_PREFIX}{secrets.token_urlsafe(24)}"
+    slug = f"guest-sandbox-{secrets.token_urlsafe(6)}"
+    org = (
+        sb.table("organizations")
+        .insert({"name": GUEST_ORG_NAME, "slug": slug, "plan": "starter"})
+        .execute()
+    )
+    org_id = (org.data or [{}])[0].get("id")
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=max(1, get_settings().CSRD_GUEST_TTL_HOURS))).isoformat()
+    sb.table("esrs_guest_sessions").insert({"token": token, "org_id": org_id, "expires_at": expires_at}).execute()
+    return {"token": token, "org_id": org_id, "expires_at": expires_at, "mode": "guest"}
+
+
+def _seed_datapoint_ids(standard: str, drs: set[str]) -> list[str]:
+    return [d["id"] for d in by_standard(standard) if (d.get("dr") or "") in drs]
+
+
+@router.post("/guest/seed")
+async def seed_guest_workspace(req: SeedRequest, authorization: str = Header(...)):
+    """Seed sample assessments + IROs into the caller's guest sandbox org.
+
+    Mirrors the browser demo seed so logged-out visitors can instantly explore
+    reports / assurance / attestation / sandbox submission on realistic data.
+    """
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    if not _is_guest(user_id):
+        raise HTTPException(status_code=403, detail="Use your own org workspace to assess real data")
+    org_id = _resolve_org(sb, user_id, None)
+
+    entries = []
+    for status, std, drs in (
+        ("assessed", "2", {"BP-1", "BP-2", "GOV-1", "GOV-3", "GOV-5", "SBM-1", "SBM-2", "MDR-P", "MDR-A", "MDR-M"}),
+        ("reported", "E1", {"E1-6"}),
+        ("not_material", "E5", {"E5-5"}),
+    ):
+        for dp_id in _seed_datapoint_ids(std, drs):
+            entries.append(
+                {
+                    "org_id": org_id,
+                    "user_id": None,
+                    "financial_year": req.financial_year,
+                    "datapoint_id": dp_id,
+                    "status": status,
+                    "evidence": "Sample evidence — replace with your source.",
+                    "notes": "Seeded in the open sandbox.",
+                    "source": "manual",
+                }
+            )
+
+    iros = [
+        {
+            "org_id": org_id,
+            "financial_year": req.financial_year,
+            "iro_type": "impact",
+            "standard": "E1",
+            "title": "Scope 1 & 2 emissions from operations",
+            "description": "Operational energy use drives direct and energy-indirect GHG emissions.",
+            "severity": 4,
+            "likelihood": 5,
+            "impact_materiality": 4.2,
+            "financial_materiality": 3.5,
+            "material": True,
+            "status": "assessed",
+            "created_by": None,
+        },
+        {
+            "org_id": org_id,
+            "financial_year": req.financial_year,
+            "iro_type": "risk",
+            "standard": "E1",
+            "title": "CBAM exposure on exported product lines",
+            "description": "Carbon-border pricing raises landed cost for EU-bound exports.",
+            "severity": 3,
+            "likelihood": 4,
+            "impact_materiality": 3.2,
+            "financial_materiality": 4.0,
+            "material": True,
+            "status": "draft",
+            "created_by": None,
+        },
+        {
+            "org_id": org_id,
+            "financial_year": req.financial_year,
+            "iro_type": "opportunity",
+            "standard": "E3",
+            "title": "Water reuse at flagship plant",
+            "description": "Zero-discharge loop reduces intake risk and operating cost.",
+            "severity": 3,
+            "likelihood": 3,
+            "impact_materiality": 2.4,
+            "financial_materiality": 2.1,
+            "material": False,
+            "status": "draft",
+            "created_by": None,
+        },
+        {
+            "org_id": org_id,
+            "financial_year": req.financial_year,
+            "iro_type": "opportunity",
+            "standard": "E5",
+            "title": "Post-consumer recycled input for packaging",
+            "description": "Recycled-content switch cut virgin resin use; below the materiality threshold for now.",
+            "severity": 2,
+            "likelihood": 3,
+            "impact_materiality": 1.8,
+            "financial_materiality": 2.2,
+            "material": False,
+            "status": "draft",
+            "created_by": None,
+        },
+    ]
+
+    iro_result = sb.table("esrs_materiality").insert(iros).execute()
+    saved_iro = iro_result.data or []
+    not_material_link = next(
+        (r.get("id") for r in saved_iro if r.get("standard") == "E5"),
+        None,
+    )
+    for row in entries:
+        if row["status"] == "not_material":
+            row["materiality_id"] = not_material_link
+    sb.table("esrs_entries").upsert(entries, on_conflict="org_id,financial_year,datapoint_id").execute()
+
+    return {
+        "seeded_entries": len(entries),
+        "seeded_iro": len(iros),
+        "financial_year": req.financial_year,
+        "org_id": org_id,
+    }
+
+
+@router.delete("/guest/workspace")
+async def reset_guest_workspace(authorization: str = Header(...)):
+    """Wipe the caller's guest sandbox org (entries, materiality, reports, submissions)."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    if not _is_guest(user_id):
+        raise HTTPException(status_code=403, detail="Own organisations cannot be bulk-reset here")
+    org_id = _resolve_org(sb, user_id, None)
+    for table in ("esrs_submissions", "esrs_reports", "esrs_materiality", "esrs_entries"):
+        sb.table(table).delete().eq("org_id", org_id).execute()
+    return {"org_id": org_id, "reset": True}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -301,7 +555,7 @@ async def upsert_entries(req: EntryBulk, authorization: str = Header(...)):
         rows.append(
             {
                 "org_id": org_id,
-                "user_id": user_id,
+                "user_id": _subject_id(user_id),
                 "financial_year": req.financial_year,
                 "datapoint_id": e.datapoint_id,
                 "status": e.status,
@@ -334,7 +588,7 @@ async def update_entry(entry_id: str, req: EntryUpdate, authorization: str = Hea
             detail=f"Invalid status: {req.status} (allowed: {', '.join(sorted(VALID_STATUSES))})",
         )
     patch = {k: v for k, v in req.model_dump().items() if v is not None}
-    patch["user_id"] = user_id
+    patch["user_id"] = _subject_id(user_id)
     result = sb.table("esrs_entries").update(patch).eq("id", entry_id).eq("org_id", org_id).execute()
     return {"entry": (result.data or [{}])[0]}
 
@@ -537,7 +791,7 @@ async def create_iro(req: IROItem, authorization: str = Header(...)):
         "financial_materiality": req.financial_materiality,
         "material": _material_flag(req.impact_materiality, req.financial_materiality, req.material),
         "status": req.status,
-        "created_by": user_id,
+        "created_by": _subject_id(user_id),
     }
     result = sb.table("esrs_materiality").insert(row).execute()
     return {"iro": (result.data or [{}])[0]}
@@ -722,20 +976,27 @@ def _parse_oam_ack(body: str, fallback_ref: str) -> dict:
     }
 
 
-def _sign_manifest_qes(manifest_digest: str, report_id: str, attested_by: str) -> dict:
+def _sign_manifest_qes(manifest_digest: str, report_id: str, attested_by: str, sandbox: bool = False) -> dict:
     """Digitally sign the manifest digest and render the package's qes.xml.
 
     Uses the process Ed25519 signer from ``app.prov.signing`` (KMS envelope in
     production, local/ephemeral seed elsewhere). The signature is detached:
     the OAM recomputes the manifest digest from ``manifest.json`` and verifies
-    it against the embedded public key.
+    it against the embedded public key. Sandbox (guest) packages are signed
+    with a fresh ephemeral key labelled ``guest-sandbox`` so a sandbox package
+    can never be mistaken for (or verified against) a real filing key.
     """
     from app.prov import signing
 
-    try:
-        signer = signing.get_signer()
-    except signing.SigningError as exc:
-        raise HTTPException(status_code=500, detail=f"Cannot sign submission: {exc}") from exc
+    if sandbox:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        signer = signing.LocalEd25519Signer(Ed25519PrivateKey.generate(), key_id="guest-sandbox")
+    else:
+        try:
+            signer = signing.get_signer()
+        except signing.SigningError as exc:
+            raise HTTPException(status_code=500, detail=f"Cannot sign submission: {exc}") from exc
     import base64
 
     signature_b64 = base64.b64encode(signer.sign(manifest_digest.encode("ascii"))).decode("ascii")
@@ -984,6 +1245,19 @@ async def generate_report(req: ReportRequest, authorization: str = Header(...)):
     fmt = req.format.lower()
     if fmt not in REPORT_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="format must be word, pdf, or esef")
+    if _is_guest(user_id):
+        existing = (
+            sb.table("esrs_reports")
+            .select("id")
+            .eq("org_id", org_id)
+            .eq("financial_year", req.financial_year)
+            .execute()
+        )
+        if len(existing.data or []) >= max(1, get_settings().CSRD_GUEST_MAX_REPORTS):
+            raise HTTPException(
+                status_code=429,
+                detail=f"Guest sandbox limit reached ({get_settings().CSRD_GUEST_MAX_REPORTS} reports). Reset the workspace to start again.",
+            )
     in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(sb, org_id, req.financial_year)
 
     t0 = time.monotonic()
@@ -1022,7 +1296,7 @@ async def generate_report(req: ReportRequest, authorization: str = Header(...)):
         "file_size_bytes": len(content),
         "datapoints_covered": handled,
         "coverage_pct": coverage_pct,
-        "created_by": user_id,
+        "created_by": _subject_id(user_id),
     }
     result = sb.table("esrs_reports").insert(row).execute()
     report = (result.data or [{}])[0]
@@ -1313,7 +1587,8 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
     }
     manifest_str = json.dumps(manifest, indent=2, default=str)
     manifest_digest = hashlib.sha256(manifest_str.encode("utf-8")).hexdigest()
-    qes = _sign_manifest_qes(manifest_digest, report_id, row.get("attested_by") or "")
+    is_guest = _is_guest(user_id)
+    qes = _sign_manifest_qes(manifest_digest, report_id, row.get("attested_by") or "", sandbox=is_guest)
     buf = _io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("esrs_statement.html", content)
@@ -1330,7 +1605,11 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
     sent_at = now_ts
     ack: dict = {}
     payload = json.dumps(manifest, default=str).encode("utf-8")
-    if settings.OAM_FILING_ENDPOINT:
+    if is_guest:
+        # Sandbox-only: never contact a real OAM, even when one is configured.
+        channel = "guest_sandbox"
+        status = "sandboxed"
+    elif settings.OAM_FILING_ENDPOINT:
         import urllib.request
 
         channel = "oam_webhook"
@@ -1417,7 +1696,7 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
         "manifest_sha256": manifest_sha,
         "package_sha256": sha256,
         "last_error": status if status.startswith("webhook_failed") else None,
-        "submitted_by": user_id,
+        "submitted_by": _subject_id(user_id),
         "channel": channel,
         "sent_at": sent_at,
         "ack_ref": ack_ref,
@@ -1452,9 +1731,11 @@ async def simulate_receipt(report_id: str, authorization: str = Header(...)):
     fake ESAP acceptance receipt (``channel = 'sandbox'``) to the submission
     for the report. Disabled in production.
     """
-    if get_settings().ENVIRONMENT == "production":
-        raise HTTPException(status_code=404, detail="Sandbox is disabled in production")
     user_id = await get_user_id(authorization)
+    # Guest sandbox sessions can always exercise the ack loop (that is their
+    # entire point); real users may only do so outside production.
+    if get_settings().ENVIRONMENT == "production" and not _is_guest(user_id):
+        raise HTTPException(status_code=404, detail="Sandbox is disabled in production")
     sb = get_supabase_admin()
     org_id = _resolve_org(sb, user_id, None)
     submission = (
