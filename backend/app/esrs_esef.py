@@ -174,7 +174,7 @@ def _tag_cell(value: Any, tag: dict, ctx_ref: str) -> str:
         return (
             f'<td class="v">'
             f'<ix:nonFraction name="{name}" contextRef="{ctx_ref}" unitRef="u_{unit}" '
-            f'decimals="{decimals}" scale="0" format="ixt:numdotdecimal">{_esc(txt)}</ix:nonFraction>'
+            f'decimals="{decimals}" scale="0">{_esc(txt)}</ix:nonFraction>'
             "</td>"
         )
     if isinstance(value, bool):
@@ -256,7 +256,7 @@ def build_esef_statement(
         ctx_duration=ctx_duration,
     )
     body = f"""<?xml version="1.0" encoding="UTF-8"?>
-<html lang="en" xmlns:ix="{IX_NS}" xmlns:xbrli="{XBRLI_NS}" xmlns:link="{LINK_NS}" xmlns:xlink="{XLINK_NS}" xmlns:esrs="{ESRS_NS}" xmlns:utr="http://www.xbrl.org/2009/utr" xmlns:ixt="{IXT_NS}">
+<html lang="en" xmlns:ix="{IX_NS}" xmlns:xbrli="{XBRLI_NS}" xmlns:link="{LINK_NS}" xmlns:xlink="{XLINK_NS}" xmlns:esrs="{ESRS_NS}" xmlns:utr="http://www.xbrl.org/2009/utr" xmlns:iso4217="http://www.xbrl.org/2003/iso4217">
 <head>
 <meta charset="utf-8"/>
 <title>ESRS Sustainability Statement — {_esc(financial_year)}</title>
@@ -275,15 +275,16 @@ def build_esef_statement(
 
 def _make_header(*, entity_identifier, entity_scheme, start, end, ctx_duration) -> str:
     return (
-        '<ix:header><ix:hidden><ix:resources>'
-        f'<link:schemaRef xlink:type="simple" xlink:href="{ESRS_NS}/esrs_all.xsd"/>'
+        "<ix:header>"
+        "<ix:hidden><!-- non-inline content placeholder --></ix:hidden>"
+        "<ix:resources>"
         f'<xbrli:context id="{ctx_duration}">'
         f'<xbrli:entity><xbrli:identifier scheme="{_esc(entity_scheme)}">{_esc(entity_identifier)}</xbrli:identifier></xbrli:entity>'
-        f'<xbrli:period><xbrli:startDate>{start}</xbrli:startDate><xbrli:endDate>{end}</xbrli:endDate></xbrli:period>'
+        f"<xbrli:period><xbrli:startDate>{start}</xbrli:startDate><xbrli:endDate>{end}</xbrli:endDate></xbrli:period>"
         "</xbrli:context>"
         f'<xbrli:context id="{ctx_duration}-prior">'
         f'<xbrli:entity><xbrli:identifier scheme="{_esc(entity_scheme)}">{_esc(entity_identifier)}</xbrli:identifier></xbrli:entity>'
-        f'<xbrli:period><xbrli:startDate>{start}</xbrli:startDate><xbrli:endDate>{end}</xbrli:endDate></xbrli:period>'
+        f"<xbrli:period><xbrli:startDate>{start}</xbrli:startDate><xbrli:endDate>{end}</xbrli:endDate></xbrli:period>"
         "</xbrli:context>"
         '<xbrli:unit id="u_eur"><xbrli:measure>iso4217:EUR</xbrli:measure></xbrli:unit>'
         '<xbrli:unit id="u_tco2e"><xbrli:measure>utr:tCO2e</xbrli:measure></xbrli:unit>'
@@ -291,7 +292,11 @@ def _make_header(*, entity_identifier, entity_scheme, start, end, ctx_duration) 
         '<xbrli:unit id="u_tonne"><xbrli:measure>utr:tonnes</xbrli:measure></xbrli:unit>'
         '<xbrli:unit id="u_mwh"><xbrli:measure>utr:megawattHours</xbrli:measure></xbrli:unit>'
         '<xbrli:unit id="u_m3"><xbrli:measure>utr:cubicMeters</xbrli:measure></xbrli:unit>'
-        "</ix:resources></ix:hidden></ix:header>"
+        "</ix:resources>"
+        "<ix:references>"
+        f'<link:schemaRef xlink:type="simple" xlink:href="{ESRS_NS}/esrs_all.xsd"/>'
+        "</ix:references>"
+        "</ix:header>"
     )
 
 

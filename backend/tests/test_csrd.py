@@ -30,6 +30,7 @@ OTHER_ORG = "org-csrd-2"
 
 # ─── stateful fake supabase (mirrors test_assurance_persistence.py) ─────────
 
+
 class _Resp:
     def __init__(self, data):
         self.data = data
@@ -184,6 +185,7 @@ def _auth(user: str = USER_ID) -> dict:
 
 # ─── registry ──────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_standards_endpoint(client):
     resp = await client.get("/api/platform/csrd/standards", headers=_auth())
@@ -197,23 +199,17 @@ async def test_standards_endpoint(client):
 
 @pytest.mark.asyncio
 async def test_registry_pagination_and_filters(client):
-    resp = await client.get(
-        "/api/platform/csrd/registry", params={"limit": 20, "offset": 0}, headers=_auth()
-    )
+    resp = await client.get("/api/platform/csrd/registry", params={"limit": 20, "offset": 0}, headers=_auth())
     body = resp.json()
     assert body["total"] == 664
     assert len(body["datapoints"]) == 20
 
-    resp = await client.get(
-        "/api/platform/csrd/registry", params={"standard": "E1"}, headers=_auth()
-    )
+    resp = await client.get("/api/platform/csrd/registry", params={"standard": "E1"}, headers=_auth())
     body = resp.json()
     assert body["total"] == 104
     assert all(d["standard"] == "E1" for d in body["datapoints"])
 
-    resp = await client.get(
-        "/api/platform/csrd/registry", params={"q": "ghg"}, headers=_auth()
-    )
+    resp = await client.get("/api/platform/csrd/registry", params={"q": "ghg"}, headers=_auth())
     assert resp.status_code == 200
     assert resp.json()["total"] > 0
 
@@ -396,9 +392,7 @@ async def test_phase_in_scopes_the_gap_by_reporting_year(client, db):
 
     # FY2024 scope: 664 - 3 (FY2025-gated) - 12 (FY2026-gated) = 649
     for fy, total, handled in (("FY2024", 649, 0), ("FY2025", 652, 1)):
-        resp = await client.get(
-            "/api/platform/csrd/gap-analysis", params={"financial_year": fy}, headers=_auth()
-        )
+        resp = await client.get("/api/platform/csrd/gap-analysis", params={"financial_year": fy}, headers=_auth())
         body = resp.json()
         assert body["total_datapoints"] == total, fy
         e4 = next(s for s in body["standards"] if s["standard"] == "E4")
@@ -433,19 +427,13 @@ async def test_not_material_requires_materiality_basis(client, db):
     )
     entry_id = entry.json()["entries"][0]["id"]
 
-    gap = await client.get(
-        "/api/platform/csrd/gap-analysis", params={"financial_year": "FY2025"}, headers=_auth()
-    )
+    gap = await client.get("/api/platform/csrd/gap-analysis", params={"financial_year": "FY2025"}, headers=_auth())
     e1 = next(s for s in gap.json()["standards"] if s["standard"] == "E1")
     assert e1["handled"] == 0  # not_material without an IRO doesn't close the gap
 
     # linking the materiality basis closes it
-    await client.put(
-        f"/api/platform/csrd/entries/{entry_id}", json={"materiality_id": iro_id}, headers=_auth()
-    )
-    gap = await client.get(
-        "/api/platform/csrd/gap-analysis", params={"financial_year": "FY2025"}, headers=_auth()
-    )
+    await client.put(f"/api/platform/csrd/entries/{entry_id}", json={"materiality_id": iro_id}, headers=_auth())
+    gap = await client.get("/api/platform/csrd/gap-analysis", params={"financial_year": "FY2025"}, headers=_auth())
     e1 = next(s for s in gap.json()["standards"] if s["standard"] == "E1")
     assert e1["handled"] == 1
 
@@ -458,14 +446,13 @@ async def test_not_material_requires_materiality_basis(client, db):
         },
         headers=_auth(),
     )
-    gap = await client.get(
-        "/api/platform/csrd/gap-analysis", params={"financial_year": "FY2024"}, headers=_auth()
-    )
+    gap = await client.get("/api/platform/csrd/gap-analysis", params={"financial_year": "FY2024"}, headers=_auth())
     e1 = next(s for s in gap.json()["standards"] if s["standard"] == "E1")
     assert e1["handled"] == 1
 
 
 # ─── double materiality ────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_iro_crud_and_material_threshold(client, db):
@@ -537,9 +524,7 @@ async def test_delete_iro_detaches_linked_entries(client, db):
         "/api/platform/csrd/entries",
         json={
             "financial_year": "FY2025",
-            "entries": [
-                {"datapoint_id": _E1_DP[0], "status": "not_material", "materiality_id": iro_id}
-            ],
+            "entries": [{"datapoint_id": _E1_DP[0], "status": "not_material", "materiality_id": iro_id}],
         },
         headers=_auth(),
     )
@@ -562,13 +547,15 @@ async def test_scope_endpoints_and_value_chain_filter(client, db):
     assert scope.json()["value_chain_scope"] == ["own_operations", "upstream", "downstream"]
 
     bad = await client.put(
-        "/api/platform/csrd/scope", json={"value_chain_scope": ["own_operations", "mars"]},
+        "/api/platform/csrd/scope",
+        json={"value_chain_scope": ["own_operations", "mars"]},
         headers=_auth(),
     )
     assert bad.status_code == 400
 
     ok = await client.put(
-        "/api/platform/csrd/scope", json={"value_chain_scope": ["own_operations"]},
+        "/api/platform/csrd/scope",
+        json={"value_chain_scope": ["own_operations"]},
         headers=_auth(),
     )
     assert ok.status_code == 200
@@ -576,9 +563,7 @@ async def test_scope_endpoints_and_value_chain_filter(client, db):
     assert scope.json()["value_chain_scope"] == ["own_operations"]
 
     # value-chain registry filter: every row is "all", so boundaries keep all rows
-    reg = await client.get(
-        "/api/platform/csrd/registry", params={"value_chain": "downstream"}, headers=_auth()
-    )
+    reg = await client.get("/api/platform/csrd/registry", params={"value_chain": "downstream"}, headers=_auth())
     assert reg.status_code == 200
     assert reg.json()["total"] == 664
 
@@ -594,6 +579,7 @@ async def test_scope_endpoints_and_value_chain_filter(client, db):
 
 
 # ─── report export ─────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_report_generation_and_download(client, db):
@@ -617,13 +603,9 @@ async def test_report_generation_and_download(client, db):
     assert body["coverage_pct"] == pytest.approx(round(1 / 652 * 100, 2))
     assert body["file_size_bytes"] > 0
 
-    download = await client.get(
-        f"/api/platform/csrd/reports/{report_id}/download", headers=_auth()
-    )
+    download = await client.get(f"/api/platform/csrd/reports/{report_id}/download", headers=_auth())
     assert download.status_code == 200
-    assert download.headers["content-type"].startswith(
-        "application/vnd.openxmlformats"
-    )
+    assert download.headers["content-type"].startswith("application/vnd.openxmlformats")
     assert len(download.content) == body["file_size_bytes"]
 
     listed = await client.get(
@@ -649,9 +631,7 @@ async def test_pdf_report_type(client):
     )
     reports = listed.json()["reports"]
     assert reports and reports[0]["report_type"] == "pdf"
-    download = await client.get(
-        f"/api/platform/csrd/reports/{reports[0]['id']}/download", headers=_auth()
-    )
+    download = await client.get(f"/api/platform/csrd/reports/{reports[0]['id']}/download", headers=_auth())
     assert download.status_code == 200
     assert download.content[:4] == b"%PDF"
 
@@ -730,9 +710,7 @@ async def test_report_excludes_unsubstantiated_not_material(client, db):
         "/api/platform/csrd/entries",
         json={
             "financial_year": "FY2025",
-            "entries": [
-                {"datapoint_id": _E1_DP[0], "status": "not_material", "materiality_id": iro_id}
-            ],
+            "entries": [{"datapoint_id": _E1_DP[0], "status": "not_material", "materiality_id": iro_id}],
         },
         headers=_auth(),
     )
@@ -755,9 +733,7 @@ async def test_registry_search_combines_with_filters(client):
     assert body["total"] > 0
     assert all(d["phase_in"] == "FY2026" for d in body["datapoints"])
 
-    resp = await client.get(
-        "/api/platform/csrd/registry", params={"q": "financial", "standard": "E1"}, headers=_auth()
-    )
+    resp = await client.get("/api/platform/csrd/registry", params={"q": "financial", "standard": "E1"}, headers=_auth())
     body = resp.json()
     assert body["total"] > 0
     assert all(d["standard"] == "E1" for d in body["datapoints"])
@@ -818,9 +794,7 @@ async def test_esef_report_generation_and_download(client, db):
     reports = listed.json()["reports"]
     assert reports and reports[0]["report_type"] == "esef"
 
-    download = await client.get(
-        f"/api/platform/csrd/reports/{report_id}/download", headers=_auth()
-    )
+    download = await client.get(f"/api/platform/csrd/reports/{report_id}/download", headers=_auth())
     assert download.status_code == 200
     assert download.headers["content-type"] == "application/xhtml+xml"
     body = download.content.decode("utf-8")
@@ -839,7 +813,10 @@ async def test_esef_report_has_concept_tags_for_numeric_and_text(client):
     )
     body = download.content.decode("utf-8")
     assert 'name="esrs:GrossGreenhouseGasEmissions"' in body
-    assert 'name="esrs:DisclosureOfExtentToWhichSustainabilityStatementCoversUpstreamAndDownstreamValueChainExplanatory"' in body
+    assert (
+        'name="esrs:DisclosureOfExtentToWhichSustainabilityStatementCoversUpstreamAndDownstreamValueChainExplanatory"'
+        in body
+    )
 
 
 @pytest.mark.asyncio
@@ -855,7 +832,7 @@ async def test_submission_requires_assurance(client):
 
 
 async def _mk_validated_report(client) -> str:
-    """ESEF report with a limited assurance opinion and a passing validation."""
+    """ESEF report attested with a limited assurance opinion + passing validation."""
     report_id = await _mk_esef_report(client)
     await client.post(
         f"/api/platform/csrd/reports/{report_id}/assurance",
@@ -865,6 +842,12 @@ async def _mk_validated_report(client) -> str:
     resp = await client.post(f"/api/platform/csrd/reports/{report_id}/validate", headers=_auth())
     assert resp.status_code == 200
     assert resp.json()["passed"] is True
+    attest = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/attestation",
+        json={"signed_by": "Test Auditor", "statement": "Signs off the ESRS statement."},
+        headers=_auth(),
+    )
+    assert attest.status_code == 200
     return report_id
 
 
@@ -900,6 +883,73 @@ async def test_validate_without_assurance_fails(client):
     body = resp.json()
     assert body["passed"] is False
     assert any(e["code"] == "assurance_missing" for e in body["errors"])
+
+
+@pytest.mark.asyncio
+async def test_validate_folds_in_arelle_authority(client, monkeypatch):
+    """With ESEF_ARRELLE_ENABLED, Arelle errors block submission."""
+    from app import router_csrd
+    from app.config import Settings
+
+    report_id = await _mk_esef_report(client)
+    await client.post(
+        f"/api/platform/csrd/reports/{report_id}/assurance",
+        json={"status": "limited"},
+        headers=_auth(),
+    )
+    settings = Settings(
+        SUPABASE_URL="http://fake",
+        SUPABASE_SERVICE_KEY="k",
+        ESEF_ARRELLE_ENABLED=True,
+    )
+    monkeypatch.setattr(router_csrd, "get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.esef_arelle.run_arelle_validation",
+        lambda *a, **k: {
+            "available": True,
+            "elapsed_ms": 150,
+            "errors": [{"severity": "error", "code": "xbrl.4.6.3", "message": "missing precision/decimals"}],
+            "warnings": [],
+        },
+    )
+    resp = await client.post(f"/api/platform/csrd/reports/{report_id}/validate", headers=_auth())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["passed"] is False
+    assert any(e["code"] == "xbrl.4.6.3" for e in body["errors"])
+    listed = await client.get(
+        "/api/platform/csrd/reports",
+        params={"financial_year": "FY2025"},
+        headers=_auth(),
+    )
+    row = next(r for r in listed.json()["reports"] if r["id"] == report_id)
+    assert row["validation_status"] == "fail"
+
+
+@pytest.mark.asyncio
+async def test_validate_records_arelle_unavailable(client, monkeypatch):
+    """Arelle enabled but not installed must not break the product gate."""
+    from app import router_csrd
+    from app.config import Settings
+
+    report_id = await _mk_esef_report(client)
+    await client.post(
+        f"/api/platform/csrd/reports/{report_id}/assurance",
+        json={"status": "limited"},
+        headers=_auth(),
+    )
+    settings = Settings(
+        SUPABASE_URL="http://fake",
+        SUPABASE_SERVICE_KEY="k",
+        ESEF_ARRELLE_ENABLED=True,
+    )
+    monkeypatch.setattr(router_csrd, "get_settings", lambda: settings)
+    monkeypatch.setattr("app.esef_arelle.run_arelle_validation", lambda *a, **k: None)
+    resp = await client.post(f"/api/platform/csrd/reports/{report_id}/validate", headers=_auth())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["passed"] is True
+    assert any(i["code"] == "arelle_unavailable" for i in body["errors"] + body["warnings"] + body["infos"])
 
 
 @pytest.mark.asyncio
@@ -959,6 +1009,24 @@ async def test_assurance_and_submission_flow(client, db):
     )
     assert vr.status_code == 200 and vr.json()["passed"] is True
 
+    # attestation gate blocks submission before the auditor signs off
+    no_attest = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "CSRD-FY2025-ACME"},
+        headers=_auth(),
+    )
+    assert no_attest.status_code == 409
+    assert "attestation" in no_attest.json()["detail"].lower()
+
+    at = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/attestation",
+        json={"signed_by": "B4 Auditor", "statement": "Signed as auditor."},
+        headers=_auth(),
+    )
+    assert at.status_code == 200
+    assert at.json()["attested_by"] == "B4 Auditor"
+    assert at.json()["attested_at"]
+
     sub = await client.post(
         f"/api/platform/csrd/reports/{report_id}/submit",
         json={"filing_ref": "CSRD-FY2025-ACME"},
@@ -981,9 +1049,7 @@ async def test_assurance_and_submission_flow(client, db):
     assert sub_row["status"] == "queued_local"
 
     # download reflects the stored assurance opinion
-    download = await client.get(
-        f"/api/platform/csrd/reports/{report_id}/download", headers=_auth()
-    )
+    download = await client.get(f"/api/platform/csrd/reports/{report_id}/download", headers=_auth())
     assert download.status_code == 200
     assert "limited assurance" in download.content.decode("utf-8").lower()
 
@@ -1082,6 +1148,136 @@ async def test_submit_retries_webhook_failure(client, db, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_submit_parses_json_oam_ack(client, db, monkeypatch):
+    """A JSON regulator receipt records ack_ref/acknowledged_at/channel."""
+    from app import router_csrd
+    from app.config import Settings
+
+    report_id = await _mk_validated_report(client)
+    settings = Settings(
+        SUPABASE_URL="http://fake", SUPABASE_SERVICE_KEY="k", OAM_FILING_ENDPOINT="https://oam.example/filing"
+    )
+    monkeypatch.setattr(router_csrd, "get_settings", lambda: settings)
+
+    import json
+    import urllib.request
+
+    ack_body = json.dumps(
+        {"submission_ref": "ESAP-2025-001", "received_at": "2026-03-20T09:00:00Z", "channel": "esap"}
+    ).encode()
+
+    def _oam(_url, data=None, timeout=None, headers=None):
+        class Resp:
+            def read(self):
+                return ack_body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        return Resp()
+
+    monkeypatch.setattr(urllib.request, "urlopen", _oam)
+    resp = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "REF-ACK"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "submitted"
+    assert body["ack_ref"] == "ESAP-2025-001"
+    assert body["acknowledged_at"] == "2026-03-20T09:00:00Z"
+    assert body["channel"] == "oam_webhook"
+    listed = await client.get(
+        "/api/platform/csrd/submissions",
+        params={"financial_year": "FY2025"},
+        headers=_auth(),
+    )
+    row = listed.json()["submissions"][0]
+    assert row["ack_ref"] == "ESAP-2025-001"
+    assert row["ack_payload"]["submission_ref"] == "ESAP-2025-001"
+    assert row["channel"] == "oam_webhook"
+
+
+@pytest.mark.asyncio
+async def test_submit_legacy_text_ack_bypasses_receipt_fields(client, db, monkeypatch):
+    """Plain-text OAM responses stay the legacy ref; no ack protocol fields."""
+    from app import router_csrd
+    from app.config import Settings
+
+    report_id = await _mk_validated_report(client)
+    settings = Settings(
+        SUPABASE_URL="http://fake", SUPABASE_SERVICE_KEY="k", OAM_FILING_ENDPOINT="https://oam.example/filing"
+    )
+    monkeypatch.setattr(router_csrd, "get_settings", lambda: settings)
+
+    import urllib.request
+
+    def _oam(_url, data=None, timeout=None, headers=None):
+        class Resp:
+            def read(self):
+                return b"legacy-ref-1"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        return Resp()
+
+    monkeypatch.setattr(urllib.request, "urlopen", _oam)
+    resp = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "REF-LEGACY"},
+        headers=_auth(),
+    )
+    body = resp.json()
+    assert body["submission_ref"] == "legacy-ref-1"
+    assert body["ack_ref"] is None
+    assert body["acknowledged_at"] is None
+    assert body["channel"] == "oam_webhook"
+
+
+@pytest.mark.asyncio
+async def test_sandbox_simulates_regulator_receipt(client, db, monkeypatch):
+    """Dev sandbox marks a queued_local submission as acknowledged by the OAM."""
+    from app import router_csrd
+    from app.config import Settings
+
+    report_id = await _mk_validated_report(client)
+    monkeypatch.setattr(
+        router_csrd,
+        "get_settings",
+        lambda: Settings(SUPABASE_URL="http://fake", SUPABASE_SERVICE_KEY="k", ENVIRONMENT="development"),
+    )
+    submitted = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "REF-SBX"},
+        headers=_auth(),
+    )
+    assert submitted.json()["status"] == "queued_local"
+    assert submitted.json()["channel"] == "local_queue"
+
+    ack = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/sandbox/ack",
+        headers=_auth(),
+    )
+    assert ack.status_code == 200
+    body = ack.json()
+    assert body["status"] == "submitted"
+    assert body["channel"] == "sandbox"
+    assert body["ack_ref"] == "REF-SBX"
+    assert body["acknowledged_at"]
+    row = next(r for r in db.tables["esrs_submissions"] if r["report_id"] == report_id)
+    assert row["channel"] == "sandbox"
+    assert row["ack_payload"]["acknowledged_by"] == "sandbox-oam"
+
+
+@pytest.mark.asyncio
 async def test_not_ready_report_409s_on_submission_and_assurance(client, db):
     """Assurance/submission both 409 when the report is not ``ready``."""
     report_id = await _mk_esef_report(client)
@@ -1104,3 +1300,93 @@ async def test_not_ready_report_409s_on_submission_and_assurance(client, db):
         headers=_auth(),
     )
     assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_attestation_requires_assurance(client, db):
+    """Attestation 409s until the report carries an assurance opinion."""
+    report_id = await _mk_esef_report(client)
+    resp = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/attestation",
+        json={"signed_by": "Auditor One", "statement": "x"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 409
+    await client.post(
+        f"/api/platform/csrd/reports/{report_id}/assurance",
+        json={"status": "reasonable"},
+        headers=_auth(),
+    )
+    ok = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/attestation",
+        json={"signed_by": "Auditor One", "statement": "x"},
+        headers=_auth(),
+    )
+    assert ok.status_code == 200
+    assert ok.json()["attested_by"] == "Auditor One"
+    row = next(r for r in db.tables["esrs_reports"] if r["id"] == report_id)
+    assert row["attested_at"] is not None
+    assert row["attestation_statement"] == "x"
+
+
+@pytest.mark.asyncio
+async def test_submission_carries_verifiable_qes_signature(client, db, monkeypatch):
+    """The submission persists an Ed25519 signature over the manifest digest;
+    the stored public key verifies it, and tampering is rejected."""
+    import base64
+
+    from app.prov import signing
+
+    report_id = await _mk_validated_report(client)
+    resp = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "CSRD-QES-1"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 200
+    row = next(r for r in db.tables["esrs_submissions"] if r["report_id"] == report_id)
+    assert row["qes_algorithm"] == "Ed25519"
+    assert row["qes_key_id"]
+    assert row["qes_manifest_digest"]
+    assert len(row["qes_manifest_digest"]) == 64
+
+    digest = row["qes_manifest_digest"].encode("ascii")
+    signature = base64.b64decode(row["qes_signature_b64"])
+    assert signing.verify(digest, signature, row["qes_public_key_b64"]) is True
+    assert signing.verify(b"deadbeef" * 8, signature, row["qes_public_key_b64"]) is False
+
+    again = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "CSRD-QES-1"},
+        headers=_auth(),
+    )
+    assert again.status_code == 200
+    assert again.json()["submission_id"] == resp.json()["submission_id"]
+
+
+@pytest.mark.asyncio
+async def test_qes_xml_renders_verifiable_signature(client):
+    """The qes.xml record self-documents a manifest digest that parses back
+    and verifies against the embedded Ed25519 public key."""
+    import base64
+    import hashlib
+    import json
+    import xml.etree.ElementTree as ET
+
+    from app import router_csrd
+    from app.prov import signing
+
+    manifest = json.dumps(
+        {"schema_version": "1.0", "filing_ref": "REF-QES", "assurance": {"status": "limited"}}, sort_keys=True
+    )
+    digest = hashlib.sha256(manifest.encode()).hexdigest()
+    record = router_csrd._sign_manifest_qes(digest, "report-123", "Auditor A")
+    root = ET.fromstring(record["xml"])
+    ns = {"qes": "filebrsr:qes"}
+    assert root.find("qes:algorithm", ns).text == "Ed25519"
+    assert root.find("qes:attested-by", ns).text == "Auditor A"
+    digest_el = root.find("qes:digest", ns)
+    assert digest_el.get("value") == digest
+    signature = base64.b64decode(root.find("qes:signature", ns).get("base64"))
+    public_key = root.find("qes:public-key", ns).get("base64")
+    assert signing.verify(digest.encode(), signature, public_key) is True

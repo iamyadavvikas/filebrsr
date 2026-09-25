@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 
 from app.auth import get_user_id_from_header as get_user_id
 from app.config import get_settings
+from app.esef_arelle import apply_arelle
 from app.esrs_datapoints import (
     ESRS_DATAPOINTS,
     ESRS_STANDARDS,
@@ -46,9 +47,7 @@ logger = logging.getLogger("filebrsr.csrd")
 
 # Statuses that count as "handled" for gap analysis / readiness.
 HANDLED_STATUSES = frozenset({"reported", "assessed", "not_material", "not_applicable"})
-VALID_STATUSES = frozenset(
-    {"not_assessed", "in_progress", "assessed", "reported", "not_material", "not_applicable"}
-)
+VALID_STATUSES = frozenset({"not_assessed", "in_progress", "assessed", "reported", "not_material", "not_applicable"})
 UNKNOWN_DP = "unknown_datapoint"
 DEFAULT_MATERIALITY_THRESHOLD = 3.0
 
@@ -115,13 +114,7 @@ def _resolve_org(supabase, user_id: str, org_id: Optional[str]) -> str:
         if not alt.data:
             raise HTTPException(status_code=403, detail="Not a member of this organisation")
         return org_id
-    profile = (
-        supabase.table("profiles")
-        .select("org_id")
-        .eq("id", user_id)
-        .maybe_single()
-        .execute()
-    )
+    profile = supabase.table("profiles").select("org_id").eq("id", user_id).maybe_single().execute()
     resolved = (profile.data or {}).get("org_id")
     if not resolved:
         raise HTTPException(status_code=400, detail="No organisation associated with your account")
@@ -169,9 +162,7 @@ async def list_standards():
                     (r["datapoints"] for r in cs["standards"] if r["standard"] == std_id),
                     0,
                 ),
-                "dr_count": next(
-                    (r["dr_count"] for r in cs["standards"] if r["standard"] == std_id), 0
-                ),
+                "dr_count": next((r["dr_count"] for r in cs["standards"] if r["standard"] == std_id), 0),
             }
         )
     return {
@@ -323,29 +314,18 @@ async def upsert_entries(req: EntryBulk, authorization: str = Header(...)):
                 "materiality_id": e.materiality_id,
             }
         )
-    result = sb.table("esrs_entries").upsert(
-        rows, on_conflict="org_id,financial_year,datapoint_id"
-    ).execute()
+    result = sb.table("esrs_entries").upsert(rows, on_conflict="org_id,financial_year,datapoint_id").execute()
     saved = result.data or []
     return {"org_id": org_id, "saved": len(saved), "entries": saved}
 
 
 @router.put("/entries/{entry_id}")
-async def update_entry(
-    entry_id: str, req: EntryUpdate, authorization: str = Header(...)
-):
+async def update_entry(entry_id: str, req: EntryUpdate, authorization: str = Header(...)):
     """Update selected fields of one entry row."""
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
     org_id = _resolve_org(sb, user_id, None)
-    existing = (
-        sb.table("esrs_entries")
-        .select("*")
-        .eq("id", entry_id)
-        .eq("org_id", org_id)
-        .maybe_single()
-        .execute()
-    )
+    existing = sb.table("esrs_entries").select("*").eq("id", entry_id).eq("org_id", org_id).maybe_single().execute()
     if not existing.data:
         raise HTTPException(status_code=404, detail="Entry not found")
     if req.status is not None and req.status not in VALID_STATUSES:
@@ -355,13 +335,7 @@ async def update_entry(
         )
     patch = {k: v for k, v in req.model_dump().items() if v is not None}
     patch["user_id"] = user_id
-    result = (
-        sb.table("esrs_entries")
-        .update(patch)
-        .eq("id", entry_id)
-        .eq("org_id", org_id)
-        .execute()
-    )
+    result = sb.table("esrs_entries").update(patch).eq("id", entry_id).eq("org_id", org_id).execute()
     return {"entry": (result.data or [{}])[0]}
 
 
@@ -370,14 +344,7 @@ async def delete_entry(entry_id: str, authorization: str = Header(...)):
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
     org_id = _resolve_org(sb, user_id, None)
-    existing = (
-        sb.table("esrs_entries")
-        .select("id")
-        .eq("id", entry_id)
-        .eq("org_id", org_id)
-        .maybe_single()
-        .execute()
-    )
+    existing = sb.table("esrs_entries").select("id").eq("id", entry_id).eq("org_id", org_id).maybe_single().execute()
     if not existing.data:
         raise HTTPException(status_code=404, detail="Entry not found")
     sb.table("esrs_entries").delete().eq("id", entry_id).execute()
@@ -410,9 +377,7 @@ async def gap_analysis(
     if not financial_year:
         raise HTTPException(status_code=400, detail="financial_year is required")
 
-    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(
-        sb, org_id, financial_year, value_chain
-    )
+    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(sb, org_id, financial_year, value_chain)
 
     standards = []
     for std_id, m in ESRS_STANDARDS.items():
@@ -466,13 +431,7 @@ def _active_scope(sb, org_id: str, value_chain: Optional[str]) -> set[str]:
         if wanted:
             return wanted
     try:
-        res = (
-            sb.table("esrs_profiles")
-            .select("value_chain_scope")
-            .eq("org_id", org_id)
-            .maybe_single()
-            .execute()
-        )
+        res = sb.table("esrs_profiles").select("value_chain_scope").eq("org_id", org_id).maybe_single().execute()
         stored = (res.data or {}).get("value_chain_scope")
     except Exception:  # noqa: BLE001 - profile table may not exist yet
         stored = None
@@ -496,20 +455,13 @@ def _scoped_state(
     substantiation). Gap analysis and report export share this so their
     coverage numbers always agree.
     """
-    resp = (
-        sb.table("esrs_entries")
-        .select("*")
-        .eq("org_id", org_id)
-        .eq("financial_year", financial_year)
-        .execute()
-    )
+    resp = sb.table("esrs_entries").select("*").eq("org_id", org_id).eq("financial_year", financial_year).execute()
     entries_map = {r["datapoint_id"]: r for r in (resp.data or [])}
     scope = _active_scope(sb, org_id, value_chain)
     in_scope_ids = {
         d["id"]
         for d in ESRS_DATAPOINTS
-        if _phase_for_year(d.get("phase_in"), financial_year)
-        and bool(_value_chain_segments(d) & scope)
+        if _phase_for_year(d.get("phase_in"), financial_year) and bool(_value_chain_segments(d) & scope)
     }
     material_rows = (
         sb.table("esrs_materiality")
@@ -554,9 +506,7 @@ class IROUpdate(BaseModel):
     status: Optional[str] = None
 
 
-def _material_flag(
-    impact: Optional[float], financial: Optional[float], explicit: Optional[bool]
-) -> bool:
+def _material_flag(impact: Optional[float], financial: Optional[float], explicit: Optional[bool]) -> bool:
     if explicit is not None:
         return explicit
     impact = impact or 0.0
@@ -620,32 +570,15 @@ async def update_iro(iro_id: str, req: IROUpdate, authorization: str = Header(..
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
     org_id = _resolve_org(sb, user_id, None)
-    existing = (
-        sb.table("esrs_materiality")
-        .select("*")
-        .eq("id", iro_id)
-        .eq("org_id", org_id)
-        .maybe_single()
-        .execute()
-    )
+    existing = sb.table("esrs_materiality").select("*").eq("id", iro_id).eq("org_id", org_id).maybe_single().execute()
     if not existing.data:
         raise HTTPException(status_code=404, detail="IRO not found")
     patch = {k: v for k, v in req.model_dump().items() if v is not None}
-    if "material" not in patch and any(
-        k in patch for k in ("impact_materiality", "financial_materiality")
-    ):
+    if "material" not in patch and any(k in patch for k in ("impact_materiality", "financial_materiality")):
         impact = patch.get("impact_materiality", existing.data.get("impact_materiality"))
-        financial = patch.get(
-            "financial_materiality", existing.data.get("financial_materiality")
-        )
+        financial = patch.get("financial_materiality", existing.data.get("financial_materiality"))
         patch["material"] = _material_flag(impact, financial, None)
-    result = (
-        sb.table("esrs_materiality")
-        .update(patch)
-        .eq("id", iro_id)
-        .eq("org_id", org_id)
-        .execute()
-    )
+    result = sb.table("esrs_materiality").update(patch).eq("id", iro_id).eq("org_id", org_id).execute()
     return {"iro": (result.data or [{}])[0]}
 
 
@@ -660,14 +593,7 @@ async def delete_iro(iro_id: str, authorization: str = Header(...)):
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
     org_id = _resolve_org(sb, user_id, None)
-    existing = (
-        sb.table("esrs_materiality")
-        .select("id")
-        .eq("id", iro_id)
-        .eq("org_id", org_id)
-        .maybe_single()
-        .execute()
-    )
+    existing = sb.table("esrs_materiality").select("id").eq("id", iro_id).eq("org_id", org_id).maybe_single().execute()
     if not existing.data:
         raise HTTPException(status_code=404, detail="IRO not found")
     sb.table("esrs_materiality").delete().eq("id", iro_id).execute()
@@ -691,13 +617,7 @@ async def get_scope(org_id: Optional[str] = None, authorization: str = Header(..
     sb = get_supabase_admin()
     org_id = _resolve_org(sb, user_id, org_id)
     try:
-        res = (
-            sb.table("esrs_profiles")
-            .select("value_chain_scope")
-            .eq("org_id", org_id)
-            .maybe_single()
-            .execute()
-        )
+        res = sb.table("esrs_profiles").select("value_chain_scope").eq("org_id", org_id).maybe_single().execute()
         stored = (res.data or {}).get("value_chain_scope")
     except Exception:  # noqa: BLE001 - profile table may not exist yet
         stored = None
@@ -709,9 +629,7 @@ async def get_scope(org_id: Optional[str] = None, authorization: str = Header(..
 
 
 @router.put("/scope")
-async def set_scope(
-    req: ScopeUpdate, org_id: Optional[str] = None, authorization: str = Header(...)
-):
+async def set_scope(req: ScopeUpdate, org_id: Optional[str] = None, authorization: str = Header(...)):
     """Persist the org's value-chain boundary (deduped, subset of the three)."""
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
@@ -728,9 +646,9 @@ async def set_scope(
             ),
         )
     scope = list(dict.fromkeys(req.value_chain_scope))
-    result = sb.table("esrs_profiles").upsert(
-        {"org_id": org_id, "value_chain_scope": scope}, on_conflict="org_id"
-    ).execute()
+    result = (
+        sb.table("esrs_profiles").upsert({"org_id": org_id, "value_chain_scope": scope}, on_conflict="org_id").execute()
+    )
     row = (result.data or [{}])[0]
     return {"org_id": org_id, "value_chain_scope": row.get("value_chain_scope") or scope}
 
@@ -748,13 +666,7 @@ REPORT_CONTENT_TYPES = {
 
 def _resolve_entity(sb, org_id: str) -> dict:
     """Org entity identity for filing (name + LEI/CIN identifier + scheme)."""
-    org = (
-        sb.table("organizations")
-        .select("id, name, cin, lei")
-        .eq("id", org_id)
-        .maybe_single()
-        .execute()
-    )
+    org = sb.table("organizations").select("id, name, cin, lei").eq("id", org_id).maybe_single().execute()
     row = org.data or {}
     name = row.get("name") or f"Organization {org_id[:8]}"
     identifier = row.get("lei") or row.get("cin") or org_id
@@ -776,6 +688,94 @@ def _report_assurance(row: dict) -> dict:
     }
 
 
+def _parse_oam_ack(body: str, fallback_ref: str) -> dict:
+    """Interpret a regulator (OAM) webhook response.
+
+    JSON receipts carry the acknowledgment reference and timestamp; plain-text
+    responses are legacy refs. Returns ``{"submission_ref", "acknowledged_at",
+    "ack_payload", "is_receipt"}`` where ``is_receipt`` is only true for a
+    well-formed JSON ack.
+    """
+    try:
+        parsed = json.loads(body)
+    except (ValueError, TypeError):
+        return {
+            "submission_ref": body.strip() or fallback_ref,
+            "acknowledged_at": None,
+            "ack_payload": None,
+            "is_receipt": False,
+        }
+    if not isinstance(parsed, dict):
+        return {
+            "submission_ref": fallback_ref,
+            "acknowledged_at": None,
+            "ack_payload": None,
+            "is_receipt": False,
+        }
+    ref = parsed.get("submission_ref") or parsed.get("ack_ref") or fallback_ref
+    received = parsed.get("received_at") or parsed.get("acknowledged_at")
+    return {
+        "submission_ref": ref or fallback_ref,
+        "acknowledged_at": received or time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "ack_payload": parsed,
+        "is_receipt": True,
+    }
+
+
+def _sign_manifest_qes(manifest_digest: str, report_id: str, attested_by: str) -> dict:
+    """Digitally sign the manifest digest and render the package's qes.xml.
+
+    Uses the process Ed25519 signer from ``app.prov.signing`` (KMS envelope in
+    production, local/ephemeral seed elsewhere). The signature is detached:
+    the OAM recomputes the manifest digest from ``manifest.json`` and verifies
+    it against the embedded public key.
+    """
+    from app.prov import signing
+
+    try:
+        signer = signing.get_signer()
+    except signing.SigningError as exc:
+        raise HTTPException(status_code=500, detail=f"Cannot sign submission: {exc}") from exc
+    import base64
+
+    signature_b64 = base64.b64encode(signer.sign(manifest_digest.encode("ascii"))).decode("ascii")
+    public_key_b64 = signer.public_key_b64()
+    signed_at = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<qes xmlns="filebrsr:qes">\n'
+        f"  <subject>csrd-report:{report_id}</subject>\n"
+        f"  <attested-by>{_xml_escape(attested_by)}</attested-by>\n"
+        "  <algorithm>Ed25519</algorithm>\n"
+        f"  <key-id>{_xml_escape(signer.key_id)}</key-id>\n"
+        f'  <public-key base64="{public_key_b64}"/>\n'
+        f"  <signed-at>{signed_at}</signed-at>\n"
+        f'  <digest algorithm="SHA-256" of="manifest.json" value="{manifest_digest}"/>\n'
+        f'  <signature base64="{signature_b64}"/>\n'
+        "</qes>\n"
+    )
+    return {
+        "algorithm": "Ed25519",
+        "key_id": signer.key_id,
+        "public_key_b64": public_key_b64,
+        "signature_b64": signature_b64,
+        "manifest_digest": manifest_digest,
+        "signed_at": signed_at,
+        "xml": xml,
+    }
+
+
+def _xml_escape(value: str) -> str:
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
+    )
+
+
 def _entry_payload(row: dict) -> dict:
     """Shrink an ``esrs_entries`` row to the fields the ESEF builder needs."""
     return {
@@ -789,9 +789,7 @@ def _entry_payload(row: dict) -> dict:
 
 def _build_esef(sb, org_id: str, row: dict) -> bytes:
     """Regenerate the ESEF artifact for a report row (shared by all flows)."""
-    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(
-        sb, org_id, row["financial_year"]
-    )
+    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(sb, org_id, row["financial_year"])
     entity = _resolve_entity(sb, org_id)
     return build_esef_statement(
         financial_year=row["financial_year"],
@@ -799,10 +797,7 @@ def _build_esef(sb, org_id: str, row: dict) -> bytes:
         org_name=entity["name"],
         entity_identifier=entity["identifier"],
         entity_scheme=entity["scheme"],
-        entries=[
-            _entry_payload(e)
-            for e in sorted(entries_map.values(), key=lambda r: r["datapoint_id"])
-        ],
+        entries=[_entry_payload(e) for e in sorted(entries_map.values(), key=lambda r: r["datapoint_id"])],
         in_scope_ids=sorted(in_scope_ids),
         coverage_pct=row.get("coverage_pct") or 0.0,
         value_chain_scope=sorted(scope),
@@ -810,9 +805,7 @@ def _build_esef(sb, org_id: str, row: dict) -> bytes:
     )
 
 
-def _scoped_handled(
-    in_scope_ids: set[str], entries_map: dict[str, Any], has_material_iro: bool
-) -> int:
+def _scoped_handled(in_scope_ids: set[str], entries_map: dict[str, Any], has_material_iro: bool) -> int:
     """Count in-scope datapoints whose entry closes the gap this year.
 
     Mirrors ``_status_handled`` so report coverage matches gap analysis
@@ -870,11 +863,7 @@ def _build_word_stmt(
             value = None
             if entry and entry.get("value") is not None:
                 v = entry["value"]
-                value = (
-                    json.dumps(v, indent=1)
-                    if isinstance(v, (dict, list))
-                    else str(v)
-                )
+                value = json.dumps(v, indent=1) if isinstance(v, (dict, list)) else str(v)
             elif entry and entry.get("notes"):
                 value = entry["notes"]
             row[2].text = (value or "")[:512]
@@ -995,19 +984,13 @@ async def generate_report(req: ReportRequest, authorization: str = Header(...)):
     fmt = req.format.lower()
     if fmt not in REPORT_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="format must be word, pdf, or esef")
-    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(
-        sb, org_id, req.financial_year
-    )
+    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(sb, org_id, req.financial_year)
 
     t0 = time.monotonic()
     if fmt == "word":
-        content = _build_word_stmt(
-            org_id, req.financial_year, entries_map, in_scope_ids, has_material_iro
-        )
+        content = _build_word_stmt(org_id, req.financial_year, entries_map, in_scope_ids, has_material_iro)
     elif fmt == "pdf":
-        content = _build_pdf_stmt(
-            org_id, req.financial_year, entries_map, in_scope_ids, has_material_iro
-        )
+        content = _build_pdf_stmt(org_id, req.financial_year, entries_map, in_scope_ids, has_material_iro)
     else:
         entity = _resolve_entity(sb, org_id)
         entries = [_entry_payload(e) for e in sorted(entries_map.values(), key=lambda r: r["datapoint_id"])]
@@ -1077,37 +1060,20 @@ async def download_report(report_id: str, authorization: str = Header(...)):
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
     org_id = _resolve_org(sb, user_id, None)
-    report = (
-        sb.table("esrs_reports")
-        .select("*")
-        .eq("id", report_id)
-        .eq("org_id", org_id)
-        .maybe_single()
-        .execute()
-    )
+    report = sb.table("esrs_reports").select("*").eq("id", report_id).eq("org_id", org_id).maybe_single().execute()
     if not report.data:
         raise HTTPException(status_code=404, detail="Report not found")
     row = report.data
     if row.get("status") != "ready":
         raise HTTPException(status_code=409, detail="Report is not ready")
-    in_scope_ids, entries_map, _, has_material_iro = _scoped_state(
-        sb, org_id, row["financial_year"]
-    )
+    in_scope_ids, entries_map, _, has_material_iro = _scoped_state(sb, org_id, row["financial_year"])
     content_type = REPORT_CONTENT_TYPES.get(row["report_type"])
     if row["report_type"] == "word":
-        in_scope_ids, entries_map, _, has_material_iro = _scoped_state(
-            sb, org_id, row["financial_year"]
-        )
-        content = _build_word_stmt(
-            org_id, row["financial_year"], entries_map, in_scope_ids, has_material_iro
-        )
+        in_scope_ids, entries_map, _, has_material_iro = _scoped_state(sb, org_id, row["financial_year"])
+        content = _build_word_stmt(org_id, row["financial_year"], entries_map, in_scope_ids, has_material_iro)
     elif row["report_type"] == "pdf":
-        in_scope_ids, entries_map, _, has_material_iro = _scoped_state(
-            sb, org_id, row["financial_year"]
-        )
-        content = _build_pdf_stmt(
-            org_id, row["financial_year"], entries_map, in_scope_ids, has_material_iro
-        )
+        in_scope_ids, entries_map, _, has_material_iro = _scoped_state(sb, org_id, row["financial_year"])
+        content = _build_pdf_stmt(org_id, row["financial_year"], entries_map, in_scope_ids, has_material_iro)
     else:
         content = _build_esef(sb, org_id, row)
     filename = (
@@ -1141,14 +1107,7 @@ async def validate_report(report_id: str, authorization: str = Header(...)):
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
     org_id = _resolve_org(sb, user_id, None)
-    report = (
-        sb.table("esrs_reports")
-        .select("*")
-        .eq("id", report_id)
-        .eq("org_id", org_id)
-        .maybe_single()
-        .execute()
-    )
+    report = sb.table("esrs_reports").select("*").eq("id", report_id).eq("org_id", org_id).maybe_single().execute()
     row = report.data
     if not row:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -1158,12 +1117,20 @@ async def validate_report(report_id: str, authorization: str = Header(...)):
         raise HTTPException(status_code=409, detail="Report is not ready")
 
     content = _build_esef(sb, org_id, row)
+    settings = get_settings()
     result = validate_esef_statement(
         content,
         financial_year=row["financial_year"],
         coverage_pct=row.get("coverage_pct") or 0.0,
         assurance=_report_assurance(row),
     )
+    if settings.ESEF_ARRELLE_ENABLED:
+        apply_arelle(
+            result,
+            content,
+            timeout=settings.ESEF_ARRELLE_TIMEOUT_SECONDS,
+            cmdline=settings.ESEF_ARRELLE_CMDLINE,
+        )
     payload = result.as_dict()
     patch = {
         "validation_status": "pass" if result.passed else "fail",
@@ -1185,9 +1152,7 @@ ASSURANCE_STATUSES = {"none", "limited", "reasonable"}
 
 
 @router.post("/reports/{report_id}/assurance")
-async def change_assurance(
-    report_id: str, req: AssuranceRequest, authorization: str = Header(...)
-):
+async def change_assurance(report_id: str, req: AssuranceRequest, authorization: str = Header(...)):
     """Attach a limited/reasonable assurance opinion to a ready report."""
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
@@ -1208,8 +1173,12 @@ async def change_assurance(
     if report.data.get("status") != "ready":
         raise HTTPException(status_code=409, detail="Report is not ready")
     if status == "none":
-        patch = {"assurance_status": "none", "assurance_firm": None,
-                 "assurance_date": None, "assurance_statement": None}
+        patch = {
+            "assurance_status": "none",
+            "assurance_firm": None,
+            "assurance_date": None,
+            "assurance_statement": None,
+        }
     else:
         patch = {
             "assurance_status": status,
@@ -1219,6 +1188,53 @@ async def change_assurance(
         }
     result = sb.table("esrs_reports").update(patch).eq("id", report_id).execute()
     return {"report_id": report_id, "assurance": (result.data or [{}])[0].get("assurance_status")}
+
+
+class AttestationRequest(BaseModel):
+    signed_by: str
+    statement: str = ""
+
+
+@router.post("/reports/{report_id}/attestation")
+async def attest_report(report_id: str, req: AttestationRequest, authorization: str = Header(...)):
+    """Record the auditor's attestation of an assured ESEF report.
+
+    Attestation is the final governance gate before the package may be
+    submitted (see /submit). The named auditor affirms the ESRS statement and
+    its assurance opinion; the identity is embedded in the qes.xml signature
+    record of any subsequent submission.
+    """
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    report = sb.table("esrs_reports").select("*").eq("id", report_id).eq("org_id", org_id).maybe_single().execute()
+    row = report.data
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row.get("report_type") != "esef":
+        raise HTTPException(status_code=400, detail="Only ESEF reports can be attested")
+    if not req.signed_by.strip():
+        raise HTTPException(status_code=422, detail="signed_by is required")
+    assurance = _report_assurance(row)
+    if assurance["status"] not in {"limited", "reasonable"}:
+        raise HTTPException(
+            status_code=409,
+            detail="An assurance opinion (limited or reasonable) is required before attestation",
+        )
+    now_ts = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    patch = {
+        "attested_by": req.signed_by.strip(),
+        "attested_at": now_ts,
+        "attestation_statement": req.statement.strip(),
+    }
+    result = sb.table("esrs_reports").update(patch).eq("id", report_id).execute()
+    updated = (result.data or [{}])[0]
+    return {
+        "report_id": report_id,
+        "attested_by": updated.get("attested_by"),
+        "attested_at": updated.get("attested_at"),
+        "attestation_statement": updated.get("attestation_statement"),
+    }
 
 
 class SubmitRequest(BaseModel):
@@ -1238,14 +1254,7 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
     org_id = _resolve_org(sb, user_id, None)
-    report = (
-        sb.table("esrs_reports")
-        .select("*")
-        .eq("id", report_id)
-        .eq("org_id", org_id)
-        .maybe_single()
-        .execute()
-    )
+    report = sb.table("esrs_reports").select("*").eq("id", report_id).eq("org_id", org_id).maybe_single().execute()
     row = report.data
     if not row:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -1263,6 +1272,11 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
         raise HTTPException(
             status_code=409,
             detail="The ESEF statement has not passed pre-flight validation (run /validate)",
+        )
+    if not row.get("attested_at"):
+        raise HTTPException(
+            status_code=409,
+            detail="An auditor attestation is required before submission (POST /attestation)",
         )
 
     content = _build_esef(sb, org_id, row)
@@ -1285,23 +1299,41 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
         "datapoints_covered": row.get("datapoints_covered"),
         "coverage_pct": row.get("coverage_pct"),
         "assurance": dict(assurance),
+        "attestation": (
+            {
+                "signed_by": row.get("attested_by"),
+                "attested_at": row.get("attested_at"),
+                "statement": row.get("attestation_statement") or "",
+            }
+            if row.get("attested_at")
+            else None
+        ),
         "prepared_at": row.get("created_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "notes": req.notes or "",
     }
+    manifest_str = json.dumps(manifest, indent=2, default=str)
+    manifest_digest = hashlib.sha256(manifest_str.encode("utf-8")).hexdigest()
+    qes = _sign_manifest_qes(manifest_digest, report_id, row.get("attested_by") or "")
     buf = _io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("esrs_statement.html", content)
-        zf.writestr("manifest.json", json.dumps(manifest, indent=2, default=str))
+        zf.writestr("manifest.json", manifest_str)
         zf.writestr("sha256.txt", sha256)
+        zf.writestr("qes.xml", qes["xml"].encode("utf-8"))
     package = buf.getvalue()
 
     status = "queued_local"
     submission_ref = manifest["filing_ref"]
     settings = get_settings()
+    now_ts = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    channel = "local_queue"
+    sent_at = now_ts
+    ack: dict = {}
     payload = json.dumps(manifest, default=str).encode("utf-8")
     if settings.OAM_FILING_ENDPOINT:
         import urllib.request
 
+        channel = "oam_webhook"
         status = "submitted"
         try:
             with urllib.request.urlopen(
@@ -1311,9 +1343,14 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
                 headers={"Content-Type": "application/json", "User-Agent": "filebrsr-csrd/1.0"},
             ) as resp:
                 body = resp.read().decode("utf-8", "replace")
-                submission_ref = body.strip() or submission_ref
+            ack = _parse_oam_ack(body, submission_ref)
+            submission_ref = ack["submission_ref"]
         except Exception as exc:  # noqa: BLE001    local-first: never fail the API on webhook trouble
             status = f"webhook_failed:{type(exc).__name__}"
+
+    ack_ref = ack.get("submission_ref") if ack.get("is_receipt") else None
+    acknowledged_at = ack.get("acknowledged_at") if ack.get("is_receipt") else None
+    ack_payload = ack.get("ack_payload") if ack.get("is_receipt") else None
 
     manifest_sha = hashlib.sha256(package).hexdigest()
     # Idempotency: one submission per report. Re-submitting only ever retries a
@@ -1333,16 +1370,29 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
             return {
                 "submission_id": old.get("id"),
                 "status": "submitted",
-                "submission_ref": old.get("submission_ref"),
+                "submission_ref": old.get("submission_ref") or old.get("ack_ref"),
                 "manifest_sha256": old.get("manifest_sha256") or manifest_sha,
                 "package_bytes": len(package),
+                "ack_ref": old.get("ack_ref"),
+                "acknowledged_at": old.get("acknowledged_at"),
+                "channel": old.get("channel"),
                 "already_submitted": True,
             }
         patch = {
             "status": status,
-            "submission_ref": submission_ref,
+            "submission_ref": ack_ref if ack.get("is_receipt") else submission_ref,
             "last_error": status if status.startswith("webhook_failed") else None,
             "retry_count": (old.get("retry_count") or 0) + 1,
+            "channel": old.get("channel") or channel,
+            "sent_at": old.get("sent_at") or sent_at,
+            "ack_ref": old.get("ack_ref") or ack_ref,
+            "acknowledged_at": old.get("acknowledged_at") or acknowledged_at,
+            "ack_payload": old.get("ack_payload") or ack_payload,
+            "qes_algorithm": old.get("qes_algorithm") or qes["algorithm"],
+            "qes_key_id": old.get("qes_key_id") or qes["key_id"],
+            "qes_signature_b64": old.get("qes_signature_b64") or qes["signature_b64"],
+            "qes_public_key_b64": old.get("qes_public_key_b64") or qes["public_key_b64"],
+            "qes_manifest_digest": old.get("qes_manifest_digest") or qes["manifest_digest"],
         }
         sb.table("esrs_submissions").update(patch).eq("id", old["id"]).execute()
         old.update(patch)
@@ -1352,6 +1402,9 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
             "submission_ref": old.get("submission_ref"),
             "manifest_sha256": old.get("manifest_sha256") or manifest_sha,
             "package_bytes": len(package),
+            "ack_ref": old.get("ack_ref"),
+            "acknowledged_at": old.get("acknowledged_at"),
+            "channel": old.get("channel"),
             "already_submitted": False,
         }
 
@@ -1360,11 +1413,21 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
         "report_id": report_id,
         "financial_year": row["financial_year"],
         "status": status,
-        "submission_ref": submission_ref,
+        "submission_ref": ack_ref if ack.get("is_receipt") else submission_ref,
         "manifest_sha256": manifest_sha,
         "package_sha256": sha256,
         "last_error": status if status.startswith("webhook_failed") else None,
         "submitted_by": user_id,
+        "channel": channel,
+        "sent_at": sent_at,
+        "ack_ref": ack_ref,
+        "acknowledged_at": acknowledged_at,
+        "ack_payload": ack_payload,
+        "qes_algorithm": qes["algorithm"],
+        "qes_key_id": qes["key_id"],
+        "qes_signature_b64": qes["signature_b64"],
+        "qes_public_key_b64": qes["public_key_b64"],
+        "qes_manifest_digest": qes["manifest_digest"],
     }
     result = sb.table("esrs_submissions").insert(sub_row).execute()
     submission = (result.data or [{}])[0]
@@ -1374,7 +1437,60 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
         "submission_ref": submission_ref,
         "manifest_sha256": manifest_sha,
         "package_bytes": len(package),
+        "ack_ref": ack_ref,
+        "acknowledged_at": acknowledged_at,
+        "channel": channel,
         "already_submitted": False,
+    }
+
+
+@router.post("/reports/{report_id}/sandbox/ack")
+async def simulate_receipt(report_id: str, authorization: str = Header(...)):
+    """Dev-only: mark a queued submission as acknowledged by the OAM.
+
+    Lets end-to-end flows be exercised without a live regulator: applies a
+    fake ESAP acceptance receipt (``channel = 'sandbox'``) to the submission
+    for the report. Disabled in production.
+    """
+    if get_settings().ENVIRONMENT == "production":
+        raise HTTPException(status_code=404, detail="Sandbox is disabled in production")
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    submission = (
+        sb.table("esrs_submissions")
+        .select("*")
+        .eq("org_id", org_id)
+        .eq("report_id", report_id)
+        .maybe_single()
+        .execute()
+    )
+    row = submission.data
+    if not row:
+        raise HTTPException(status_code=404, detail="Submission not found for this report")
+    now_ts = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    ack = {
+        "submission_ref": row.get("submission_ref"),
+        "received_at": now_ts,
+        "channel": "sandbox",
+        "acknowledged_by": "sandbox-oam",
+    }
+    patch = {
+        "status": "submitted",
+        "channel": "sandbox",
+        "ack_ref": ack["submission_ref"],
+        "acknowledged_at": now_ts,
+        "ack_payload": ack,
+        "last_error": None,
+    }
+    sb.table("esrs_submissions").update(patch).eq("id", row["id"]).execute()
+    return {
+        "submission_id": row.get("id"),
+        "status": "submitted",
+        "ack_ref": ack["submission_ref"],
+        "acknowledged_at": now_ts,
+        "channel": "sandbox",
+        "ack_payload": ack,
     }
 
 
