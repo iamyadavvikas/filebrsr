@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str
     SUPABASE_ANON_KEY: str = ""
     SUPABASE_JWT_SECRET: str = ""
+    # CSRD filing: when set, report submission posts a manifest webhook to a
+    # designated OAM (competent authority). Empty = local-first queue.
+    OAM_FILING_ENDPOINT: str = ""
+    OAM_CODE: str = "oam-eu"
     ANTHROPIC_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     GROQ_API_KEY: str = ""

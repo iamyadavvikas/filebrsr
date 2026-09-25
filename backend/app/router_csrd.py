@@ -37,6 +37,7 @@ from app.esrs_datapoints import (
     coverage_stats,
     search,
 )
+from app.esrs_esef import build_esef_statement
 
 router = APIRouter(prefix="/api/platform/csrd", tags=["CSRD / ESRS"])
 settings = get_settings()
@@ -740,7 +741,49 @@ async def set_scope(
 REPORT_CONTENT_TYPES = {
     "word": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "pdf": "application/pdf",
+    "esef": "application/xhtml+xml",
 }
+
+
+def _resolve_entity(sb, org_id: str) -> dict:
+    """Org entity identity for filing (name + LEI/CIN identifier + scheme)."""
+    org = (
+        sb.table("organizations")
+        .select("id, name, cin, lei")
+        .eq("id", org_id)
+        .maybe_single()
+        .execute()
+    )
+    row = org.data or {}
+    name = row.get("name") or f"Organization {org_id[:8]}"
+    identifier = row.get("lei") or row.get("cin") or org_id
+    if row.get("lei"):
+        scheme = "http://xbrl.efrag.org/LEI"
+    elif row.get("cin"):
+        scheme = "http://www.mca.gov.in/CIN"
+    else:
+        scheme = "filebrsr:org"
+    return {"name": str(name), "identifier": str(identifier), "scheme": str(scheme)}
+
+
+def _report_assurance(row: dict) -> dict:
+    return {
+        "status": row.get("assurance_status") or "none",
+        "firm": row.get("assurance_firm") or "",
+        "date": row.get("assurance_date") or "",
+        "statement": row.get("assurance_statement") or "",
+    }
+
+
+def _entry_payload(row: dict) -> dict:
+    """Shrink an ``esrs_entries`` row to the fields the ESEF builder needs."""
+    return {
+        "datapoint_id": row.get("datapoint_id"),
+        "status": row.get("status") or "not_assessed",
+        "value": row.get("value"),
+        "evidence": row.get("evidence") or "",
+        "notes": row.get("notes") or "",
+    }
 
 
 def _scoped_handled(
@@ -927,7 +970,7 @@ async def generate_report(req: ReportRequest, authorization: str = Header(...)):
     org_id = _resolve_org(sb, user_id, req.org_id)
     fmt = req.format.lower()
     if fmt not in REPORT_CONTENT_TYPES:
-        raise HTTPException(status_code=400, detail="format must be word or pdf")
+        raise HTTPException(status_code=400, detail="format must be word, pdf, or esef")
     in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(
         sb, org_id, req.financial_year
     )
@@ -937,9 +980,25 @@ async def generate_report(req: ReportRequest, authorization: str = Header(...)):
         content = _build_word_stmt(
             org_id, req.financial_year, entries_map, in_scope_ids, has_material_iro
         )
-    else:
+    elif fmt == "pdf":
         content = _build_pdf_stmt(
             org_id, req.financial_year, entries_map, in_scope_ids, has_material_iro
+        )
+    else:
+        entity = _resolve_entity(sb, org_id)
+        entries = [_entry_payload(e) for e in sorted(entries_map.values(), key=lambda r: r["datapoint_id"])]
+        handled = _scoped_handled(in_scope_ids, entries_map, has_material_iro)
+        scope_total = len(in_scope_ids)
+        content = build_esef_statement(
+            financial_year=req.financial_year,
+            org_id=org_id,
+            org_name=entity["name"],
+            entity_identifier=entity["identifier"],
+            entity_scheme=entity["scheme"],
+            entries=entries,
+            in_scope_ids=sorted(in_scope_ids),
+            coverage_pct=round(handled / scope_total * 100, 2) if scope_total else 0.0,
+            value_chain_scope=sorted(scope),
         )
 
     import hashlib
@@ -950,7 +1009,7 @@ async def generate_report(req: ReportRequest, authorization: str = Header(...)):
     row = {
         "org_id": org_id,
         "financial_year": req.financial_year,
-        "report_type": "word" if fmt == "word" else "pdf",
+        "report_type": "word" if fmt == "word" else ("pdf" if fmt == "pdf" else "esef"),
         "status": "ready",
         "file_sha256": hashlib.sha256(content).hexdigest(),
         "file_size_bytes": len(content),
@@ -1015,14 +1074,33 @@ async def download_report(report_id: str, authorization: str = Header(...)):
         content = _build_word_stmt(
             org_id, row["financial_year"], entries_map, in_scope_ids, has_material_iro
         )
-    else:
+    elif row["report_type"] == "pdf":
         content = _build_pdf_stmt(
             org_id, row["financial_year"], entries_map, in_scope_ids, has_material_iro
+        )
+    else:
+        entity = _resolve_entity(sb, org_id)
+        _, _, scope, _ = _scoped_state(sb, org_id, row["financial_year"])
+        content = build_esef_statement(
+            financial_year=row["financial_year"],
+            org_id=org_id,
+            org_name=entity["name"],
+            entity_identifier=entity["identifier"],
+            entity_scheme=entity["scheme"],
+            entries=[_entry_payload(e) for e in sorted(entries_map.values(), key=lambda r: r["datapoint_id"])],
+            in_scope_ids=sorted(in_scope_ids),
+            coverage_pct=row.get("coverage_pct") or 0.0,
+            value_chain_scope=sorted(scope),
+            assurance=_report_assurance(row),
         )
     filename = (
         f"esrs_statement_{org_id[:8]}_{row['financial_year']}.docx"
         if row["report_type"] == "word"
-        else f"esrs_statement_{org_id[:8]}_{row['financial_year']}.pdf"
+        else (
+            f"esrs_statement_{org_id[:8]}_{row['financial_year']}.pdf"
+            if row["report_type"] == "pdf"
+            else f"esrs_statement_{org_id[:8]}_{row['financial_year']}.html"
+        )
     )
     response = StreamingResponse(
         io.BytesIO(content),
@@ -1033,3 +1111,190 @@ async def download_report(report_id: str, authorization: str = Header(...)):
         },
     )
     return response
+
+
+class AssuranceRequest(BaseModel):
+    status: str = "none"  # none | limited | reasonable
+    firm: Optional[str] = None
+    date: Optional[str] = None
+    statement: Optional[str] = None
+
+
+ASSURANCE_STATUSES = {"none", "limited", "reasonable"}
+
+
+@router.post("/reports/{report_id}/assurance")
+async def change_assurance(
+    report_id: str, req: AssuranceRequest, authorization: str = Header(...)
+):
+    """Attach a limited/reasonable assurance opinion to a ready report."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    status = req.status.lower()
+    if status not in ASSURANCE_STATUSES:
+        raise HTTPException(status_code=400, detail="status must be none, limited, or reasonable")
+    report = (
+        sb.table("esrs_reports")
+        .select("id, org_id, report_type, status")
+        .eq("id", report_id)
+        .eq("org_id", org_id)
+        .maybe_single()
+        .execute()
+    )
+    if not report.data:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if report.data.get("status") != "ready":
+        raise HTTPException(status_code=409, detail="Report is not ready")
+    if status == "none":
+        patch = {"assurance_status": "none", "assurance_firm": None,
+                 "assurance_date": None, "assurance_statement": None}
+    else:
+        patch = {
+            "assurance_status": status,
+            "assurance_firm": req.firm,
+            "assurance_date": req.date,
+            "assurance_statement": req.statement,
+        }
+    result = sb.table("esrs_reports").update(patch).eq("id", report_id).execute()
+    return {"report_id": report_id, "assurance": (result.data or [{}])[0].get("assurance_status")}
+
+
+class SubmitRequest(BaseModel):
+    filing_ref: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@router.post("/reports/{report_id}/submit")
+async def submit_report(report_id: str, req: SubmitRequest, authorization: str = Header(...)):
+    """Package the ESEF report (single-file XHTML + manifest + sha256) for filing.
+
+    Requires report_type ``esef``, status ``ready``, and a ``limited`` or
+    ``reasonable`` assurance opinion (ESRS-required precondition). Records the
+    submission locally; when ``OAM_FILING_ENDPOINT`` is configured, posts a
+    manifest webhook and records the returned reference.
+    """
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    report = (
+        sb.table("esrs_reports")
+        .select("*")
+        .eq("id", report_id)
+        .eq("org_id", org_id)
+        .maybe_single()
+        .execute()
+    )
+    row = report.data
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row.get("report_type") != "esef":
+        raise HTTPException(status_code=400, detail="Only ESEF reports can be submitted for filing")
+    if row.get("status") != "ready":
+        raise HTTPException(status_code=409, detail="Report is not ready")
+    assurance = _report_assurance(row)
+    if assurance["status"] not in {"limited", "reasonable"}:
+        raise HTTPException(
+            status_code=409,
+            detail="A limited or reasonable assurance opinion is required before submission",
+        )
+
+    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(
+        sb, org_id, row["financial_year"]
+    )
+    entity = _resolve_entity(sb, org_id)
+    content = build_esef_statement(
+        financial_year=row["financial_year"],
+        org_id=org_id,
+        org_name=entity["name"],
+        entity_identifier=entity["identifier"],
+        entity_scheme=entity["scheme"],
+        entries=[_entry_payload(e) for e in sorted(entries_map.values(), key=lambda r: r["datapoint_id"])],
+        in_scope_ids=sorted(in_scope_ids),
+        coverage_pct=row.get("coverage_pct") or 0.0,
+        value_chain_scope=sorted(scope),
+        assurance=_report_assurance(row),
+    )
+
+    import hashlib
+    import io as _io
+    import zipfile
+
+    sha256 = hashlib.sha256(content).hexdigest()
+    manifest = {
+        "schema_version": "1.0",
+        "filing_ref": req.filing_ref or f"{org_id[:8]}-{row['financial_year']}",
+        "entity_name": entity["name"],
+        "entity_identifier": {"scheme": entity["scheme"], "value": entity["identifier"]},
+        "financial_year": row["financial_year"],
+        "report_id": report_id,
+        "report_sha256": sha256,
+        "report_size_bytes": len(content),
+        "datapoints_covered": row.get("datapoints_covered"),
+        "coverage_pct": row.get("coverage_pct"),
+        "assurance": dict(assurance),
+        "prepared_at": row.get("created_at") or time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "notes": req.notes or "",
+    }
+    buf = _io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("esrs_statement.html", content)
+        zf.writestr("manifest.json", json.dumps(manifest, indent=2, default=str))
+        zf.writestr("sha256.txt", sha256)
+    package = buf.getvalue()
+
+    status = "queued_local"
+    submission_ref = manifest["filing_ref"]
+    settings = get_settings()
+    if settings.OAM_FILING_ENDPOINT:
+        import urllib.request
+
+        status = "submitted"
+        payload = json.dumps(manifest, default=str).encode("utf-8")
+        try:
+            with urllib.request.urlopen(
+                settings.OAM_FILING_ENDPOINT,
+                data=payload,
+                timeout=15,
+                headers={"Content-Type": "application/json", "User-Agent": "filebrsr-csrd/1.0"},
+            ) as resp:
+                body = resp.read().decode("utf-8", "replace")
+                submission_ref = body.strip() or submission_ref
+        except Exception as exc:  # noqa: BLE001    local-first: never fail the API on webhook trouble
+            status = f"webhook_failed:{type(exc).__name__}"
+
+    sub_row = {
+        "org_id": org_id,
+        "report_id": report_id,
+        "financial_year": row["financial_year"],
+        "status": status,
+        "submission_ref": submission_ref,
+        "manifest_sha256": hashlib.sha256(package).hexdigest(),
+        "package_sha256": sha256,
+        "submitted_by": user_id,
+    }
+    result = sb.table("esrs_submissions").insert(sub_row).execute()
+    submission = (result.data or [{}])[0]
+    return {
+        "submission_id": submission.get("id"),
+        "status": status,
+        "submission_ref": submission_ref,
+        "manifest_sha256": sub_row["manifest_sha256"],
+        "package_bytes": len(package),
+    }
+
+
+@router.get("/submissions")
+async def list_submissions(
+    org_id: Optional[str] = None,
+    financial_year: Optional[str] = None,
+    authorization: str = Header(...),
+):
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, org_id)
+    query = sb.table("esrs_submissions").select("*").eq("org_id", org_id)
+    if financial_year:
+        query = query.eq("financial_year", financial_year)
+    result = query.order("created_at", desc=True).execute()
+    return {"org_id": org_id, "count": len(result.data or []), "submissions": result.data or []}

@@ -774,3 +774,158 @@ async def test_upsert_rejects_invalid_status(client):
     )
     assert resp.status_code == 400
     assert "Invalid status" in resp.json()["detail"]
+
+
+# ─── ESEF single-file export, assurance gate, OAM submission (v25) ─────────
+
+_ESEF_NUM = "E1.E1-6.44"
+_ESEF_TXT = "ESRS2.BP-1.3"
+
+
+async def _mk_esef_report(client, value=_ESEF_NUM):
+    await client.post(
+        "/api/platform/csrd/entries",
+        json={
+            "financial_year": "FY2025",
+            "entries": [
+                {"datapoint_id": _ESEF_NUM, "status": "reported", "value": 2140.0},
+                {"datapoint_id": _ESEF_TXT, "status": "reported", "value": "Transition plan covers Scopes 1-3."},
+            ],
+        },
+        headers=_auth(),
+    )
+    resp = await client.post(
+        "/api/platform/csrd/reports",
+        json={"financial_year": "FY2025", "format": "esef"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 200
+    return resp.json()["report_id"]
+
+
+@pytest.mark.asyncio
+async def test_esef_report_generation_and_download(client, db):
+    """ESEF export is well-formed XHTML with inline-XBRL facts + schemaRef."""
+    import xml.dom.minidom as minidom
+
+    report_id = await _mk_esef_report(client)
+    listed = await client.get(
+        "/api/platform/csrd/reports",
+        params={"financial_year": "FY2025"},
+        headers=_auth(),
+    )
+    reports = listed.json()["reports"]
+    assert reports and reports[0]["report_type"] == "esef"
+
+    download = await client.get(
+        f"/api/platform/csrd/reports/{report_id}/download", headers=_auth()
+    )
+    assert download.status_code == 200
+    assert download.headers["content-type"] == "application/xhtml+xml"
+    body = download.content.decode("utf-8")
+    minidom.parseString(body)  # must be XML-serializable XHTML
+    assert "<ix:header" in body
+    assert 'xlink:href="https://xbrl.efrag.org/taxonomy/esrs/2023-12-22/esrs_all.xsd"' in body
+    assert "<ix:nonFraction" in body  # numeric GHG fact tagged
+    assert "<ix:nonNumeric" in body  # text fact tagged
+
+
+@pytest.mark.asyncio
+async def test_esef_report_has_concept_tags_for_numeric_and_text(client):
+    download = await client.get(
+        f"/api/platform/csrd/reports/{await _mk_esef_report(client)}/download",
+        headers=_auth(),
+    )
+    body = download.content.decode("utf-8")
+    assert 'name="esrs:GrossGreenhouseGasEmissions"' in body
+    assert 'name="esrs:DisclosureOfExtentToWhichSustainabilityStatementCoversUpstreamAndDownstreamValueChainExplanatory"' in body
+
+
+@pytest.mark.asyncio
+async def test_submission_requires_assurance(client):
+    report_id = await _mk_esef_report(client)
+    resp = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={},
+        headers=_auth(),
+    )
+    assert resp.status_code == 409
+    assert "assurance" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_assurance_and_submission_flow(client, db):
+    report_id = await _mk_esef_report(client)
+
+    bad = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/assurance",
+        json={"status": "comprehensive"},
+        headers=_auth(),
+    )
+    assert bad.status_code == 400
+
+    resp = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/assurance",
+        json={
+            "status": "limited",
+            "firm": "B4 Assurance LLP",
+            "date": "2026-03-15",
+            "statement": "The ESRS sustainability statement is fairly presented.",
+        },
+        headers=_auth(),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["assurance"] == "limited"
+
+    sub = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "CSRD-FY2025-ACME"},
+        headers=_auth(),
+    )
+    assert sub.status_code == 200
+    body = sub.json()
+    assert body["status"] == "queued_local"
+    assert body["submission_ref"] == "CSRD-FY2025-ACME"
+    assert body["manifest_sha256"]
+
+    listed = await client.get(
+        "/api/platform/csrd/submissions",
+        params={"financial_year": "FY2025"},
+        headers=_auth(),
+    )
+    assert listed.json()["count"] == 1
+    sub_row = listed.json()["submissions"][0]
+    assert sub_row["report_id"] == report_id
+    assert sub_row["status"] == "queued_local"
+
+    # download reflects the stored assurance opinion
+    download = await client.get(
+        f"/api/platform/csrd/reports/{report_id}/download", headers=_auth()
+    )
+    assert download.status_code == 200
+    assert "limited assurance" in download.content.decode("utf-8").lower()
+
+
+@pytest.mark.asyncio
+async def test_not_ready_report_409s_on_submission_and_assurance(client, db):
+    """Assurance/submission both 409 when the report is not ``ready``."""
+    report_id = await _mk_esef_report(client)
+    await client.post(
+        f"/api/platform/csrd/reports/{report_id}/assurance",
+        json={"status": "limited"},
+        headers=_auth(),
+    )
+    row = next(r for r in db.tables["esrs_reports"] if r["id"] == report_id)
+    row["status"] = "archived"
+    resp = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "x"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 409
+    resp = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/assurance",
+        json={"status": "reasonable"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 409

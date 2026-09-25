@@ -88,6 +88,10 @@ export interface ReportRow {
   datapoints_covered: number;
   file_size_bytes: number | null;
   created_at: string;
+  assurance_status: string;
+  assurance_firm: string | null;
+  assurance_date: string | null;
+  assurance_statement: string | null;
 }
 
 export interface WorkspaceData {
@@ -474,12 +478,53 @@ export async function listReports(financialYear: string): Promise<ReportRow[]> {
   return readJson<ReportRow[]>(demoKey(financialYear, "reports"), []);
 }
 
-export async function generateCloudReport(financialYear: string, format: "word" | "pdf") {
+export async function generateCloudReport(financialYear: string, format: "word" | "pdf" | "esef") {
   return cloudJSON<{ report_id: string; format: string; datapoints_covered: number; coverage_pct: number }>("/reports", {
     method: "POST",
     body: JSON.stringify({ financial_year: financialYear, format }),
   });
 }
+
+export interface AssuranceInput {
+  status: "none" | "limited" | "reasonable";
+  firm?: string;
+  date?: string;
+  statement?: string;
+}
+
+export async function setReportAssurance(reportId: string, input: AssuranceInput) {
+  return cloudJSON<{ report_id: string; assurance: string }>(`/reports/${reportId}/assurance`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export interface SubmissionRow {
+  id: string;
+  report_id: string;
+  financial_year: string;
+  status: string;
+  submission_ref: string;
+  created_at: string;
+}
+
+export async function submitEsefReport(reportId: string, filingRef?: string, notes?: string) {
+  return cloudJSON<{ submission_id: string; status: string; submission_ref: string; package_bytes: number }>(
+    `/reports/${reportId}/submit`,
+    { method: "POST", body: JSON.stringify({ filing_ref: filingRef, notes: notes ?? "" }) },
+  );
+}
+
+export async function listSubmissions(financialYear: string): Promise<SubmissionRow[]> {
+  const data = await cloudJSON<{ submissions: SubmissionRow[] }>(`/submissions?financial_year=${encodeURIComponent(financialYear)}`);
+  return data.submissions || [];
+}
+
+export const REPORT_EXT: Record<string, string> = {
+  word: "docx",
+  pdf: "pdf",
+  esef: "html",
+};
 
 /** Stream a signed-in org's generated report artifact as a blob. */
 export async function downloadCloudReport(reportId: string): Promise<Blob> {

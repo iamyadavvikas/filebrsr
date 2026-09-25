@@ -21,6 +21,8 @@ import {
   HardDrive,
   Plus,
   Wand2,
+  ShieldCheck,
+  Send,
 } from "lucide-react";
 import {
   detectMode,
@@ -51,11 +53,17 @@ import {
   type RegistryItem,
   type ReportRow,
   type StandardMeta,
+  type AssuranceInput,
+  type SubmissionRow,
   STATUS_LABELS,
   STATUS_OPTIONS,
   HANDLED,
   VALUE_CHAIN_SEGMENTS,
   FULL_SCOPE,
+  listSubmissions,
+  setReportAssurance,
+  submitEsefReport,
+  REPORT_EXT,
 } from "@/lib/csrd/workspace";
 import { AuthSessionError } from "@/lib/supabase/session";
 import { createClient } from "@/lib/supabase/client";
@@ -1098,16 +1106,21 @@ function MaterialityMatrix({ iro, material, onSelect }: { iro: IRO[]; material: 
 
 function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void }) {
   const [reports, setReports] = useState<ReportRow[]>([]);
+  const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [assuring, setAssuring] = useState<string | null>(null);
+  const [assuranceDraft, setAssuranceDraft] = useState<Record<string, AssuranceInput>>({});
 
   const load = useCallback(async () => {
     try {
       const rows = await listReports(financialYear);
       setReports(rows);
+      if (mode === "cloud") setSubmissions(await listSubmissions(financialYear));
     } catch (e) {
       notify(e as Error, false);
     }
-  }, [financialYear, notify]);
+  }, [financialYear, notify, mode]);
 
   useEffect(() => {
     load();
@@ -1123,12 +1136,14 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
     a.remove();
   };
 
-  const generate = async (format: "word" | "pdf") => {
+  const generate = async (format: "word" | "pdf" | "esef") => {
     setGenerating(format);
     try {
       const data = await generateCloudReport(financialYear, format);
       await load();
-      notify(`Statement generated: ${data.datapoints_covered} datapoints, ${data.coverage_pct}% coverage`);
+      notify(format === "esef"
+        ? `ESEF statement generated: ${data.datapoints_covered} datapoints, ${data.coverage_pct}% coverage`
+        : `Statement generated: ${data.datapoints_covered} datapoints, ${data.coverage_pct}% coverage`);
     } catch (e) {
       notify(e as Error, false);
     } finally {
@@ -1154,9 +1169,37 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
     try {
       const blob = await downloadCloudReport(id);
       const report = reports.find((r) => r.id === id);
-      downloadBlob(blob, `esrs_statement_${financialYear}.${report?.report_type === "pdf" ? "pdf" : "docx"}`);
+      downloadBlob(blob, `esrs_statement_${financialYear}.${REPORT_EXT[report?.report_type ?? "word"] ?? "docx"}`);
     } catch (e) {
       notify(e as Error, false);
+    }
+  };
+
+  const saveAssurance = async (reportId: string) => {
+    const draft = assuranceDraft[reportId];
+    if (!draft) return notify("Set assurance status first", false);
+    setAssuring(reportId);
+    try {
+      await setReportAssurance(reportId, draft);
+      await load();
+      notify(`Assurance recorded: ${draft.status}`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setAssuring(null);
+    }
+  };
+
+  const submit = async (reportId: string) => {
+    setBusy(reportId);
+    try {
+      const data = await submitEsefReport(reportId, `CSRD-${financialYear}-${reportId.slice(0, 6)}`, "");
+      await load();
+      notify(`Submitted for filing · ref ${data.submission_ref} · ${data.status}`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -1167,12 +1210,15 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
           <h2 className="font-bold text-slate-900">ESRS sustainability statement</h2>
           <p className="text-sm text-slate-500 mt-1">Generate a structured draft from your saved assessments for {financialYear}.</p>
           {mode === "demo" && (
-            <p className="text-xs text-amber-700 mt-1.5">Demo mode: download an HTML statement (print to PDF) or the CSV register. Sign in for native Word/PDF export with an audit fingerprint.</p>
+            <p className="text-xs text-amber-700 mt-1.5">Demo mode: download an HTML statement (print to PDF) or the CSV register. Sign in for native Word/PDF/ESEF export with an audit fingerprint.</p>
           )}
         </div>
         <div className="flex gap-3 flex-shrink-0">
           {mode === "cloud" ? (
             <>
+              <button onClick={() => generate("esef")} disabled={!!generating} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-semibold px-4 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}>
+                {generating === "esef" ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} ESEF (XBRL)
+              </button>
               <button onClick={() => generate("word")} disabled={!!generating} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-semibold px-4 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
                 {generating === "word" ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} Word
               </button>
@@ -1200,13 +1246,20 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
       )}
       <div className="space-y-3">
         {reports.map((r) => (
-          <div key={r.id} className="rounded-2xl border border-slate-200 bg-white p-5 flex items-center justify-between gap-4">
+          <div key={r.id} className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: r.report_type === "pdf" ? "#FEE2E2" : "#EFF6FF" }}>
-                <FileText className="w-5 h-5" style={{ color: r.report_type === "pdf" ? "#DC2626" : "#2563EB" }} />
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: r.report_type === "pdf" ? "#FEE2E2" : r.report_type === "esef" ? "#D1FAE5" : "#EFF6FF" }}>
+                <FileText className="w-5 h-5" style={{ color: r.report_type === "pdf" ? "#DC2626" : r.report_type === "esef" ? "#059669" : "#2563EB" }} />
               </div>
               <div>
-                <p className="font-semibold text-slate-900 text-sm">ESRS statement · {r.report_type.toUpperCase()}</p>
+                <p className="font-semibold text-slate-900 text-sm">
+                  ESRS statement · {r.report_type.toUpperCase()}
+                  {r.report_type === "esef" && r.assurance_status !== "none" && (
+                    <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: r.assurance_status === "reasonable" ? "#DBEAFE" : "#FEF3C7", color: r.assurance_status === "reasonable" ? "#1D4ED8" : "#92400E" }}>
+                      {r.assurance_status} assurance{r.assurance_firm ? ` · ${r.assurance_firm}` : ""}
+                    </span>
+                  )}
+                </p>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {r.coverage_pct ?? 0}% coverage · {r.datapoints_covered} datapoints ·{" "}
                   {r.file_size_bytes ? `${(r.file_size_bytes / 1024).toFixed(0)} KB` : "pending"} · {new Date(r.created_at).toLocaleString()}
@@ -1214,16 +1267,112 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
               </div>
             </div>
             {mode === "cloud" && (
-              <button onClick={() => downloadCloud(r.id)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                <FileText className="w-4 h-4" /> Download
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button onClick={() => downloadCloud(r.id)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                  <FileText className="w-4 h-4" /> Download
+                </button>
+                {r.report_type === "esef" && (
+                  <>
+                    <button
+                      onClick={() => setAssuring((v) => (v === r.id ? null : r.id))}
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <ShieldCheck className="w-4 h-4" /> Assurance
+                    </button>
+                    <button
+                      onClick={() => submit(r.id)}
+                      disabled={busy === r.id || r.assurance_status === "none"}
+                      className="inline-flex items-center gap-2 rounded-lg text-white text-sm font-semibold px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}
+                    >
+                      {busy === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Submit to OAM
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            {assuring === r.id && r.report_type === "esef" && (
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {(["none", "limited", "reasonable"] as const).map((s) => (
+                    <label key={s} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name={`assurance-${r.id}`}
+                        checked={assuranceDraft[r.id]?.status === s}
+                        onChange={() =>
+                          setAssuranceDraft((d) => ({
+                            ...d,
+                            [r.id]: {
+                              ...(s === "none" ? {} : d[r.id]),
+                              status: s,
+                              firm: d[r.id]?.firm || "Independent auditor",
+                              date: d[r.id]?.date || new Date().toISOString().slice(0, 10),
+                            },
+                          }))
+                        }
+                      />
+                      {s === "none" ? "No assurance" : s[0].toUpperCase() + s.slice(1)}
+                    </label>
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  <input
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    placeholder="Assurance firm"
+                    value={assuranceDraft[r.id]?.firm ?? ""}
+                    onChange={(e) => setAssuranceDraft((d) => ({ ...d, [r.id]: { ...(d[r.id] ?? { status: "limited" }), firm: e.target.value } }))}
+                  />
+                  <input
+                    type="date"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    value={assuranceDraft[r.id]?.date ?? ""}
+                    onChange={(e) => setAssuranceDraft((d) => ({ ...d, [r.id]: { ...(d[r.id] ?? { status: "limited" }), date: e.target.value } }))}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
+                  <p className="text-xs text-slate-500 max-w-md">The chosen opinion is embedded in the ESEF file and recorded on the report before submission.</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setAssuring(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600">Close</button>
+                    <button
+                      onClick={() => {
+                        void saveAssurance(r.id);
+                        setAssuring(null);
+                      }}
+                      disabled={assuring === r.id}
+                      className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-60"
+                    >
+                      Save assurance
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         ))}
       </div>
 
+      {mode === "cloud" && submissions.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h3 className="font-bold text-slate-900 text-sm mb-3">Regulator submissions</h3>
+          <div className="space-y-2">
+            {submissions.map((s) => (
+              <div key={s.id} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm">
+                <div>
+                  <p className="font-semibold text-slate-800">{s.submission_ref}</p>
+                  <p className="text-xs text-slate-400">{new Date(s.created_at).toLocaleString()}</p>
+                </div>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: s.status === "submitted" ? "#D1FAE5" : s.status.startsWith("webhook_failed") ? "#FEE2E2" : "#FEF3C7", color: s.status === "submitted" ? "#065F46" : s.status.startsWith("webhook_failed") ? "#991B1B" : "#92400E" }}>
+                  {s.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500 leading-5">
-        Note: the export produces a structured draft statement. ESRS digital tagging (ESEF-style XBRL) is on the roadmap — the registry ids map to the ESRS XBRL taxonomy.
+        Note: the export produces a structured draft statement. ESEF reports embed official ESRS XBRL tags (ix:nonFraction / ix:nonNumeric) mapped to the EFRAG 2023-12-22 taxonomy; add a limited/reasonable assurance opinion before submitting to the regulator.
       </div>
     </div>
   );
