@@ -8,7 +8,7 @@ import {
   subscribeSession,
 } from "@/lib/supabase/session";
 
-export type CsrdMode = "cloud" | "demo";
+export type CsrdMode = "cloud" | "guest" | "demo";
 
 export interface RegistryItem {
   id: string;
@@ -148,7 +148,12 @@ export function segmentApplies(item: RegistryItem, scope: string[]): boolean {
 
 const API = "/backend/api/platform/csrd";
 const CLOUD = "cloud";
+const GUEST = "guest";
 const DEMO = "demo";
+
+const GUEST_TOKEN_KEY = "csrd.guest.token";
+const GUEST_EXPIRES_KEY = "csrd.guest.expires";
+const GUEST_PIN_KEY = "csrd.demo.pinned";
 
 let _cache: { mode: CsrdMode; token: string } | null = null;
 const _modeListeners = new Set<(mode: CsrdMode | null) => void>();
@@ -204,32 +209,130 @@ export function subscribeMode(cb: (mode: CsrdMode | null) => void): () => void {
 export async function detectMode(): Promise<CsrdMode> {
   if (_cache) return _cache.mode;
   const token = await getSessionToken();
-  _cache = { mode: token ? CLOUD : DEMO, token };
+  if (token) {
+    _cache = { mode: CLOUD, token };
+    return _cache.mode;
+  }
+  if (isDemoPinned()) {
+    _cache = { mode: DEMO, token: "" };
+    return _cache.mode;
+  }
+  const guest = await ensureGuestSession();
+  if (guest) {
+    _cache = { mode: GUEST, token: guest };
+    return _cache.mode;
+  }
+  _cache = { mode: DEMO, token: "" };
   return _cache.mode;
+}
+
+function cacheState(): { mode: CsrdMode; token: string } | null {
+  return _cache;
 }
 
 /** Token used by the current session, if any. */
 export async function sessionToken(): Promise<string> {
-  if (_cache?.token !== undefined) return _cache.token;
-  const token = await getSessionToken();
-  _cache = { mode: token ? CLOUD : DEMO, token };
+  if (_cache) return _cache.token;
+  await detectMode();
+  return cacheState()?.token ?? "";
+}
+
+// ──────────────────────────────────────────────────────── guest sandbox ────
+
+/** Request a throwaway sandbox org from the backend (no sign-in required). */
+export async function mintGuestSession(): Promise<{ token: string; org_id: string; expires_at: string } | null> {
+  try {
+    const res = await fetch(`${API}/guest/session`, { method: "POST", headers: { "Content-Type": "application/json" } });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { token?: unknown; org_id?: unknown; expires_at?: unknown };
+    if (typeof body?.token !== "string" || !body.token.startsWith("guest_")) return null;
+    writeJson(GUEST_TOKEN_KEY, body.token);
+    writeJson(GUEST_EXPIRES_KEY, typeof body.expires_at === "string" ? body.expires_at : "");
+    return {
+      token: body.token,
+      org_id: typeof body.org_id === "string" ? body.org_id : "",
+      expires_at: typeof body.expires_at === "string" ? body.expires_at : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Forget the stored guest token (and its expiry). */
+export function clearGuestToken(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(GUEST_TOKEN_KEY);
+    window.localStorage.removeItem(GUEST_EXPIRES_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Stored guest token, or null if absent/expired (with a 60s safety margin). */
+export function getStoredGuestToken(): string | null {
+  if (typeof window === "undefined") return null;
+  const token = readJson<string | null>(GUEST_TOKEN_KEY, null);
+  if (!token) return null;
+  const exp = readJson<string>(GUEST_EXPIRES_KEY, "");
+  if (exp) {
+    const ms = new Date(exp).getTime();
+    if (!Number.isNaN(ms) && ms <= Date.now() + 60_000) {
+      clearGuestToken();
+      return null;
+    }
+  }
   return token;
 }
 
+/** Pin the browser to demo mode so logged-out visits don't auto-mint a sandbox. */
+export function pinDemoMode(): void {
+  writeJson(GUEST_PIN_KEY, true);
+}
+
+function isDemoPinned(): boolean {
+  return readJson<boolean>(GUEST_PIN_KEY, false);
+}
+
+async function ensureGuestSession(): Promise<string | null> {
+  if (isDemoPinned()) return null;
+  const existing = getStoredGuestToken();
+  if (existing) return existing;
+  const fresh = await mintGuestSession();
+  return fresh ? fresh.token : null;
+}
+
+/** Leave demo mode and re-resolve the mode with a fresh sandbox session. */
+export async function enterGuestSandbox(): Promise<CsrdMode> {
+  writeJson(GUEST_PIN_KEY, false);
+  clearGuestToken();
+  invalidateSession();
+  return detectMode();
+}
+
 async function cloudFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  let token = await sessionToken();
+  await detectMode();
+  const mode = _cache?.mode;
   const doFetch = () =>
     fetch(`${API}${path}`, {
       ...init,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(init.headers || {}) },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${_cache?.token ?? ""}`, ...(init.headers || {}) },
     });
   let res = await doFetch();
   if (isAuthFailure(res)) {
     invalidateSession();
-    token = await refreshSessionToken();
-    if (!token) throw new AuthSessionError();
-    _cache = { mode: CLOUD, token };
-    res = await doFetch();
+    if (mode === GUEST) {
+      clearGuestToken();
+      const fresh = await mintGuestSession();
+      if (!fresh) throw new AuthSessionError();
+      _cache = { mode: GUEST, token: fresh.token };
+      res = await doFetch();
+    } else {
+      const token = await refreshSessionToken();
+      if (!token) throw new AuthSessionError();
+      _cache = { mode: CLOUD, token };
+      res = await doFetch();
+    }
   }
   return res;
 }
@@ -248,6 +351,11 @@ async function cloudJSON<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new Error(detail);
   }
   return res.json() as Promise<T>;
+}
+
+/** Cloud-backed modes (real org or throwaway sandbox org) vs the browser-only demo. */
+export function isServerMode(mode: CsrdMode): boolean {
+  return mode === CLOUD || mode === GUEST;
 }
 
 // ─────────────────────────────────────────────────────────── registry ─────
@@ -344,7 +452,7 @@ function round2(n: number): number {
 // ──────────────────────────────────────────────────────── entries ─────────
 
 export async function listEntries(financialYear: string): Promise<{ entries: EntryRow[] }> {
-  if ((await detectMode()) === CLOUD) {
+  if (isServerMode(await detectMode())) {
     const data = await cloudJSON<{ entries: EntryRow[] }>(`/entries?financial_year=${encodeURIComponent(financialYear)}`);
     return { entries: data.entries || [] };
   }
@@ -352,7 +460,7 @@ export async function listEntries(financialYear: string): Promise<{ entries: Ent
 }
 
 export async function saveEntry(financialYear: string, item: EntryRow): Promise<void> {
-  if ((await detectMode()) === CLOUD) {
+  if (isServerMode(await detectMode())) {
     await cloudJSON("/entries", {
       method: "POST",
       body: JSON.stringify({
@@ -371,7 +479,12 @@ export async function saveEntry(financialYear: string, item: EntryRow): Promise<
 }
 
 export async function resetEntries(financialYear: string): Promise<void> {
-  if ((await detectMode()) === CLOUD) return; // cloud deletions are per-row; not supported in bulk
+  const mode = await detectMode();
+  if (mode === GUEST) {
+    await cloudJSON("/guest/workspace", { method: "DELETE" });
+    return;
+  }
+  if (mode === CLOUD) return; // cloud deletions are per-row; not supported in bulk
   writeJson(demoKey(financialYear, "entries"), []);
   writeJson(demoKey(financialYear, "iro"), []);
   writeJson(demoKey(financialYear, "reports"), []);
@@ -380,7 +493,7 @@ export async function resetEntries(financialYear: string): Promise<void> {
 // ──────────────────────────────────────────────────────────── materiality ─
 
 export async function listIro(financialYear: string): Promise<IRO[]> {
-  if ((await detectMode()) === CLOUD) {
+  if (isServerMode(await detectMode())) {
     const data = await cloudJSON<{ iro: IRO[] }>(`/materiality?financial_year=${encodeURIComponent(financialYear)}`);
     return data.iro || [];
   }
@@ -388,7 +501,7 @@ export async function listIro(financialYear: string): Promise<IRO[]> {
 }
 
 export async function addIro(financialYear: string, item: Partial<IRO>): Promise<IRO> {
-  if ((await detectMode()) === CLOUD) {
+  if (isServerMode(await detectMode())) {
     const data = await cloudJSON<{ iro: IRO }>("/materiality", {
       method: "POST",
       body: JSON.stringify({ financial_year: financialYear, ...item, description: item.description || null }),
@@ -417,7 +530,7 @@ export async function addIro(financialYear: string, item: Partial<IRO>): Promise
 }
 
 export async function updateIro(financialYear: string, iro: IRO): Promise<IRO> {
-  if ((await detectMode()) === CLOUD) {
+  if (isServerMode(await detectMode())) {
     const data = await cloudJSON<{ iro: IRO }>(`/materiality/${iro.id}`, {
       method: "PUT",
       body: JSON.stringify({
@@ -441,7 +554,7 @@ export async function updateIro(financialYear: string, iro: IRO): Promise<IRO> {
 }
 
 export async function deleteIro(financialYear: string, id: string): Promise<void> {
-  if ((await detectMode()) === CLOUD) {
+  if (isServerMode(await detectMode())) {
     await cloudJSON(`/materiality/${id}`, { method: "DELETE" });
     return;
   }
@@ -460,7 +573,7 @@ const SCOPE_KEY = "csrd.demo.scope";
 
 /** The org's declared value-chain boundary (which segments it reports on). */
 export async function getScope(): Promise<string[]> {
-  if ((await detectMode()) === CLOUD) {
+  if (isServerMode(await detectMode())) {
     const data = await cloudJSON<{ value_chain_scope: string[] }>("/scope");
     return data.value_chain_scope?.length ? data.value_chain_scope : FULL_SCOPE;
   }
@@ -468,7 +581,7 @@ export async function getScope(): Promise<string[]> {
 }
 
 export async function setScope(scope: string[]): Promise<string[]> {
-  if ((await detectMode()) === CLOUD) {
+  if (isServerMode(await detectMode())) {
     const data = await cloudJSON<{ value_chain_scope: string[] }>("/scope", {
       method: "PUT",
       body: JSON.stringify({ value_chain_scope: scope }),
@@ -482,7 +595,7 @@ export async function setScope(scope: string[]): Promise<string[]> {
 // ────────────────────────────────────────────────────────────── reports ───
 
 export async function listReports(financialYear: string): Promise<ReportRow[]> {
-  if ((await detectMode()) === CLOUD) {
+  if (isServerMode(await detectMode())) {
     const data = await cloudJSON<{ reports: ReportRow[] }>(`/reports?financial_year=${encodeURIComponent(financialYear)}`);
     return data.reports || [];
   }
@@ -673,6 +786,13 @@ export async function generateDemoArtifacts(financialYear: string): Promise<{ ht
 // ──────────────────────────────────────────────────────────── sample seed ─
 
 export async function seedDemo(financialYear: string): Promise<void> {
+  if ((await detectMode()) === GUEST) {
+    await cloudJSON<{ seeded_entries: number; seeded_iro: number }>("/guest/seed", {
+      method: "POST",
+      body: JSON.stringify({ financial_year: financialYear }),
+    });
+    return;
+  }
   const [registry] = await Promise.all([fullRegistry()]);
   const sample: EntryRow[] = [];
   const seedFor = (std: string, drs: string[], status: string) => {

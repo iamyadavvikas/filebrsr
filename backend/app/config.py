@@ -50,6 +50,19 @@ class Settings(BaseSettings):
     ESEF_ARRELLE_CMDLINE: str = "arelleCmdLine"
     ESEF_ARRELLE_TIMEOUT_SECONDS: int = 180
 
+    # ─── Open-to-all guest sandbox (no sign-in exploration) ─────────────
+    # When enabled, logged-out visitors can mint a throwaway sandbox org
+    # (esrs_guest_sessions) and run the full CSRD workflow: seed, entries,
+    # materiality, scope, report generation/validation, assurance,
+    # attestation and a sandbox-only submission. Guest submissions are never
+    # posted to a real OAM (channel=guest_sandbox, status=sandboxed) and are
+    # signed with a clearly-labelled test key, so a guest can explore without
+    # creating any legally meaningful filing.
+    CSRD_GUEST_ENABLED: bool = False
+    CSRD_GUEST_TTL_HOURS: int = 72        # session retention; expired rows are purged on mint
+    CSRD_GUEST_RATE_MINUTE: int = 20      # max guest session minted per rolling minute
+    CSRD_GUEST_MAX_REPORTS: int = 5       # per-workspace report generation cap
+
     # Phase 3.2 — opt-in retrieval-based extraction layer. Off by default
     # so existing prod traffic is unaffected. Each filing with this on
     # costs ~8 Gemini Flash calls (free tier 1500 RPD = ~180 filings/day).

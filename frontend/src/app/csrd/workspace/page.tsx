@@ -25,6 +25,7 @@ import {
   Send,
   FileCheck2,
   PenTool,
+  FlaskConical,
   X,
 } from "lucide-react";
 import {
@@ -36,6 +37,7 @@ import {
   computeGap,
   deleteIro,
   downloadCloudReport,
+  enterGuestSandbox,
   generateCloudReport,
   generateDemoArtifacts,
   getScope,
@@ -43,6 +45,7 @@ import {
   listEntries,
   listIro,
   listReports,
+  pinDemoMode,
   resetEntries,
   saveEntry,
   seedDemo,
@@ -189,10 +192,20 @@ function CsrdWorkspace() {
 
   const continueDemo = async () => {
     await createClient().auth.signOut().catch(() => {});
+    pinDemoMode();
     invalidateSession();
     setMode("demo");
     setAuthExpired(false);
     notify("Continuing in demo mode — this browser only", true);
+  };
+
+  const openSandbox = async () => {
+    setAuthExpired(false);
+    try {
+      setMode(await enterGuestSandbox());
+    } catch {
+      setMode("demo");
+    }
   };
 
   const nextQp = new URLSearchParams(searchParams.toString());
@@ -221,10 +234,22 @@ function CsrdWorkspace() {
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-[11px] font-semibold text-amber-700">
                 <HardDrive className="w-3.5 h-3.5" /> Demo · saved in this browser
               </span>
+            ) : mode === "guest" ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 border border-violet-200 px-3 py-1 text-[11px] font-semibold text-violet-700">
+                <FlaskConical className="w-3.5 h-3.5" /> Open sandbox · nothing filed
+              </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-[11px] font-semibold text-emerald-700">
                 <CloudSun className="w-3.5 h-3.5" /> Signed in · synced to your org
               </span>
+            )}
+            {mode === "demo" && (
+              <button
+                onClick={openSandbox}
+                className="inline-flex items-center gap-1.5 rounded-full border border-violet-300 bg-white px-3 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-50 transition-colors"
+              >
+                <FlaskConical className="w-3.5 h-3.5" /> Try the open sandbox
+              </button>
             )}
             <a
               href="https://filebrsr.com"
@@ -333,6 +358,9 @@ function CsrdWorkspace() {
               <button onClick={continueDemo} className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                 Continue in demo
               </button>
+              <button onClick={openSandbox} className="rounded-xl border border-violet-300 bg-white px-5 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-50">
+                Explore in the open sandbox
+              </button>
               <button onClick={() => window.location.reload()} className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                 Reload
               </button>
@@ -400,13 +428,13 @@ function OverviewTab({
 
   const seed = async () => {
     await seedDemo(financialYear);
-    notify("Sample data loaded");
+    notify(mode === "guest" ? "Sample data loaded into your sandbox" : "Sample data loaded");
     await load();
   };
 
   const clear = async () => {
     await resetEntries(financialYear);
-    notify("Workspace cleared");
+    notify(mode === "guest" ? "Sandbox workspace reset" : "Workspace cleared");
     await load();
   };
 
@@ -420,17 +448,28 @@ function OverviewTab({
 
   return (
     <div className="space-y-6">
-      {mode === "demo" && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5">
+      {mode !== "cloud" && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-5">
           <div className="flex items-start gap-3">
-            <Sparkles className="w-5 h-5 flex-shrink-0 mt-0.5 text-blue-600" />
+            <Sparkles className="w-5 h-5 flex-shrink-0 mt-0.5 text-violet-600" />
             <div>
-              <p className="text-sm font-bold text-slate-800">You&apos;re in the demo workspace</p>
-              <p className="text-xs text-slate-500 mt-1">Everything is saved in this browser, ready to explore. Sign in to persist to your organisation and export Word/PDF statements.</p>
+              <p className="text-sm font-bold text-slate-800">
+                {mode === "guest" ? "You're in an open sandbox" : "You're in the demo workspace"}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {mode === "guest"
+                  ? "A throwaway workspace — nothing you do here is filed with a regulator."
+                  : "Everything is saved in this browser, ready to explore."}
+              </p>
+              <ol className="text-xs text-slate-600 mt-2 space-y-1">
+                <li><span className="font-semibold text-violet-700">1.</span> Assess datapoints in the registry (or load sample data)</li>
+                <li><span className="font-semibold text-violet-700">2.</span> Record impacts, risks &amp; opportunities in Materiality</li>
+                <li><span className="font-semibold text-violet-700">3.</span> Generate your ESRS statement in Reports</li>
+              </ol>
             </div>
           </div>
           <div className="flex gap-2 flex-shrink-0">
-            <button onClick={seed} className="inline-flex items-center gap-2 rounded-lg bg-white border border-blue-300 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+            <button onClick={seed} className="inline-flex items-center gap-2 rounded-lg bg-white border border-violet-300 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50">
               <Wand2 className="w-4 h-4" /> Load sample data
             </button>
             <button onClick={clear} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-50">
@@ -1126,7 +1165,7 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
     try {
       const rows = await listReports(financialYear);
       setReports(rows);
-      if (mode === "cloud") setSubmissions(await listSubmissions(financialYear));
+      if (mode !== "demo") setSubmissions(await listSubmissions(financialYear));
     } catch (e) {
       notify(e as Error, false);
     }
@@ -1233,7 +1272,11 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
     try {
       const data = await submitEsefReport(reportId, `CSRD-${financialYear}-${reportId.slice(0, 6)}`, "");
       await load();
-      notify(data.ack_ref ? `Acknowledged by regulator · ${data.ack_ref} · ${data.channel}` : `Submitted for filing · ref ${data.submission_ref} · ${data.status}`);
+      if (data.channel === "guest_sandbox") {
+        notify(`Sandbox deposit complete · nothing was filed with a regulator`);
+      } else {
+        notify(data.ack_ref ? `Acknowledged by regulator · ${data.ack_ref} · ${data.channel}` : `Submitted for filing · ref ${data.submission_ref} · ${data.status}`);
+      }
     } catch (e) {
       notify(e as Error, false);
     } finally {
@@ -1263,9 +1306,12 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
           {mode === "demo" && (
             <p className="text-xs text-amber-700 mt-1.5">Demo mode: download an HTML statement (print to PDF) or the CSV register. Sign in for native Word/PDF/ESEF export with an audit fingerprint.</p>
           )}
+          {mode === "guest" && (
+            <p className="text-xs text-violet-700 mt-1.5">Sandbox: generated statements and submissions stay in your throwaway workspace — nothing is filed with a regulator.</p>
+          )}
         </div>
         <div className="flex gap-3 flex-shrink-0">
-          {mode === "cloud" ? (
+          {mode !== "demo" ? (
             <>
               <button onClick={() => generate("esef")} disabled={!!generating} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-semibold px-4 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}>
                 {generating === "esef" ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} ESEF (XBRL)
@@ -1322,7 +1368,7 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
                 </p>
               </div>
             </div>
-            {mode === "cloud" && (
+            {mode !== "demo" && (
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button onClick={() => downloadCloud(r.id)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                   <FileText className="w-4 h-4" /> Download
@@ -1353,9 +1399,9 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
                       onClick={() => submit(r.id)}
                       disabled={busy === r.id || r.assurance_status === "none" || r.validation_status !== "pass" || !r.attested_at}
                       className="inline-flex items-center gap-2 rounded-lg text-white text-sm font-semibold px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}
+                      style={{ background: mode === "guest" ? "linear-gradient(120deg, #7C3AED, #6D28D9)" : "linear-gradient(120deg, #059669, #0D9488)" }}
                     >
-                      {busy === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Submit to OAM
+                      {busy === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} {mode === "guest" ? "Submit (sandbox)" : "Submit to OAM"}
                     </button>
                   </>
                 )}
@@ -1483,13 +1529,13 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
         ))}
       </div>
 
-      {mode === "cloud" && submissions.length > 0 && (
+      {mode !== "demo" && submissions.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h3 className="font-bold text-slate-900 text-sm mb-3">Regulator submissions</h3>
+          <h3 className="font-bold text-slate-900 text-sm mb-3">{mode === "guest" ? "Sandbox deposits" : "Regulator submissions"}</h3>
           <div className="space-y-2">
             {submissions.map((s) => {
               const acknowledged = !!s.ack_ref;
-              const pending = s.status === "queued_local" || s.status.startsWith("webhook_failed");
+              const pending = s.status === "queued_local" || s.status.startsWith("webhook_failed") || s.status === "sandboxed";
               return (
                 <div key={s.id} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm">
                   <div className="min-w-0">
@@ -1499,7 +1545,7 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
                       {s.sent_at ? ` · sent ${new Date(s.sent_at).toLocaleString()}` : ""}
                     </p>
                     {acknowledged && (
-                      <p className="text-xs text-emerald-700 mt-0.5">
+                      <p className="text-xs text-violet-700 mt-0.5">
                         Acknowledged {new Date(s.acknowledged_at ?? s.sent_at ?? s.created_at).toLocaleString()} · {s.channel}
                       </p>
                     )}
@@ -1513,7 +1559,7 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: acknowledged ? "#D1FAE5" : s.status === "submitted" ? "#DBEAFE" : s.status.startsWith("webhook_failed") ? "#FEE2E2" : "#FEF3C7", color: acknowledged ? "#065F46" : s.status === "submitted" ? "#1E40AF" : s.status.startsWith("webhook_failed") ? "#991B1B" : "#92400E" }}>
                       {acknowledged ? "acknowledged" : s.status}
                     </span>
-                    {process.env.NEXT_PUBLIC_APP_ENV?.toLowerCase() !== "production" && pending && (
+                    {(mode === "guest" || process.env.NEXT_PUBLIC_APP_ENV?.toLowerCase() !== "production") && pending && (
                       <button onClick={() => simulateAck(s.report_id)} disabled={!!busy} className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-60">
                         Simulate receipt
                       </button>
