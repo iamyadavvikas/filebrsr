@@ -23,6 +23,8 @@ import {
   Wand2,
   ShieldCheck,
   Send,
+  FileCheck2,
+  X,
 } from "lucide-react";
 import {
   detectMode,
@@ -63,6 +65,7 @@ import {
   listSubmissions,
   setReportAssurance,
   submitEsefReport,
+  validateEsefReport,
   REPORT_EXT,
 } from "@/lib/csrd/workspace";
 import { AuthSessionError } from "@/lib/supabase/session";
@@ -1109,6 +1112,7 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   const [generating, setGenerating] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [validating, setValidating] = useState<string | null>(null);
   const [assuring, setAssuring] = useState<string | null>(null);
   const [assuranceDraft, setAssuranceDraft] = useState<Record<string, AssuranceInput>>({});
 
@@ -1187,6 +1191,19 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
       notify(e as Error, false);
     } finally {
       setAssuring(null);
+    }
+  };
+
+  const validate = async (reportId: string) => {
+    setValidating(reportId);
+    try {
+      const v = await validateEsefReport(reportId);
+      await load();
+      notify(v.passed ? `ESEF validation passed (${v.summary})` : `ESEF validation failed: ${v.summary}`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setValidating(null);
     }
   };
 
@@ -1274,6 +1291,13 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
                 {r.report_type === "esef" && (
                   <>
                     <button
+                      onClick={() => validate(r.id)}
+                      disabled={validating === r.id}
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      {validating === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck2 className="w-4 h-4" />} Validate
+                    </button>
+                    <button
                       onClick={() => setAssuring((v) => (v === r.id ? null : r.id))}
                       className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                     >
@@ -1281,7 +1305,7 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
                     </button>
                     <button
                       onClick={() => submit(r.id)}
-                      disabled={busy === r.id || r.assurance_status === "none"}
+                      disabled={busy === r.id || r.assurance_status === "none" || r.validation_status !== "pass"}
                       className="inline-flex items-center gap-2 rounded-lg text-white text-sm font-semibold px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}
                     >
@@ -1289,6 +1313,25 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
                     </button>
                   </>
                 )}
+              </div>
+            )}
+            {(r.validation_status === "pass" || r.validation_status === "fail") && r.report_type === "esef" && (
+              <div className="w-full">
+                <span
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-full"
+                  style={{ background: r.validation_status === "pass" ? "#D1FAE5" : "#FEE2E2", color: r.validation_status === "pass" ? "#065F46" : "#991B1B" }}
+                >
+                  {r.validation_status === "pass" ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+                  {r.validation_status === "pass" ? "ESEF valid" : "ESEF needs fixes"} · {r.validation_summary?.summary ?? ""}
+                  {r.validated_at ? ` · ${new Date(r.validated_at).toLocaleString()}` : ""}
+                </span>
+                {r.validation_status === "fail" && r.validation_summary?.errors.length ? (
+                  <ul className="mt-2 space-y-1 text-xs text-red-700 list-disc list-inside">
+                    {r.validation_summary.errors.slice(0, 4).map((e, i) => (
+                      <li key={i}>{e.message}</li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             )}
             {assuring === r.id && r.report_type === "esef" && (

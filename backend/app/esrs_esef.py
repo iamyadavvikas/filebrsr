@@ -70,6 +70,23 @@ def concept_unit(item_type: str) -> Optional[str]:
     return "pure"
 
 
+_DECIMALS: dict[str, str] = {
+    "xbrli:integerItemType": "0",
+    "xbrli:monetaryItemType": "2",
+    "xbrli:percentItemType": "INF",
+    "xbrli:pureItemType": "INF",
+    "ghgEmissionsItemType": "0",
+    "massItemType": "0",
+    "energyItemType": "0",
+    "volumeItemType": "0",
+    "areaItemType": "0",
+}
+
+
+def concept_decimals(item_type: str) -> str:
+    return _DECIMALS.get(item_type, "INF")
+
+
 @lru_cache(maxsize=1)
 def _taxonomy_map() -> dict[str, Any]:
     path = Path(__file__).resolve().parent / "esrs_taxonomy_map.json"
@@ -152,7 +169,7 @@ def _tag_cell(value: Any, tag: dict, ctx_ref: str) -> str:
     txt = _value_text(value)
     name = f'esrs:{_esc(tag["concept"])}'
     if item_type in _NUMERIC_TYPES and isinstance(value, (int, float)) and not isinstance(value, bool):
-        decimals = "0" if item_type == "xbrli:integerItemType" else "-1"
+        decimals = concept_decimals(item_type)
         unit = concept_unit(item_type)
         return (
             f'<td class="v">'

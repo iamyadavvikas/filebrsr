@@ -38,6 +38,7 @@ from app.esrs_datapoints import (
     search,
 )
 from app.esrs_esef import build_esef_statement
+from app.esrs_validate import validate_esef_statement
 
 router = APIRouter(prefix="/api/platform/csrd", tags=["CSRD / ESRS"])
 settings = get_settings()
@@ -786,6 +787,29 @@ def _entry_payload(row: dict) -> dict:
     }
 
 
+def _build_esef(sb, org_id: str, row: dict) -> bytes:
+    """Regenerate the ESEF artifact for a report row (shared by all flows)."""
+    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(
+        sb, org_id, row["financial_year"]
+    )
+    entity = _resolve_entity(sb, org_id)
+    return build_esef_statement(
+        financial_year=row["financial_year"],
+        org_id=org_id,
+        org_name=entity["name"],
+        entity_identifier=entity["identifier"],
+        entity_scheme=entity["scheme"],
+        entries=[
+            _entry_payload(e)
+            for e in sorted(entries_map.values(), key=lambda r: r["datapoint_id"])
+        ],
+        in_scope_ids=sorted(in_scope_ids),
+        coverage_pct=row.get("coverage_pct") or 0.0,
+        value_chain_scope=sorted(scope),
+        assurance=_report_assurance(row),
+    )
+
+
 def _scoped_handled(
     in_scope_ids: set[str], entries_map: dict[str, Any], has_material_iro: bool
 ) -> int:
@@ -1071,28 +1095,21 @@ async def download_report(report_id: str, authorization: str = Header(...)):
     )
     content_type = REPORT_CONTENT_TYPES.get(row["report_type"])
     if row["report_type"] == "word":
+        in_scope_ids, entries_map, _, has_material_iro = _scoped_state(
+            sb, org_id, row["financial_year"]
+        )
         content = _build_word_stmt(
             org_id, row["financial_year"], entries_map, in_scope_ids, has_material_iro
         )
     elif row["report_type"] == "pdf":
+        in_scope_ids, entries_map, _, has_material_iro = _scoped_state(
+            sb, org_id, row["financial_year"]
+        )
         content = _build_pdf_stmt(
             org_id, row["financial_year"], entries_map, in_scope_ids, has_material_iro
         )
     else:
-        entity = _resolve_entity(sb, org_id)
-        _, _, scope, _ = _scoped_state(sb, org_id, row["financial_year"])
-        content = build_esef_statement(
-            financial_year=row["financial_year"],
-            org_id=org_id,
-            org_name=entity["name"],
-            entity_identifier=entity["identifier"],
-            entity_scheme=entity["scheme"],
-            entries=[_entry_payload(e) for e in sorted(entries_map.values(), key=lambda r: r["datapoint_id"])],
-            in_scope_ids=sorted(in_scope_ids),
-            coverage_pct=row.get("coverage_pct") or 0.0,
-            value_chain_scope=sorted(scope),
-            assurance=_report_assurance(row),
-        )
+        content = _build_esef(sb, org_id, row)
     filename = (
         f"esrs_statement_{org_id[:8]}_{row['financial_year']}.docx"
         if row["report_type"] == "word"
@@ -1111,6 +1128,50 @@ async def download_report(report_id: str, authorization: str = Header(...)):
         },
     )
     return response
+
+
+@router.post("/reports/{report_id}/validate")
+async def validate_report(report_id: str, authorization: str = Header(...)):
+    """Run the ESEF pre-flight validation and persist the result on the report.
+
+    Submission for filing requires ``validation_status == 'pass'``. The check
+    is deterministic for a given report snapshot (same inputs → same result),
+    so re-running never blurs prior approval.
+    """
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    report = (
+        sb.table("esrs_reports")
+        .select("*")
+        .eq("id", report_id)
+        .eq("org_id", org_id)
+        .maybe_single()
+        .execute()
+    )
+    row = report.data
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if row.get("report_type") != "esef":
+        raise HTTPException(status_code=400, detail="Only ESEF reports can be validated")
+    if row.get("status") != "ready":
+        raise HTTPException(status_code=409, detail="Report is not ready")
+
+    content = _build_esef(sb, org_id, row)
+    result = validate_esef_statement(
+        content,
+        financial_year=row["financial_year"],
+        coverage_pct=row.get("coverage_pct") or 0.0,
+        assurance=_report_assurance(row),
+    )
+    payload = result.as_dict()
+    patch = {
+        "validation_status": "pass" if result.passed else "fail",
+        "validation_summary": payload,
+        "validated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    sb.table("esrs_reports").update(patch).eq("id", report_id).eq("org_id", org_id).execute()
+    return {"report_id": report_id, **payload}
 
 
 class AssuranceRequest(BaseModel):
@@ -1198,23 +1259,14 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
             status_code=409,
             detail="A limited or reasonable assurance opinion is required before submission",
         )
+    if row.get("validation_status") != "pass":
+        raise HTTPException(
+            status_code=409,
+            detail="The ESEF statement has not passed pre-flight validation (run /validate)",
+        )
 
-    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(
-        sb, org_id, row["financial_year"]
-    )
+    content = _build_esef(sb, org_id, row)
     entity = _resolve_entity(sb, org_id)
-    content = build_esef_statement(
-        financial_year=row["financial_year"],
-        org_id=org_id,
-        org_name=entity["name"],
-        entity_identifier=entity["identifier"],
-        entity_scheme=entity["scheme"],
-        entries=[_entry_payload(e) for e in sorted(entries_map.values(), key=lambda r: r["datapoint_id"])],
-        in_scope_ids=sorted(in_scope_ids),
-        coverage_pct=row.get("coverage_pct") or 0.0,
-        value_chain_scope=sorted(scope),
-        assurance=_report_assurance(row),
-    )
 
     import hashlib
     import io as _io
@@ -1246,11 +1298,11 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
     status = "queued_local"
     submission_ref = manifest["filing_ref"]
     settings = get_settings()
+    payload = json.dumps(manifest, default=str).encode("utf-8")
     if settings.OAM_FILING_ENDPOINT:
         import urllib.request
 
         status = "submitted"
-        payload = json.dumps(manifest, default=str).encode("utf-8")
         try:
             with urllib.request.urlopen(
                 settings.OAM_FILING_ENDPOINT,
@@ -1263,14 +1315,55 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
         except Exception as exc:  # noqa: BLE001    local-first: never fail the API on webhook trouble
             status = f"webhook_failed:{type(exc).__name__}"
 
+    manifest_sha = hashlib.sha256(package).hexdigest()
+    # Idempotency: one submission per report. Re-submitting only ever retries a
+    # webhook that has not reached the OAM yet; a confirmed submission is
+    # returned as-is (its ref is the authoritative one).
+    existing = (
+        sb.table("esrs_submissions")
+        .select("*")
+        .eq("org_id", org_id)
+        .eq("report_id", report_id)
+        .maybe_single()
+        .execute()
+    )
+    if existing.data:
+        old = dict(existing.data)
+        if old.get("status") == "submitted":
+            return {
+                "submission_id": old.get("id"),
+                "status": "submitted",
+                "submission_ref": old.get("submission_ref"),
+                "manifest_sha256": old.get("manifest_sha256") or manifest_sha,
+                "package_bytes": len(package),
+                "already_submitted": True,
+            }
+        patch = {
+            "status": status,
+            "submission_ref": submission_ref,
+            "last_error": status if status.startswith("webhook_failed") else None,
+            "retry_count": (old.get("retry_count") or 0) + 1,
+        }
+        sb.table("esrs_submissions").update(patch).eq("id", old["id"]).execute()
+        old.update(patch)
+        return {
+            "submission_id": old.get("id"),
+            "status": old.get("status"),
+            "submission_ref": old.get("submission_ref"),
+            "manifest_sha256": old.get("manifest_sha256") or manifest_sha,
+            "package_bytes": len(package),
+            "already_submitted": False,
+        }
+
     sub_row = {
         "org_id": org_id,
         "report_id": report_id,
         "financial_year": row["financial_year"],
         "status": status,
         "submission_ref": submission_ref,
-        "manifest_sha256": hashlib.sha256(package).hexdigest(),
+        "manifest_sha256": manifest_sha,
         "package_sha256": sha256,
+        "last_error": status if status.startswith("webhook_failed") else None,
         "submitted_by": user_id,
     }
     result = sb.table("esrs_submissions").insert(sub_row).execute()
@@ -1279,8 +1372,9 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
         "submission_id": submission.get("id"),
         "status": status,
         "submission_ref": submission_ref,
-        "manifest_sha256": sub_row["manifest_sha256"],
+        "manifest_sha256": manifest_sha,
         "package_bytes": len(package),
+        "already_submitted": False,
     }
 
 

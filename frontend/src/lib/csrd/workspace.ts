@@ -92,6 +92,14 @@ export interface ReportRow {
   assurance_firm: string | null;
   assurance_date: string | null;
   assurance_statement: string | null;
+  validation_status: string;
+  validation_summary: {
+    passed: boolean;
+    summary: string;
+    errors: { severity: string; code: string; message: string }[];
+    warnings: { severity: string; code: string; message: string }[];
+  } | null;
+  validated_at: string | null;
 }
 
 export interface WorkspaceData {
@@ -497,6 +505,17 @@ export async function setReportAssurance(reportId: string, input: AssuranceInput
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export interface ValidationResult {
+  passed: boolean;
+  summary: string;
+  errors: { severity: string; code: string; message: string }[];
+  warnings: { severity: string; code: string; message: string }[];
+}
+
+export async function validateEsefReport(reportId: string): Promise<ValidationResult> {
+  return cloudJSON<ValidationResult>(`/reports/${reportId}/validate`, { method: "POST" });
 }
 
 export interface SubmissionRow {

@@ -664,6 +664,7 @@ async def test_report_rejects_bad_format(client):
         headers=_auth(),
     )
     assert resp.status_code == 400
+    assert "esef" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -853,6 +854,72 @@ async def test_submission_requires_assurance(client):
     assert "assurance" in resp.json()["detail"].lower()
 
 
+async def _mk_validated_report(client) -> str:
+    """ESEF report with a limited assurance opinion and a passing validation."""
+    report_id = await _mk_esef_report(client)
+    await client.post(
+        f"/api/platform/csrd/reports/{report_id}/assurance",
+        json={"status": "limited", "firm": "B4 Assurance LLP", "date": "2026-03-15", "statement": "Fairly presented."},
+        headers=_auth(),
+    )
+    resp = await client.post(f"/api/platform/csrd/reports/{report_id}/validate", headers=_auth())
+    assert resp.status_code == 200
+    assert resp.json()["passed"] is True
+    return report_id
+
+
+@pytest.mark.asyncio
+async def test_validate_endpoint_persists_pass(client, db):
+    report_id = await _mk_esef_report(client)
+    await client.post(
+        f"/api/platform/csrd/reports/{report_id}/assurance",
+        json={"status": "limited"},
+        headers=_auth(),
+    )
+    resp = await client.post(f"/api/platform/csrd/reports/{report_id}/validate", headers=_auth())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["passed"] is True
+    assert body["errors"] == []
+    listed = await client.get(
+        "/api/platform/csrd/reports",
+        params={"financial_year": "FY2025"},
+        headers=_auth(),
+    )
+    row = next(r for r in listed.json()["reports"] if r["id"] == report_id)
+    assert row["validation_status"] == "pass"
+    assert row["validation_summary"]["passed"] is True
+
+
+@pytest.mark.asyncio
+async def test_validate_without_assurance_fails(client):
+    """Pre-flight validation reflects that filing is not possible without assurance."""
+    report_id = await _mk_esef_report(client)
+    resp = await client.post(f"/api/platform/csrd/reports/{report_id}/validate", headers=_auth())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["passed"] is False
+    assert any(e["code"] == "assurance_missing" for e in body["errors"])
+
+
+@pytest.mark.asyncio
+async def test_submit_requires_validation_pass(client):
+    """Assurance alone is not enough — the ESEF file must pass validation."""
+    report_id = await _mk_esef_report(client)
+    await client.post(
+        f"/api/platform/csrd/reports/{report_id}/assurance",
+        json={"status": "limited"},
+        headers=_auth(),
+    )
+    resp = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "REF"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 409
+    assert "validation" in resp.json()["detail"].lower()
+
+
 @pytest.mark.asyncio
 async def test_assurance_and_submission_flow(client, db):
     report_id = await _mk_esef_report(client)
@@ -876,6 +943,21 @@ async def test_assurance_and_submission_flow(client, db):
     )
     assert resp.status_code == 200
     assert resp.json()["assurance"] == "limited"
+
+    # validation gate blocks submission before /validate runs
+    blocked = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "CSRD-FY2025-ACME"},
+        headers=_auth(),
+    )
+    assert blocked.status_code == 409
+    assert "validation" in blocked.json()["detail"].lower()
+
+    vr = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/validate",
+        headers=_auth(),
+    )
+    assert vr.status_code == 200 and vr.json()["passed"] is True
 
     sub = await client.post(
         f"/api/platform/csrd/reports/{report_id}/submit",
@@ -904,6 +986,99 @@ async def test_assurance_and_submission_flow(client, db):
     )
     assert download.status_code == 200
     assert "limited assurance" in download.content.decode("utf-8").lower()
+
+
+@pytest.mark.asyncio
+async def test_submit_is_idempotent(client, db):
+    report_id = await _mk_validated_report(client)
+    first = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "REF-X"},
+        headers=_auth(),
+    )
+    assert first.status_code == 200
+    assert first.json()["already_submitted"] is False
+    second = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "REF-X"},
+        headers=_auth(),
+    )
+    assert second.status_code == 200
+    # queued (webhook endpoint unset) → not yet at the OAM, so no re-submit marker
+    assert second.json()["already_submitted"] is False
+    assert second.json()["submission_id"] == first.json()["submission_id"]
+    assert second.json()["submission_ref"] == "REF-X"
+    listed = await client.get(
+        "/api/platform/csrd/submissions",
+        params={"financial_year": "FY2025"},
+        headers=_auth(),
+    )
+    assert listed.json()["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_submit_retries_webhook_failure(client, db, monkeypatch):
+    """A failed webhook marks the submission and bumps retry_count; a later
+    successful attempt flips status to submitted without creating a new row."""
+    from app import router_csrd
+    from app.config import Settings
+
+    report_id = await _mk_validated_report(client)
+    settings = Settings(
+        SUPABASE_URL="http://fake", SUPABASE_SERVICE_KEY="k", OAM_FILING_ENDPOINT="https://oam.example/filing"
+    )
+    monkeypatch.setattr(router_csrd, "get_settings", lambda: settings)
+
+    import urllib.request
+
+    def _boom(_url, data=None, timeout=None, headers=None):
+        raise ConnectionError("regulator down")
+
+    def _ok(_url, data=None, timeout=None, headers=None):
+        class Resp:
+            def read(self):
+                return b"ref-ok"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        return Resp()
+
+    calls = {"n": 0}
+
+    def _flaky(url, **kw):
+        calls["n"] += 1
+        return _boom(url, **kw) if calls["n"] == 1 else _ok(url, **kw)
+
+    monkeypatch.setattr(urllib.request, "urlopen", _flaky)
+    first = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "REF-Y"},
+        headers=_auth(),
+    )
+    assert first.status_code == 200
+    assert first.json()["status"] == "webhook_failed:ConnectionError"
+
+    ok = await client.post(
+        f"/api/platform/csrd/reports/{report_id}/submit",
+        json={"filing_ref": "REF-Y"},
+        headers=_auth(),
+    )
+    assert ok.status_code == 200
+    assert ok.json()["status"] == "submitted"
+    assert ok.json()["submission_ref"] == "ref-ok"
+    assert ok.json()["submission_id"] == first.json()["submission_id"]
+    listed = await client.get(
+        "/api/platform/csrd/submissions",
+        params={"financial_year": "FY2025"},
+        headers=_auth(),
+    )
+    assert listed.json()["count"] == 1
+    assert listed.json()["submissions"][0]["retry_count"] == 1
+    assert listed.json()["submissions"][0]["last_error"] is None
 
 
 @pytest.mark.asyncio
