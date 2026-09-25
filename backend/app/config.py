@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     PROV_SIGNING_KEY_B64: str = ""
     PROV_SIGNING_KEY_ID: str = "local-dev"
 
+    # ─── ESEF conformance authority (Arelle) ────────────────────────────
+    # When enabled, the /validate endpoint also runs the official Arelle
+    # conformance suite (arelleCmdLine) over the statement and folds its
+    # findings into validation_status. Arelle errors block submission; its
+    # warnings are advisory completeness guidance. Disabled = product gate
+    # only (no external dependency in the request path).
+    ESEF_ARRELLE_ENABLED: bool = False
+    ESEF_ARRELLE_CMDLINE: str = "arelleCmdLine"
+    ESEF_ARRELLE_TIMEOUT_SECONDS: int = 180
+
     # Phase 3.2 — opt-in retrieval-based extraction layer. Off by default
     # so existing prod traffic is unaffected. Each filing with this on
     # costs ~8 Gemini Flash calls (free tier 1500 RPD = ~180 filings/day).

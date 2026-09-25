@@ -37,7 +37,6 @@ from app.esrs_esef import (
     IX_NS,
     IXT_NS,
     LINK_NS,
-    XBRLI_NS,
     XLINK_NS,
     concepts_for,
 )
@@ -153,17 +152,12 @@ def validate_esef_statement(
     if header is None:
         v.error("ix_header_missing", "No <ix:header> element found; the file is not valid inline XBRL")
     else:
-        hidden = _first(root, IX_NS, "hidden") or _find(header, IX_NS, "hidden")
-        resources = (
-            _first(header, IX_NS, "resources")
-            if hidden is None
-            else _find(hidden, IX_NS, "resources")
-        )
-        schema_ref = (
-            _first(resources, LINK_NS, "schemaRef")
-            if resources is not None
-            else _find(header, LINK_NS, "schemaRef")
-        )
+        resources = _first(header, IX_NS, "resources")
+        if resources is None:
+            resources = _find(header, IX_NS, "resources")
+        schema_ref = _find(header, LINK_NS, "schemaRef")
+        if schema_ref is None and resources is not None:
+            schema_ref = _first(resources, LINK_NS, "schemaRef")
         href = (schema_ref.attrib.get(f"{{{XLINK_NS}}}href") or "") if schema_ref is not None else ""
         if not href:
             v.error("schema_ref_missing", "No link:schemaRef element found in the ix:header")
@@ -178,37 +172,39 @@ def validate_esef_statement(
     if esrs_namespace != ESRS_NS:
         v.error("esrs_namespace", f"esrs prefix must bind to {ESRS_NS}, got {esrs_namespace!r}")
 
-    # 3. Collect contexts and units defined in the hidden resources
+    # 3. Collect contexts and units defined in the resources (ix:context is the
+    #    inline form; xbrli:context tolerated for older single-file exports)
+    def _local(tag: str) -> str:
+        return tag.rsplit("}", 1)[-1]
+
     defined_contexts: set[str] = set()
     defined_units: set[str] = set()
     context_period_ok: set[str] = set()
-    if header is not None:
-        hidden = _first(header, IX_NS, "hidden")
-        if hidden is None:
-            hidden = header
-        for el in hidden.iter():
-            if el.tag == f"{{{XBRLI_NS}}}context":
-                ctx_id = el.attrib.get("id")
-                if ctx_id:
-                    defined_contexts.add(ctx_id)
-                    period = _first(el, XBRLI_NS, "period")
-                    if period is not None:
-                        start = _first(period, XBRLI_NS, "startDate")
-                        end = _first(period, XBRLI_NS, "endDate")
-                        if (
-                            start is not None
-                            and end is not None
-                            and _DATEPART_RE.match(start.text or "")
-                            and (end.text or "") > (start.text or "")
-                        ):
-                            context_period_ok.add(ctx_id)
-            elif el.tag == f"{{{XBRLI_NS}}}unit":
-                unit_id = el.attrib.get("id")
-                if unit_id:
-                    defined_units.add(unit_id)
+    header_scope = header if header is not None else root
+    for el in header_scope.iter():
+        local = _local(el.tag)
+        if local == "context":
+            ctx_id = el.attrib.get("id")
+            period = next((c for c in el if _local(c.tag) == "period"), None)
+            if ctx_id:
+                defined_contexts.add(ctx_id)
+                if period is not None:
+                    start = next((c for c in period if _local(c.tag) == "startDate"), None)
+                    end = next((c for c in period if _local(c.tag) == "endDate"), None)
+                    if (
+                        start is not None
+                        and end is not None
+                        and _DATEPART_RE.match(start.text or "")
+                        and (end.text or "") > (start.text or "")
+                    ):
+                        context_period_ok.add(ctx_id)
+        elif local == "unit":
+            unit_id = el.attrib.get("id")
+            if unit_id:
+                defined_units.add(unit_id)
 
     if not defined_contexts:
-        v.error("contexts_missing", "No <xbrli:context> elements defined in the header")
+        v.error("contexts_missing", "No <ix:context> elements defined in the header")
 
     # 4. Facts
     facts_seen: dict[tuple[str, str, str], str] = {}

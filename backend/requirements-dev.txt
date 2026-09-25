@@ -4,3 +4,4 @@ pytest-cov>=5.0
 httpx>=0.28.1
 ruff>=0.4.0
 hypothesis>=6.0
+arelle-release>=2.37

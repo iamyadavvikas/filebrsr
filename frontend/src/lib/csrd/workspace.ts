@@ -100,6 +100,9 @@ export interface ReportRow {
     warnings: { severity: string; code: string; message: string }[];
   } | null;
   validated_at: string | null;
+  attested_by: string | null;
+  attested_at: string | null;
+  attestation_statement: string | null;
 }
 
 export interface WorkspaceData {
@@ -501,10 +504,22 @@ export interface AssuranceInput {
 }
 
 export async function setReportAssurance(reportId: string, input: AssuranceInput) {
-  return cloudJSON<{ report_id: string; assurance: string }>(`/reports/${reportId}/assurance`, {
+  return cloudJSON<{ assurance: string }>(`/reports/${reportId}/assurance`, {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export interface AttestationInput {
+  signed_by: string;
+  statement: string;
+}
+
+export async function attestEsefReport(reportId: string, input: AttestationInput) {
+  return cloudJSON<{ report_id: string; attested_by: string; attested_at: string; attestation_statement: string }>(
+    `/reports/${reportId}/attestation`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
 }
 
 export interface ValidationResult {
@@ -524,13 +539,35 @@ export interface SubmissionRow {
   financial_year: string;
   status: string;
   submission_ref: string;
+  ack_ref: string | null;
+  acknowledged_at: string | null;
+  sent_at: string | null;
+  channel: string | null;
   created_at: string;
 }
 
+export interface SubmitResult {
+  submission_id: string;
+  status: string;
+  submission_ref: string;
+  package_bytes: number;
+  ack_ref: string | null;
+  acknowledged_at: string | null;
+  channel: string | null;
+}
+
 export async function submitEsefReport(reportId: string, filingRef?: string, notes?: string) {
-  return cloudJSON<{ submission_id: string; status: string; submission_ref: string; package_bytes: number }>(
+  return cloudJSON<SubmitResult>(
     `/reports/${reportId}/submit`,
     { method: "POST", body: JSON.stringify({ filing_ref: filingRef, notes: notes ?? "" }) },
+  );
+}
+
+/** Dev-only: ask the sandbox OAM to acknowledge a queued submission. */
+export async function simulateRegulatorReceipt(reportId: string) {
+  return cloudJSON<{ submission_id: string; status: string; ack_ref: string | null; acknowledged_at: string | null; channel: string }>(
+    `/reports/${reportId}/sandbox/ack`,
+    { method: "POST" },
   );
 }
 

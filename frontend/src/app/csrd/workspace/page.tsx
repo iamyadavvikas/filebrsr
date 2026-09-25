@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Send,
   FileCheck2,
+  PenTool,
   X,
 } from "lucide-react";
 import {
@@ -56,6 +57,7 @@ import {
   type ReportRow,
   type StandardMeta,
   type AssuranceInput,
+  type AttestationInput,
   type SubmissionRow,
   STATUS_LABELS,
   STATUS_OPTIONS,
@@ -63,7 +65,9 @@ import {
   VALUE_CHAIN_SEGMENTS,
   FULL_SCOPE,
   listSubmissions,
+  attestEsefReport,
   setReportAssurance,
+  simulateRegulatorReceipt,
   submitEsefReport,
   validateEsefReport,
   REPORT_EXT,
@@ -1114,6 +1118,8 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
   const [busy, setBusy] = useState<string | null>(null);
   const [validating, setValidating] = useState<string | null>(null);
   const [assuring, setAssuring] = useState<string | null>(null);
+  const [attesting, setAttesting] = useState<string | null>(null);
+  const [attestationDraft, setAttestationDraft] = useState<Record<string, AttestationInput>>({});
   const [assuranceDraft, setAssuranceDraft] = useState<Record<string, AssuranceInput>>({});
 
   const load = useCallback(async () => {
@@ -1194,6 +1200,21 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
     }
   };
 
+  const saveAttestation = async (reportId: string) => {
+    const draft = attestationDraft[reportId];
+    if (!draft?.signed_by?.trim()) return notify("Enter the auditor's name first", false);
+    setAttesting(reportId);
+    try {
+      const data = await attestEsefReport(reportId, draft);
+      await load();
+      notify(`Attested by ${data.attested_by}`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setAttesting(null);
+    }
+  };
+
   const validate = async (reportId: string) => {
     setValidating(reportId);
     try {
@@ -1212,7 +1233,20 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
     try {
       const data = await submitEsefReport(reportId, `CSRD-${financialYear}-${reportId.slice(0, 6)}`, "");
       await load();
-      notify(`Submitted for filing · ref ${data.submission_ref} · ${data.status}`);
+      notify(data.ack_ref ? `Acknowledged by regulator · ${data.ack_ref} · ${data.channel}` : `Submitted for filing · ref ${data.submission_ref} · ${data.status}`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const simulateAck = async (reportId: string) => {
+    setBusy(reportId);
+    try {
+      const data = await simulateRegulatorReceipt(reportId);
+      await load();
+      notify(data.ack_ref ? `Sandbox OAM acknowledged · ${data.ack_ref}` : "Sandbox receipt simulated");
     } catch (e) {
       notify(e as Error, false);
     } finally {
@@ -1276,6 +1310,11 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
                       {r.assurance_status} assurance{r.assurance_firm ? ` · ${r.assurance_firm}` : ""}
                     </span>
                   )}
+                  {r.report_type === "esef" && r.attested_at && (
+                    <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      Attested{r.attested_by ? ` · ${r.attested_by}` : ""}
+                    </span>
+                  )}
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {r.coverage_pct ?? 0}% coverage · {r.datapoints_covered} datapoints ·{" "}
@@ -1304,8 +1343,15 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
                       <ShieldCheck className="w-4 h-4" /> Assurance
                     </button>
                     <button
+                      onClick={() => setAttesting((v) => (v === r.id ? null : r.id))}
+                      disabled={r.assurance_status === "none" || r.validation_status !== "pass"}
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      <PenTool className="w-4 h-4" /> Attestation
+                    </button>
+                    <button
                       onClick={() => submit(r.id)}
-                      disabled={busy === r.id || r.assurance_status === "none" || r.validation_status !== "pass"}
+                      disabled={busy === r.id || r.assurance_status === "none" || r.validation_status !== "pass" || !r.attested_at}
                       className="inline-flex items-center gap-2 rounded-lg text-white text-sm font-semibold px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}
                     >
@@ -1391,6 +1437,48 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
                 </div>
               </div>
             )}
+            {attesting === r.id && r.report_type === "esef" && (
+              <div className="w-full rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-slate-500 max-w-md">Auditor sign-off: records the attesting identity on the report. The submission package will carry a digitally signed (Ed25519) qes.xml over the manifest digest.</p>
+                  {r.attested_at && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      Attested {new Date(r.attested_at).toLocaleString()}{r.attested_by ? ` · ${r.attested_by}` : ""}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                  <input
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    placeholder="Attesting auditor / signatory"
+                    value={attestationDraft[r.id]?.signed_by ?? r.attested_by ?? ""}
+                    onChange={(e) => setAttestationDraft((d) => ({ ...d, [r.id]: { signed_by: e.target.value, statement: d[r.id]?.statement ?? "" } }))}
+                  />
+                  <input
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    placeholder="Attestation statement (optional)"
+                    value={attestationDraft[r.id]?.statement ?? ""}
+                    onChange={(e) => setAttestationDraft((d) => ({ ...d, [r.id]: { signed_by: d[r.id]?.signed_by ?? r.attested_by ?? "", statement: e.target.value } }))}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
+                  <p className="text-xs text-slate-500 max-w-md">Required before submission. Cannot be changed after the package is deposited with the OAM.</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setAttesting(null)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600">Close</button>
+                    <button
+                      onClick={() => {
+                        void saveAttestation(r.id);
+                        setAttesting(null);
+                      }}
+                      disabled={attesting === r.id}
+                      className="rounded-lg bg-emerald-700 px-3 py-2 text-sm text-white disabled:opacity-60"
+                    >
+                      {attesting === r.id ? <Loader2 className="w-4 h-4 animate-spin inline" /> : null} Sign & attest
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -1399,17 +1487,41 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <h3 className="font-bold text-slate-900 text-sm mb-3">Regulator submissions</h3>
           <div className="space-y-2">
-            {submissions.map((s) => (
-              <div key={s.id} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm">
-                <div>
-                  <p className="font-semibold text-slate-800">{s.submission_ref}</p>
-                  <p className="text-xs text-slate-400">{new Date(s.created_at).toLocaleString()}</p>
+            {submissions.map((s) => {
+              const acknowledged = !!s.ack_ref;
+              const pending = s.status === "queued_local" || s.status.startsWith("webhook_failed");
+              return (
+                <div key={s.id} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-800 break-all">{acknowledged ? s.ack_ref : s.submission_ref}</p>
+                    <p className="text-xs text-slate-400">
+                      {new Date(s.created_at).toLocaleString()}
+                      {s.sent_at ? ` · sent ${new Date(s.sent_at).toLocaleString()}` : ""}
+                    </p>
+                    {acknowledged && (
+                      <p className="text-xs text-emerald-700 mt-0.5">
+                        Acknowledged {new Date(s.acknowledged_at ?? s.sent_at ?? s.created_at).toLocaleString()} · {s.channel}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {s.channel && s.channel !== "local_queue" && (
+                      <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                        {s.channel}
+                      </span>
+                    )}
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: acknowledged ? "#D1FAE5" : s.status === "submitted" ? "#DBEAFE" : s.status.startsWith("webhook_failed") ? "#FEE2E2" : "#FEF3C7", color: acknowledged ? "#065F46" : s.status === "submitted" ? "#1E40AF" : s.status.startsWith("webhook_failed") ? "#991B1B" : "#92400E" }}>
+                      {acknowledged ? "acknowledged" : s.status}
+                    </span>
+                    {process.env.NEXT_PUBLIC_APP_ENV?.toLowerCase() !== "production" && pending && (
+                      <button onClick={() => simulateAck(s.report_id)} disabled={!!busy} className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700 disabled:opacity-60">
+                        Simulate receipt
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: s.status === "submitted" ? "#D1FAE5" : s.status.startsWith("webhook_failed") ? "#FEE2E2" : "#FEF3C7", color: s.status === "submitted" ? "#065F46" : s.status.startsWith("webhook_failed") ? "#991B1B" : "#92400E" }}>
-                  {s.status}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
