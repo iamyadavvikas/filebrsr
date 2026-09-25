@@ -1,0 +1,501 @@
+"""CSRD / ESRS platform router tests (migration v23).
+
+Acceptance:
+- registry endpoints return the full ESRS Set 1 encoding (standards,
+  paginated/searchable datapoints, whole-registry coverage statics);
+- entry CRUD is org-scoped: upserts against (org, year, datapoint), rejects
+  unknown datapoint ids, and refuses writes/reads across organisations;
+- the gap analysis computes per-standard readiness (handled vs remaining);
+- the double-materiality register stores IROs and auto-derives the material
+  flag from the 1-5 scores (threshold 3.0);
+- Word/PDF statement export records an immutable snapshot (sha256, size,
+  coverage) and streams a regenerable artifact with the right content type.
+"""
+
+from __future__ import annotations
+
+import uuid
+from unittest.mock import patch
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from app.esrs_datapoints import ESRS_DATAPOINTS
+
+USER_ID = "user-csrd-1"
+OTHER_USER = "user-csrd-2"
+ORG_ID = "org-csrd-1"
+OTHER_ORG = "org-csrd-2"
+
+
+# ─── stateful fake supabase (mirrors test_assurance_persistence.py) ─────────
+
+class _Resp:
+    def __init__(self, data):
+        self.data = data
+
+
+class _Query:
+    def __init__(self, store: list[dict]):
+        self._store = store
+        self._filters: list[tuple[str, object]] = []
+        self._order: tuple[str, bool] | None = None
+        self._single_mode: str | None = None
+        self._op: tuple | None = None
+
+    def select(self, *_a, **_k):
+        return self
+
+    def eq(self, col, val):
+        self._filters.append((col, val))
+        return self
+
+    def order(self, col, desc=False):
+        self._order = (col, desc)
+        return self
+
+    def maybe_single(self):
+        self._single_mode = "maybe"
+        return self
+
+    def single(self):
+        self._single_mode = "exact"
+        return self
+
+    def insert(self, rows):
+        rows = rows if isinstance(rows, list) else [rows]
+        self._op = ("insert", rows)
+        return self
+
+    def upsert(self, rows, on_conflict=None):
+        self._op = ("upsert", rows, on_conflict)
+        return self
+
+    def update(self, patch):
+        self._op = ("update", patch)
+        return self
+
+    def delete(self):
+        self._op = ("delete",)
+        return self
+
+    def _matched(self) -> list[dict]:
+        rows = [r for r in self._store if all(r.get(c) == v for c, v in self._filters)]
+        if self._order:
+            col, desc = self._order
+            rows = sorted(rows, key=lambda r: r.get(col) or "", reverse=desc)
+        return rows
+
+    def execute(self):
+        op = self._op
+        if op is None:  # plain select
+            rows = self._matched()
+            if self._single_mode == "maybe":
+                return _Resp(rows[0] if rows else None)
+            return _Resp(rows)
+        kind, *rest = op
+        if kind == "insert":
+            rows = rest[0]
+            for r in rows:
+                r.setdefault("id", str(uuid.uuid4()))
+                r.setdefault("created_at", "2026-01-01T00:00:00Z")
+                r.setdefault("updated_at", "2026-01-01T00:00:00Z")
+                self._store.append(r)
+            return _Resp(rows)
+        if kind == "upsert":
+            rows, on_conflict = rest
+            keys = [k.strip() for k in (on_conflict or "id").split(",") if k.strip()]
+            written = []
+            for r in rows:
+                match = next(
+                    (x for x in self._store if all(x[k] == r.get(k) for k in keys)),
+                    None,
+                )
+                if match is None:
+                    r.setdefault("id", str(uuid.uuid4()))
+                    r.setdefault("created_at", "2026-01-01T00:00:00Z")
+                    r.setdefault("updated_at", "2026-01-01T00:00:00Z")
+                    self._store.append(r)
+                    written.append(r)
+                else:
+                    match.update({k: v for k, v in r.items() if v is not None and k != "id"})
+                    match["updated_at"] = "2026-01-02T00:00:00Z"
+                    written.append(match)
+            return _Resp(written)
+        if kind == "update":
+            patch = rest[0]
+            matched = self._matched()
+            for r in matched:
+                r.update({k: v for k, v in patch.items() if k != "id"})
+                r["updated_at"] = "2026-01-02T00:00:00Z"
+            return _Resp(matched)
+        if kind == "delete":
+            matched = self._matched()
+            for r in matched:
+                self._store.remove(r)
+            return _Resp(matched)
+        raise AssertionError(f"unhandled op {kind}")
+
+
+class _FakeDB:
+    def __init__(self):
+        self.tables: dict[str, list[dict]] = {
+            "org_members": [
+                {"org_id": ORG_ID, "user_id": USER_ID, "role": "owner"},
+            ],
+            "organization_members": [
+                {"org_id": ORG_ID, "user_id": USER_ID, "role": "owner"},
+            ],
+            "profiles": [
+                {"id": USER_ID, "org_id": ORG_ID, "plan": "enterprise"},
+                {"id": OTHER_USER, "org_id": OTHER_ORG, "plan": "free"},
+            ],
+            "esrs_entries": [],
+            "esrs_materiality": [],
+            "esrs_reports": [],
+        }
+
+    def table(self, name: str) -> _Query:
+        if name not in self.tables:
+            self.tables[name] = []
+        return _Query(self.tables[name])
+
+
+@pytest.fixture
+def db():
+    return _FakeDB()
+
+
+@pytest.fixture
+def client(db):
+    import app.router_csrd as csrd
+    from app.main import app
+
+    app.dependency_overrides.clear()
+    with patch.object(csrd, "get_supabase_admin", return_value=db):
+        transport = ASGITransport(app=app)
+        yield AsyncClient(transport=transport, base_url="http://test")
+
+
+def _auth(user: str = USER_ID) -> dict:
+    return {"authorization": f"Bearer {user}"}
+
+
+# ─── registry ──────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_standards_endpoint(client):
+    resp = await client.get("/api/platform/csrd/standards", headers=_auth())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_datapoints"] == len(ESRS_DATAPOINTS) == 664
+    assert len(body["standards"]) == 11
+    assert body["standards"][0]["standard"] == "2"
+    assert body["standards"][0]["datapoints"] > 100
+
+
+@pytest.mark.asyncio
+async def test_registry_pagination_and_filters(client):
+    resp = await client.get(
+        "/api/platform/csrd/registry", params={"limit": 20, "offset": 0}, headers=_auth()
+    )
+    body = resp.json()
+    assert body["total"] == 664
+    assert len(body["datapoints"]) == 20
+
+    resp = await client.get(
+        "/api/platform/csrd/registry", params={"standard": "E1"}, headers=_auth()
+    )
+    body = resp.json()
+    assert body["total"] == 104
+    assert all(d["standard"] == "E1" for d in body["datapoints"])
+
+    resp = await client.get(
+        "/api/platform/csrd/registry", params={"q": "ghg"}, headers=_auth()
+    )
+    assert resp.status_code == 200
+    assert resp.json()["total"] > 0
+
+
+@pytest.mark.asyncio
+async def test_registry_rejects_unauthenticated(client):
+    resp = await client.get("/api/platform/csrd/standards")
+    assert resp.status_code in (401, 422)
+
+
+@pytest.mark.asyncio
+async def test_coverage_endpoint(client):
+    resp = await client.get("/api/platform/csrd/coverage", headers=_auth())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_datapoints"] == 664
+    assert len(body["standards"]) == 11
+    assert "SFDR" in body["derived_from_eu_legislation"]
+
+
+# ─── entries + gap analysis ────────────────────────────────────────────────
+
+_E1_DP = [d["id"] for d in ESRS_DATAPOINTS if d["standard"] == "E1"]
+
+
+@pytest.mark.asyncio
+async def test_upsert_and_list_entries(client, db):
+    payload = {
+        "financial_year": "FY2025",
+        "entries": [
+            {"datapoint_id": _E1_DP[0], "status": "reported", "value": "tCO2e"},
+            {"datapoint_id": _E1_DP[1], "status": "in_progress", "notes": "collect data"},
+        ],
+    }
+    resp = await client.post("/api/platform/csrd/entries", json=payload, headers=_auth())
+    assert resp.status_code == 200
+    assert resp.json()["saved"] == 2
+
+    resp = await client.get(
+        "/api/platform/csrd/entries",
+        params={"financial_year": "FY2025", "standard": "E1"},
+        headers=_auth(),
+    )
+    body = resp.json()
+    assert body["org_id"] == ORG_ID
+    assert body["count"] == 2
+    entry_id = next(e["id"] for e in body["entries"] if e["datapoint_id"] == _E1_DP[0])
+
+    # update one row, then upsert again -> conflict key keeps one row per datapoint
+    resp = await client.put(
+        f"/api/platform/csrd/entries/{entry_id}",
+        json={"status": "assessed", "value": "updated"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 200
+    resp = await client.post(
+        "/api/platform/csrd/entries",
+        json={
+            "financial_year": "FY2025",
+            "entries": [{"datapoint_id": _E1_DP[0], "status": "reported"}],
+        },
+        headers=_auth(),
+    )
+    assert resp.json()["saved"] == 1
+    resp = await client.get(
+        "/api/platform/csrd/entries",
+        params={"financial_year": "FY2025", "standard": "E1"},
+        headers=_auth(),
+    )
+    assert resp.json()["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_upsert_rejects_unknown_datapoint(client):
+    resp = await client.post(
+        "/api/platform/csrd/entries",
+        json={
+            "financial_year": "FY2025",
+            "entries": [{"datapoint_id": "E9-99.999", "status": "reported"}],
+        },
+        headers=_auth(),
+    )
+    assert resp.status_code == 400
+    assert "Unknown datapoint" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_entries_are_org_scoped(client):
+    payload = {
+        "financial_year": "FY2025",
+        "entries": [{"datapoint_id": _E1_DP[0], "status": "reported"}],
+    }
+    await client.post("/api/platform/csrd/entries", json=payload, headers=_auth())
+
+    # outsider cannot read this org's entries even via explicit org_id
+    resp = await client.get(
+        "/api/platform/csrd/entries",
+        params={"org_id": ORG_ID, "financial_year": "FY2025"},
+        headers=_auth(OTHER_USER),
+    )
+    assert resp.status_code == 403
+
+    # outsider cannot save into this org either
+    resp = await client.post(
+        "/api/platform/csrd/entries",
+        json={**payload, "org_id": ORG_ID},
+        headers=_auth(OTHER_USER),
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_delete_entry(client, db):
+    resp = await client.post(
+        "/api/platform/csrd/entries",
+        json={
+            "financial_year": "FY2025",
+            "entries": [{"datapoint_id": _E1_DP[0], "status": "reported"}],
+        },
+        headers=_auth(),
+    )
+    entry_id = resp.json()["entries"][0]["id"]
+    resp = await client.delete(f"/api/platform/csrd/entries/{entry_id}", headers=_auth())
+    assert resp.status_code == 200
+    assert db.tables["esrs_entries"] == []
+
+
+@pytest.mark.asyncio
+async def test_gap_analysis_readiness(client, db):
+    # seed: E1 partially handled, all E2 reported, rest untouched
+    entries = [
+        {"datapoint_id": d["id"], "status": "reported"} if d["standard"] == "E2"
+        else {"datapoint_id": d["id"], "status": "reported"}
+        for d in ESRS_DATAPOINTS[: len(_E1_DP) // 2]  # half of E1
+    ]
+    entries = [
+        {"datapoint_id": d["id"], "status": "reported"}
+        for d in ESRS_DATAPOINTS
+        if d["standard"] == "E2" or d["id"] in _E1_DP[: len(_E1_DP) // 2]
+    ]
+    await client.post(
+        "/api/platform/csrd/entries",
+        json={"financial_year": "FY2025", "entries": entries},
+        headers=_auth(),
+    )
+    resp = await client.get(
+        "/api/platform/csrd/gap-analysis",
+        params={"financial_year": "FY2025"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_datapoints"] == 664
+    e1 = next(s for s in body["standards"] if s["standard"] == "E1")
+    e2 = next(s for s in body["standards"] if s["standard"] == "E2")
+    assert e1["handled"] == len(_E1_DP) // 2
+    assert e1["remaining"] == len(_E1_DP) - len(_E1_DP) // 2
+    assert e2["handled"] == e2["datapoints"]
+    assert body["effective_gap"] == 664 - (len(_E1_DP) // 2 + e2["datapoints"])
+
+
+# ─── double materiality ────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_iro_crud_and_material_threshold(client, db):
+    payload = {
+        "financial_year": "FY2025",
+        "iro_type": "impact",
+        "standard": "E1",
+        "title": "Climate impact from operations",
+        "severity": 4,
+        "likelihood": 5,
+        "impact_materiality": 4.2,
+        "financial_materiality": 1.1,
+    }
+    resp = await client.post("/api/platform/csrd/materiality", json=payload, headers=_auth())
+    assert resp.status_code == 200
+    iro = resp.json()["iro"]
+    assert iro["material"] is True  # impact 4.2 >= 3.0
+    iro_id = iro["id"]
+
+    # non-material: both below threshold
+    resp = await client.post(
+        "/api/platform/csrd/materiality",
+        json={
+            "financial_year": "FY2025",
+            "iro_type": "opportunity",
+            "standard": "E2",
+            "title": "Minor",
+            "impact_materiality": 1.0,
+            "financial_materiality": 2.0,
+        },
+        headers=_auth(),
+    )
+    assert resp.json()["iro"]["material"] is False
+
+    # raise one score -> material flips
+    resp = await client.put(
+        f"/api/platform/csrd/materiality/{iro_id}",
+        json={"financial_materiality": 4.8},
+        headers=_auth(),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["iro"]["material"] is True
+
+    resp = await client.get(
+        "/api/platform/csrd/materiality",
+        params={"financial_year": "FY2025", "material_only": True},
+        headers=_auth(),
+    )
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["iro"][0]["id"] == iro_id
+
+
+# ─── report export ─────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_report_generation_and_download(client, db):
+    await client.post(
+        "/api/platform/csrd/entries",
+        json={
+            "financial_year": "FY2025",
+            "entries": [{"datapoint_id": _E1_DP[0], "status": "reported", "value": 120.5}],
+        },
+        headers=_auth(),
+    )
+    resp = await client.post(
+        "/api/platform/csrd/reports",
+        json={"financial_year": "FY2025", "format": "word"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    report_id = body["report_id"]
+    assert body["datapoints_covered"] == 1
+    assert body["coverage_pct"] == pytest.approx(round(1 / 664 * 100, 2))
+    assert body["file_size_bytes"] > 0
+
+    download = await client.get(
+        f"/api/platform/csrd/reports/{report_id}/download", headers=_auth()
+    )
+    assert download.status_code == 200
+    assert download.headers["content-type"].startswith(
+        "application/vnd.openxmlformats"
+    )
+    assert len(download.content) == body["file_size_bytes"]
+
+    listed = await client.get(
+        "/api/platform/csrd/reports",
+        params={"financial_year": "FY2025"},
+        headers=_auth(),
+    )
+    assert listed.json()["count"] == 1
+    assert listed.json()["reports"][0]["file_sha256"]
+
+
+@pytest.mark.asyncio
+async def test_pdf_report_type(client):
+    await client.post(
+        "/api/platform/csrd/reports",
+        json={"financial_year": "FY2025", "format": "pdf"},
+        headers=_auth(),
+    )
+    listed = await client.get(
+        "/api/platform/csrd/reports",
+        params={"financial_year": "FY2025"},
+        headers=_auth(),
+    )
+    reports = listed.json()["reports"]
+    assert reports and reports[0]["report_type"] == "pdf"
+    download = await client.get(
+        f"/api/platform/csrd/reports/{reports[0]['id']}/download", headers=_auth()
+    )
+    assert download.status_code == 200
+    assert download.content[:4] == b"%PDF"
+
+
+@pytest.mark.asyncio
+async def test_report_rejects_bad_format(client):
+    resp = await client.post(
+        "/api/platform/csrd/reports",
+        json={"financial_year": "FY2025", "format": "xlsx"},
+        headers=_auth(),
+    )
+    assert resp.status_code == 400

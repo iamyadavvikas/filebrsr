@@ -27,6 +27,7 @@ export default function Footer() {
                 { label: "Supply Chain ESG", href: "/platform/supply-chain" },
                 { label: "BRSR Automation", href: "/platform" },
                 { label: "Carbon Calculator", href: "/platform/carbon" },
+                { label: "CSRD / ESRS Reporting", href: "/csrd" },
                 { label: "Pricing", href: "/pricing" },
               ].map((l) => (
                 <li key={l.label}>
