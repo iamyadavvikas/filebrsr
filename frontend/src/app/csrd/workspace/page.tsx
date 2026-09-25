@@ -567,16 +567,22 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
       const params: Record<string, string> = { limit: String(LIMIT), offset: String(offset) };
       if (q.trim()) params.q = q.trim();
       if (standard) params.standard = standard;
-      if (statusF) params.status = statusF;
       const data = await fetchRegistry(params);
-      setItems(data.datapoints);
-      setTotal(data.total);
+      let rows = data.datapoints;
+      let n = data.total;
+      if (statusF) {
+        const big = await fetchRegistry({ ...params, limit: "2000", offset: "0" });
+        rows = big.datapoints.filter((d) => entriesByDp[d.id]?.status === statusF);
+        n = rows.length;
+      }
+      setItems(rows);
+      setTotal(n);
     } catch (e) {
       notify(e as Error);
     } finally {
       setLoading(false);
     }
-  }, [q, standard, statusF, offset, notify]);
+  }, [q, standard, statusF, offset, entriesByDp, notify]);
 
   useEffect(() => {
     loadRegistry();
@@ -698,9 +704,9 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
               <p className="text-sm font-semibold text-slate-700">{total} datapoints</p>
               <div className="flex items-center gap-1 text-xs text-slate-400">
-                <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - LIMIT))} className="p-1 rounded hover:bg-slate-100 disabled:opacity-40">‹</button>
+                <button disabled={Boolean(statusF) || offset === 0} onClick={() => setOffset(Math.max(0, offset - LIMIT))} className="p-1 rounded hover:bg-slate-100 disabled:opacity-40">‹</button>
                 <span>{Math.floor(offset / LIMIT) + 1}</span>
-                <button disabled={offset + LIMIT >= total} onClick={() => setOffset(offset + LIMIT)} className="p-1 rounded hover:bg-slate-100 disabled:opacity-40">›</button>
+                <button disabled={Boolean(statusF) || offset + LIMIT >= total} onClick={() => setOffset(offset + LIMIT)} className="p-1 rounded hover:bg-slate-100 disabled:opacity-40">›</button>
               </div>
             </div>
             <div className="max-h-[600px] overflow-y-auto divide-y divide-slate-50">

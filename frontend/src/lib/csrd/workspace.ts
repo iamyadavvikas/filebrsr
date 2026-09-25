@@ -498,11 +498,25 @@ export async function downloadCloudReport(reportId: string): Promise<Blob> {
   return res.blob();
 }
 
-function buildStatementHtml(financialYear: string, registry: RegistryItem[], entries: EntryRow[], standards: StandardMeta[]): string {
+function buildStatementHtml(
+  financialYear: string,
+  registry: RegistryItem[],
+  entries: EntryRow[],
+  standards: StandardMeta[],
+  opts?: { valueChainScope?: string[]; iro?: IRO[] }
+): string {
+  const scope = opts?.valueChainScope?.length ? opts.valueChainScope : FULL_SCOPE;
+  const hasMaterialIro = opts?.iro?.some((r) => r.material) ?? false;
   const byDp: Record<string, EntryRow> = {};
   for (const e of entries) byDp[e.datapoint_id] = e;
-  const handled = entries.filter((e) => HANDLED.has(e.status)).length;
-  const pct = registry.length ? round2((handled / registry.length) * 100) : 0;
+  const inScoped = registry.filter((d) => phaseForYear(d.phase_in, financialYear) && segmentApplies(d, scope));
+  const handled = inScoped.filter((d) => {
+    const s = byDp[d.id]?.status || "not_assessed";
+    if (!HANDLED.has(s)) return false;
+    if (s === "not_material" && hasMaterialIro) return Boolean(byDp[d.id]?.materiality_id);
+    return true;
+  }).length;
+  const pct = inScoped.length ? round2((handled / inScoped.length) * 100) : 0;
   const esc = (s: unknown) =>
     String(s ?? "")
       .replace(/&/g, "&amp;")
@@ -510,7 +524,8 @@ function buildStatementHtml(financialYear: string, registry: RegistryItem[], ent
       .replace(/>/g, "&gt;");
   const sections = standards
     .map((std) => {
-      const dps = registry.filter((d) => d.standard === std.standard);
+      const dps = inScoped.filter((d) => d.standard === std.standard);
+      if (dps.length === 0) return "";
       const rows = dps
         .map((d) => {
           const e = byDp[d.id];
@@ -525,7 +540,7 @@ function buildStatementHtml(financialYear: string, registry: RegistryItem[], ent
     .join("");
   return `<!doctype html><html><head><meta charset="utf-8"><title>ESRS Sustainability Statement — ${esc(financialYear)}</title>
 <style>body{font-family:Georgia,serif;margin:40px;color:#1a2333} h1{border-bottom:2px solid #2563EB;padding-bottom:10px} h2{color:#2563EB;margin-top:32px;border-left:4px solid #2563EB;padding-left:10px} table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px} th,td{border:1px solid #d6dee9;padding:6px;text-align:left;vertical-align:top} th{background:#eef3ff}</style></head>
-<body><h1>ESRS Sustainability Statement</h1><p><b>Reporting period:</b> ${esc(financialYear)} &nbsp;·&nbsp; <b>Coverage:</b> ${pct}% (${handled} of ${registry.length})</p><p>Generated from the CSRD workspace demo. Print to PDF or export for review.</p>${sections}</body></html>`;
+<body><h1>ESRS Sustainability Statement</h1><p><b>Reporting period:</b> ${esc(financialYear)} &nbsp;·&nbsp; <b>Coverage:</b> ${pct}% (${handled} of ${inScoped.length} in-scope datapoints, incl. phase-in)</p><p>Generated from the CSRD workspace demo. Print to PDF or export for review.</p>${sections}</body></html>`;
 }
 
 export function buildCsv(financialYear: string, registry: RegistryItem[], entries: EntryRow[]): string {
@@ -541,9 +556,15 @@ export function buildCsv(financialYear: string, registry: RegistryItem[], entrie
 }
 
 export async function generateDemoArtifacts(financialYear: string): Promise<{ html: string; csv: string }> {
-  const [registry, standards, entries] = await Promise.all([fullRegistry(), fetchStandards(), listEntries(financialYear)]);
+  const [registry, standards, entries, scope, iro] = await Promise.all([
+    fullRegistry(),
+    fetchStandards(),
+    listEntries(financialYear),
+    getScope(),
+    listIro(financialYear).catch(() => [] as IRO[]),
+  ]);
   return {
-    html: buildStatementHtml(financialYear, registry, entries.entries, standards),
+    html: buildStatementHtml(financialYear, registry, entries.entries, standards, { valueChainScope: scope, iro }),
     csv: buildCsv(financialYear, registry, entries.entries),
   };
 }

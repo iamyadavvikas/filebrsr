@@ -44,6 +44,9 @@ logger = logging.getLogger("filebrsr.csrd")
 
 # Statuses that count as "handled" for gap analysis / readiness.
 HANDLED_STATUSES = frozenset({"reported", "assessed", "not_material", "not_applicable"})
+VALID_STATUSES = frozenset(
+    {"not_assessed", "in_progress", "assessed", "reported", "not_material", "not_applicable"}
+)
 UNKNOWN_DP = "unknown_datapoint"
 DEFAULT_MATERIALITY_THRESHOLD = 3.0
 
@@ -192,17 +195,18 @@ async def list_registry(
     items = ESRS_DATAPOINTS if standard is None else by_standard(standard)
     if dr:
         items = [d for d in items if d["dr"] == dr]
-    if q:
-        items = search(q, standard=standard)
-    if phase_in:
-        items = [d for d in items if d["phase_in"] == phase_in]
     if data_type:
         items = [d for d in items if d["data_type"] == data_type]
     if requirement:
         items = [d for d in items if d["requirement"] == requirement]
+    if phase_in:
+        items = [d for d in items if d["phase_in"] == phase_in]
     if value_chain:
         wanted = {p.strip() for p in value_chain.split(",") if p.strip()}
         items = [d for d in items if _value_chain_segments(d) & wanted]
+    if q:
+        hits = {d["id"] for d in search(q, standard=standard)}
+        items = [d for d in items if d["id"] in hits]
     total = len(items)
     page = items[offset : offset + limit]
     return {
@@ -292,6 +296,12 @@ async def upsert_entries(req: EntryBulk, authorization: str = Header(...)):
     sb = get_supabase_admin()
     org_id = _resolve_org(sb, user_id, req.org_id)
     _validate_datapoints([e.datapoint_id for e in req.entries])
+    invalid = sorted({e.status for e in req.entries} - VALID_STATUSES)
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status: {', '.join(invalid)} (allowed: {', '.join(sorted(VALID_STATUSES))})",
+        )
 
     rows = []
     for e in req.entries:
@@ -336,6 +346,11 @@ async def update_entry(
     )
     if not existing.data:
         raise HTTPException(status_code=404, detail="Entry not found")
+    if req.status is not None and req.status not in VALID_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status: {req.status} (allowed: {', '.join(sorted(VALID_STATUSES))})",
+        )
     patch = {k: v for k, v in req.model_dump().items() if v is not None}
     patch["user_id"] = user_id
     result = (
@@ -393,47 +408,21 @@ async def gap_analysis(
     if not financial_year:
         raise HTTPException(status_code=400, detail="financial_year is required")
 
-    result = (
-        sb.table("esrs_entries")
-        .select("datapoint_id, status, materiality_id")
-        .eq("org_id", org_id)
-        .eq("financial_year", financial_year)
-        .execute()
+    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(
+        sb, org_id, financial_year, value_chain
     )
-    entries_map = {
-        r["datapoint_id"]: {
-            "status": r.get("status", "not_assessed"),
-            "materiality_id": r.get("materiality_id"),
-        }
-        for r in (result.data or [])
-    }
-
-    scope = _active_scope(sb, org_id, value_chain)
-    material_rows = (
-        sb.table("esrs_materiality")
-        .select("id")
-        .eq("org_id", org_id)
-        .eq("financial_year", financial_year)
-        .eq("material", True)
-        .execute()
-    )
-    has_material_iro = bool(material_rows.data)
 
     standards = []
     for std_id, m in ESRS_STANDARDS.items():
-        scoped = [
-            d
-            for d in by_standard(std_id)
-            if _phase_for_year(d["phase_in"], financial_year)
-            and bool(_value_chain_segments(d) & scope)
-        ]
+        scoped = [d for d in by_standard(std_id) if d["id"] in in_scope_ids]
         handled = 0
         statuses: dict[str, int] = {}
         for d in scoped:
-            e = entries_map.get(d["id"], {"status": "not_assessed", "materiality_id": None})
-            if _status_handled(e["status"], e["materiality_id"], has_material_iro):
+            e = entries_map.get(d["id"], {})
+            status = e.get("status", "not_assessed")
+            if _status_handled(status, e.get("materiality_id"), has_material_iro):
                 handled += 1
-            statuses[e["status"]] = statuses.get(e["status"], 0) + 1
+            statuses[status] = statuses.get(status, 0) + 1
         standards.append(
             {
                 "code": m["code"],
@@ -490,6 +479,46 @@ def _active_scope(sb, org_id: str, value_chain: Optional[str]) -> set[str]:
         if wanted:
             return wanted
     return set(VALUE_CHAIN_SEGMENTS)
+
+
+def _scoped_state(
+    sb, org_id: str, financial_year: str, value_chain: Optional[str] = None
+) -> tuple[set[str], dict[str, dict], set[str], bool]:
+    """One source of truth for what is in scope for an org/year.
+
+    Returns ``(in_scope_ids, entries_map, scope, has_material_iro)`` where
+    ``in_scope_ids`` are the datapoints whose phase-in applies for the year and
+    whose value-chain segments intersect the org's boundary; ``entries_map`` is
+    the org's saved rows keyed by datapoint; ``has_material_iro`` tells whether
+    the org has declared a material IRO (gate for ``not_material``
+    substantiation). Gap analysis and report export share this so their
+    coverage numbers always agree.
+    """
+    resp = (
+        sb.table("esrs_entries")
+        .select("*")
+        .eq("org_id", org_id)
+        .eq("financial_year", financial_year)
+        .execute()
+    )
+    entries_map = {r["datapoint_id"]: r for r in (resp.data or [])}
+    scope = _active_scope(sb, org_id, value_chain)
+    in_scope_ids = {
+        d["id"]
+        for d in ESRS_DATAPOINTS
+        if _phase_for_year(d.get("phase_in"), financial_year)
+        and bool(_value_chain_segments(d) & scope)
+    }
+    material_rows = (
+        sb.table("esrs_materiality")
+        .select("id")
+        .eq("org_id", org_id)
+        .eq("financial_year", financial_year)
+        .eq("material", True)
+        .execute()
+    )
+    has_material_iro = bool(material_rows.data)
+    return in_scope_ids, entries_map, scope, has_material_iro
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -714,21 +743,31 @@ REPORT_CONTENT_TYPES = {
 }
 
 
-def _fetch_entries_for_year(sb, org_id: str, financial_year: str) -> dict[str, Any]:
-    result = (
-        sb.table("esrs_entries")
-        .select("*")
-        .eq("org_id", org_id)
-        .eq("financial_year", financial_year)
-        .execute()
+def _scoped_handled(
+    in_scope_ids: set[str], entries_map: dict[str, Any], has_material_iro: bool
+) -> int:
+    """Count in-scope datapoints whose entry closes the gap this year.
+
+    Mirrors ``_status_handled`` so report coverage matches gap analysis
+    (phase-in + value-chain scope + substantiated ``not_material``).
+    """
+    return sum(
+        1
+        for dp_id in in_scope_ids
+        if _status_handled(
+            entries_map.get(dp_id, {}).get("status", "not_assessed"),
+            entries_map.get(dp_id, {}).get("materiality_id"),
+            has_material_iro,
+        )
     )
-    return {r["datapoint_id"]: r for r in (result.data or [])}
 
 
 def _build_word_stmt(
     org_id: str,
     financial_year: str,
     entries: dict[str, Any],
+    in_scope_ids: set[str],
+    has_material_iro: bool,
 ) -> bytes:
     from docx import Document
 
@@ -739,14 +778,16 @@ def _build_word_stmt(
     doc.add_paragraph(f"Generated: {date.today().isoformat()}")
 
     doc.add_heading("Coverage summary", level=1)
-    handled = sum(1 for e in entries.values() if e.get("status") in HANDLED_STATUSES)
+    handled = _scoped_handled(in_scope_ids, entries, has_material_iro)
     doc.add_paragraph(
-        f"{handled} of {len(ESRS_DATAPOINTS)} ESRS datapoints assessed "
-        f"({round(handled / len(ESRS_DATAPOINTS) * 100, 2)}%)."
+        f"{handled} of {len(in_scope_ids)} in-scope ESRS datapoints assessed "
+        f"for {financial_year} ({round(handled / len(in_scope_ids) * 100, 2)}%)."
     )
 
     for std_id, m in ESRS_STANDARDS.items():
-        dps = by_standard(std_id)
+        dps = [d for d in by_standard(std_id) if d["id"] in in_scope_ids]
+        if not dps:
+            continue
         doc.add_heading(f"{m['code']} — {m['name']}", level=1)
         table = doc.add_table(rows=1, cols=3)
         table.style = "Light Grid Accent 1"
@@ -779,6 +820,8 @@ def _build_pdf_stmt(
     org_id: str,
     financial_year: str,
     entries: dict[str, Any],
+    in_scope_ids: set[str],
+    has_material_iro: bool,
 ) -> bytes:
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
@@ -812,11 +855,12 @@ def _build_pdf_stmt(
         ),
         Spacer(1, 6 * mm),
     ]
-    handled = sum(1 for e in entries.values() if e.get("status") in HANDLED_STATUSES)
+    handled = _scoped_handled(in_scope_ids, entries, has_material_iro)
     story.append(
         Paragraph(
-            f"Coverage: {handled} of {len(ESRS_DATAPOINTS)} ESRS datapoints assessed "
-            f"({round(handled / len(ESRS_DATAPOINTS) * 100, 2)}%).",
+            f"Coverage: {handled} of {len(in_scope_ids)} in-scope ESRS datapoints "
+            f"assessed for {financial_year} "
+            f"({round(handled / len(in_scope_ids) * 100, 2)}%).",
             styles["Normal"],
         )
     )
@@ -824,7 +868,9 @@ def _build_pdf_stmt(
 
     cell = styles["BodyText"]
     for std_id, m in ESRS_STANDARDS.items():
-        dps = by_standard(std_id)
+        dps = [d for d in by_standard(std_id) if d["id"] in in_scope_ids]
+        if not dps:
+            continue
         story.append(Paragraph(f"{m['code']} — {m['name']}", styles["Heading2"]))
         data = [["Datapoint", "Status", "Value / note"]]
         for dp in dps:
@@ -882,18 +928,25 @@ async def generate_report(req: ReportRequest, authorization: str = Header(...)):
     fmt = req.format.lower()
     if fmt not in REPORT_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="format must be word or pdf")
-    entries = _fetch_entries_for_year(sb, org_id, req.financial_year)
+    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(
+        sb, org_id, req.financial_year
+    )
 
     t0 = time.monotonic()
     if fmt == "word":
-        content = _build_word_stmt(org_id, req.financial_year, entries)
+        content = _build_word_stmt(
+            org_id, req.financial_year, entries_map, in_scope_ids, has_material_iro
+        )
     else:
-        content = _build_pdf_stmt(org_id, req.financial_year, entries)
+        content = _build_pdf_stmt(
+            org_id, req.financial_year, entries_map, in_scope_ids, has_material_iro
+        )
 
     import hashlib
 
-    handled = sum(1 for e in entries.values() if e.get("status") in HANDLED_STATUSES)
-    coverage_pct = round(handled / len(ESRS_DATAPOINTS) * 100, 2) if ESRS_DATAPOINTS else 0.0
+    handled = _scoped_handled(in_scope_ids, entries_map, has_material_iro)
+    scope_total = len(in_scope_ids)
+    coverage_pct = round(handled / scope_total * 100, 2) if scope_total else 0.0
     row = {
         "org_id": org_id,
         "financial_year": req.financial_year,
@@ -954,12 +1007,18 @@ async def download_report(report_id: str, authorization: str = Header(...)):
     row = report.data
     if row.get("status") != "ready":
         raise HTTPException(status_code=409, detail="Report is not ready")
-    entries = _fetch_entries_for_year(sb, org_id, row["financial_year"])
+    in_scope_ids, entries_map, _, has_material_iro = _scoped_state(
+        sb, org_id, row["financial_year"]
+    )
     content_type = REPORT_CONTENT_TYPES.get(row["report_type"])
     if row["report_type"] == "word":
-        content = _build_word_stmt(org_id, row["financial_year"], entries)
+        content = _build_word_stmt(
+            org_id, row["financial_year"], entries_map, in_scope_ids, has_material_iro
+        )
     else:
-        content = _build_pdf_stmt(org_id, row["financial_year"], entries)
+        content = _build_pdf_stmt(
+            org_id, row["financial_year"], entries_map, in_scope_ids, has_material_iro
+        )
     filename = (
         f"esrs_statement_{org_id[:8]}_{row['financial_year']}.docx"
         if row["report_type"] == "word"

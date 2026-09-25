@@ -614,7 +614,7 @@ async def test_report_generation_and_download(client, db):
     body = resp.json()
     report_id = body["report_id"]
     assert body["datapoints_covered"] == 1
-    assert body["coverage_pct"] == pytest.approx(round(1 / 664 * 100, 2))
+    assert body["coverage_pct"] == pytest.approx(round(1 / 652 * 100, 2))
     assert body["file_size_bytes"] > 0
 
     download = await client.get(
@@ -664,3 +664,113 @@ async def test_report_rejects_bad_format(client):
         headers=_auth(),
     )
     assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_report_coverage_is_phase_in_aware(client, db):
+    """Report coverage uses the in-scope (phase-filtered) total, not 664."""
+    for fy in ("FY2025", "FY2026"):
+        await client.post(
+            "/api/platform/csrd/entries",
+            json={
+                "financial_year": fy,
+                "entries": [{"datapoint_id": _E1_DP[0], "status": "reported"}],
+            },
+            headers=_auth(),
+        )
+
+    resp = await client.post(
+        "/api/platform/csrd/reports",
+        json={"financial_year": "FY2025", "format": "word"},
+        headers=_auth(),
+    )
+    assert resp.json()["coverage_pct"] == pytest.approx(round(1 / 652 * 100, 2))
+
+    resp = await client.post(
+        "/api/platform/csrd/reports",
+        json={"financial_year": "FY2026", "format": "word"},
+        headers=_auth(),
+    )
+    assert resp.json()["coverage_pct"] == pytest.approx(round(1 / 664 * 100, 2))
+
+
+@pytest.mark.asyncio
+async def test_report_excludes_unsubstantiated_not_material(client, db):
+    """A material IRO in the register makes unlinked not-material shrink coverage."""
+    resp = await client.post(
+        "/api/platform/csrd/materiality",
+        json={
+            "financial_year": "FY2025",
+            "iro_type": "impact",
+            "standard": "E1",
+            "title": "Material climate risk",
+            "impact_materiality": 4.0,
+        },
+        headers=_auth(),
+    )
+    iro_id = resp.json()["iro"]["id"]
+    await client.post(
+        "/api/platform/csrd/entries",
+        json={
+            "financial_year": "FY2025",
+            "entries": [{"datapoint_id": _E1_DP[0], "status": "not_material"}],
+        },
+        headers=_auth(),
+    )
+
+    resp = await client.post(
+        "/api/platform/csrd/reports",
+        json={"financial_year": "FY2025", "format": "word"},
+        headers=_auth(),
+    )
+    assert resp.json()["datapoints_covered"] == 0
+
+    await client.post(
+        "/api/platform/csrd/entries",
+        json={
+            "financial_year": "FY2025",
+            "entries": [
+                {"datapoint_id": _E1_DP[0], "status": "not_material", "materiality_id": iro_id}
+            ],
+        },
+        headers=_auth(),
+    )
+    resp = await client.post(
+        "/api/platform/csrd/reports",
+        json={"financial_year": "FY2025", "format": "word"},
+        headers=_auth(),
+    )
+    assert resp.json()["datapoints_covered"] == 1
+
+
+@pytest.mark.asyncio
+async def test_registry_search_combines_with_filters(client):
+    """q narrows the already-filtered list instead of replacing it."""
+    resp = await client.get(
+        "/api/platform/csrd/registry", params={"q": "pollution", "phase_in": "FY2026"}, headers=_auth()
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] > 0
+    assert all(d["phase_in"] == "FY2026" for d in body["datapoints"])
+
+    resp = await client.get(
+        "/api/platform/csrd/registry", params={"q": "financial", "standard": "E1"}, headers=_auth()
+    )
+    body = resp.json()
+    assert body["total"] > 0
+    assert all(d["standard"] == "E1" for d in body["datapoints"])
+
+
+@pytest.mark.asyncio
+async def test_upsert_rejects_invalid_status(client):
+    resp = await client.post(
+        "/api/platform/csrd/entries",
+        json={
+            "financial_year": "FY2025",
+            "entries": [{"datapoint_id": _E1_DP[0], "status": "shipped"}],
+        },
+        headers=_auth(),
+    )
+    assert resp.status_code == 400
+    assert "Invalid status" in resp.json()["detail"]
