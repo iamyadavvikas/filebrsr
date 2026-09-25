@@ -29,4 +29,4 @@ update public.esrs_reports
  where validation_status is null;
 
 comment on column public.esrs_reports.validation_status is
-  'Outcome of the ESEF pre-flight validation ('"'"'pass'"'"' required before submit).';
+  'Outcome of the ESEF pre-flight validation (''pass'' required before submit).';
