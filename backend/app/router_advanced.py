@@ -12,6 +12,7 @@ import uuid
 import logging
 
 from app.auth import get_user_id_from_header as get_user_id
+from app.brsr_core_assurance import assurance_gate, resolve_org_for_gate
 from app.config import get_settings
 
 router = APIRouter(prefix="/api/platform", tags=["Advanced Platform"])
@@ -512,6 +513,7 @@ class XBRLFilingCreate(BaseModel):
     financial_year: str
     filing_type: str = "brsr_annual"
     exchange: str = "both"
+    enforce_assurance: bool = False  # opt-in BRSR Core assurance gate (409 on gaps)
 
 
 @router.get("/xbrl/filings")
@@ -529,6 +531,18 @@ async def generate_xbrl(req: XBRLFilingCreate, authorization: str = Header(...))
     """Generate XBRL filing from BRSR data."""
     user_id = await get_user_id(authorization)
     supabase = get_supabase_admin()
+
+    # Optional BRSR Core assurance gate (opt-in, non-breaking)
+    if req.enforce_assurance:
+        org_id, tier, _ = resolve_org_for_gate(supabase, user_id)
+        if tier:
+            gate = assurance_gate(supabase, org_id, req.financial_year, tier=tier)
+            if gate["blockers"]:
+                raise HTTPException(
+                    status_code=409,
+                    detail="BRSR Core assurance required before filing: "
+                    + ", ".join(b["kpi_code"] for b in gate["blockers"]),
+                )
 
     # Fetch user's BRSR entries for the financial year
     entries_result = supabase.table("brsr_entries").select("*").eq(

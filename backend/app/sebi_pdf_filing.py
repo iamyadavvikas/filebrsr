@@ -13,21 +13,27 @@ import io
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import Response
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import cm, mm
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import cm
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    PageBreak, HRFlowable, KeepTogether
+    HRFlowable,
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
 )
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
 from app.auth import get_user_id_from_header as get_user_id
-from app.config import get_settings
+from app.brsr_core_assurance import assurance_gate, resolve_org_for_gate
 from app.brsr_datapoints import BRSR_DATAPOINTS
+from app.config import get_settings
 
 router = APIRouter(prefix="/api/v2/filing", tags=["SEBI PDF Filing"])
 settings = get_settings()
@@ -64,6 +70,7 @@ def build_sebi_pdf(
     entity_name: str,
     entity_cin: str,
     financial_year: str,
+    assurance_coverage: dict | None = None,
 ) -> bytes:
     """Generate SEBI-format BRSR PDF."""
     buffer = io.BytesIO()
@@ -110,7 +117,6 @@ def build_sebi_pdf(
 
     # === DATA SECTIONS ===
     # Build lookup
-    dp_lookup = {dp["id"]: dp for dp in BRSR_DATAPOINTS}
     entry_lookup = {e["datapoint_id"]: e.get("value", "") for e in entries}
 
     for section in SECTIONS:
@@ -193,8 +199,21 @@ def build_sebi_pdf(
         ["Category", "Filled", "Total", "Completion"],
         ["All Datapoints", str(filled), str(total_dps), f"{round(filled/total_dps*100, 1)}%"],
         ["Mandatory (Essential)", str(mandatory_filled), str(mandatory_total), f"{round(mandatory_filled/mandatory_total*100, 1)}%" if mandatory_total else "—"],
-        ["BRSR Core (Assurance)", str(core_filled), str(core_total), f"{round(core_filled/core_total*100, 1)}%" if core_total else "—"],
+        ["BRSR Core (Data Entry)", str(core_filled), str(core_total), f"{round(core_filled/core_total*100, 1)}%" if core_total else "—"],
     ]
+    if assurance_coverage:
+        summary_data.append([
+            "BRSR Core Assurance",
+            f"{assurance_coverage.get('assured_kpis', 0)}",
+            f"{assurance_coverage.get('total_kpis', 43)}",
+            f"{assurance_coverage.get('coverage_pct', 0)}%"
+            + (
+                f" ({assurance_coverage.get('required_mode') or 'no tier required'}"
+                f"{' required' if assurance_coverage.get('required_mode') else ''})"
+                if assurance_coverage.get("tier")
+                else ""
+            ),
+        ])
 
     summary_table = Table(summary_data, colWidths=[6 * cm, 3 * cm, 3 * cm, 3 * cm])
     summary_table.setStyle(TableStyle([
@@ -219,21 +238,31 @@ async def export_sebi_pdf(
     financial_year: str = "FY2025-26",
     company_name: Optional[str] = None,
     cin: Optional[str] = None,
+    enforce_assurance: bool = False,
+    assurance_tier: Optional[str] = None,
     authorization: str = Header(...),
 ):
     """
     Generate SEBI-format BRSR PDF for Annual Report attachment.
-    
+
     This creates the official formatted disclosure document following
     SEBI Circular SEBI/HO/CFD/CFD-SEC-2/P/CIR/2023/122 (Annexure II).
-    
+
     Use this PDF to:
     - Attach to your Annual Report
     - Share with auditors/assurance providers
     - Submit to stock exchanges alongside XBRL
+
+    ``enforce_assurance=true`` turns the BRSR Core assurance coverage into a
+    hard gate: the export is rejected (409) while assurance gaps exist for the
+    applicable market-cap tier (derived from the profile's reporting category,
+    or overridden with ``assurance_tier``).
     """
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
+
+    org_id, tier, _profile = resolve_org_for_gate(sb, user_id, explicit_tier=assurance_tier)
+    gate = assurance_gate(sb, org_id, financial_year, tier) if org_id else None
 
     entries_result = sb.table("brsr_entries").select(
         "datapoint_id, value"
@@ -245,18 +274,26 @@ async def export_sebi_pdf(
             detail="No data entries found. Complete the Data Entry section first."
         )
 
-    profile = sb.table("profiles").select(
-        "company_name, cin"
-    ).eq("id", user_id).single().execute()
+    if enforce_assurance and gate and not gate["ready"]:
+        blockers = gate["blockers"]
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"BRSR Core assurance not complete for {financial_year} "
+                f"({gate['tier']}: {gate['coverage']['assured_kpis']}/{gate['coverage']['total_kpis']} assured). "
+                f"Blocking KPIs: {', '.join(b['kpi_code'] for b in blockers)}."
+            ),
+        )
 
-    entity_name = company_name or (profile.data or {}).get("company_name", "Company")
-    entity_cin = cin or (profile.data or {}).get("cin", "L00000MH2020PLC000000")
+    entity_name = company_name or (_profile or {}).get("company_name") or "Company"
+    entity_cin = cin or (_profile or {}).get("cin") or "L00000MH2020PLC000000"
 
     pdf_bytes = build_sebi_pdf(
         entries=entries_result.data,
         entity_name=entity_name,
         entity_cin=entity_cin,
         financial_year=financial_year,
+        assurance_coverage=(gate or {}).get("coverage") if gate else None,
     )
 
     filename = f"BRSR_{entity_cin}_{financial_year}.pdf"
@@ -266,5 +303,7 @@ async def export_sebi_pdf(
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-FileBRSR-Assurance-Ready": "1" if (gate or {}).get("ready") else "0",
+            "X-FileBRSR-Assurance-Coverage": f"{((gate or {}).get('coverage') or {}).get('coverage_pct', 0.0)}%",
         },
     )

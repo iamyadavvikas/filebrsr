@@ -1,5 +1,10 @@
 // Auto-generated from backend/app/brsr_datapoints.py — 337 BRSR datapoints
 // DO NOT EDIT MANUALLY
+// Field `core` flags and the CORE/MANDATORY/LEADERSHIP counts are derived below
+// from the canonical catalog (frontend/src/lib/brsr-datapoints.ts), so the
+// data-entry UI always agrees with the assurance scope in backend/app/brsr_core.py.
+
+import { BRSR_DATAPOINTS } from "@/lib/brsr-datapoints";
 
 export interface BRSRField {
   id: string;
@@ -200,6 +205,7 @@ export const SECTIONS: Record<string, BRSRSection> = {
           { id: "C.P1.E.21", label: "Sales to related parties as % of Total Sales (RPT)", type: "number", required: true },
           { id: "C.P1.E.22", label: "Loans & advances to related parties as % of Total Loans & advances (RPT)", type: "number", required: true },
           { id: "C.P1.E.23", label: "Investments in related parties as % of Total Investments (RPT)", type: "number", required: true },
+          { id: "C.P1.E.24", label: "Purchases from top 10 trading houses as % of total purchases from trading houses", type: "number", required: true },
         ],
       },
       {
@@ -260,6 +266,7 @@ export const SECTIONS: Record<string, BRSRSection> = {
           { id: "C.P3.E.29", label: "Whether workers can report work-related hazards and remove themselves from risks (Y/N)", type: "select", required: true, options: ["Yes", "No"] },
           { id: "C.P3.E.30", label: "Whether employees/workers have access to non-occupational medical/healthcare services (Y/N)", type: "select", required: true, options: ["Yes", "No"] },
           { id: "C.P3.E.31", label: "Complaints on Working Conditions - Filed/Pending/Resolved (current + preceding FY)", type: "textarea", required: true, core: true },
+          { id: "C.P3.E.32", label: "Number of permanent disabilities among employees and workers", type: "number", required: true },
           { id: "C.P3.L.5", label: "Measures undertaken to ensure statutory dues deposited by value chain partners", type: "textarea", required: false, leadership: true },
           { id: "C.P3.L.6", label: "% of value chain partners assessed for health and safety practices", type: "number", required: false, leadership: true },
           { id: "C.P3.L.7", label: "% of value chain partners assessed for working conditions", type: "number", required: false, leadership: true },
@@ -485,8 +492,18 @@ export const SECTIONS: Record<string, BRSRSection> = {
   },
 };
 
-export const TOTAL_DATAPOINTS = 337;
-export const MANDATORY_DATAPOINTS = 276;
-export const CORE_DATAPOINTS = 121;
-export const LEADERSHIP_DATAPOINTS = 58;
+const CORE_IDS = new Set(BRSR_DATAPOINTS.filter((d) => d.core).map((d) => d.id));
+
+const allFields = Object.values(SECTIONS).flatMap((section) =>
+  section.subsections.flatMap((subsection) => subsection.fields)
+);
+
+for (const field of allFields) {
+  field.core = CORE_IDS.has(field.id);
+}
+
+export const TOTAL_DATAPOINTS = allFields.length;
+export const MANDATORY_DATAPOINTS = allFields.filter((f) => f.required).length;
+export const CORE_DATAPOINTS = allFields.filter((f) => f.core).length;
+export const LEADERSHIP_DATAPOINTS = allFields.filter((f) => f.leadership).length;
 
