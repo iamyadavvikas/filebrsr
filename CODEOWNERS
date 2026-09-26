@@ -1,0 +1,11 @@
+# Owners for change-sensitive paths. Anything touching schema, deployment,
+# observability or the CI/CD pipeline must be reviewed by the repo owner.
+# Update the handle(s) to your team before relying on this.
+
+supabase/**   @iamyadavvikas
+scripts/**    @iamyadavvikas
+.github/**    @iamyadavvikas
+docker-compose*.yml   @iamyadavvikas
+nginx/**      @iamyadavvikas
+observability/**      @iamyadavvikas
+backend/requirements*.txt   @iamyadavvikas

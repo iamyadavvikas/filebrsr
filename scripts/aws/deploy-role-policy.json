@@ -1,0 +1,52 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ECRReadWrite",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetAuthorizationToken",
+        "ecr:BatchGetImage",
+        "ecr:PutImage",
+        "ecr:BatchDeleteImage",
+        "ecr:DescribeImages",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:CompleteLayerUpload",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ConfigBucket",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject"],
+      "Resource": "arn:aws:s3:::YOUR_CONFIG_BUCKET/filebrsr/*"
+    },
+    {
+      "Sid": "SSMRunCommandOnProd",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand",
+        "ssm:GetCommandInvocation",
+        "ssm:DescribeInstanceInformation"
+      ],
+      "Resource": [
+        "arn:aws:ssm:ap-south-1:ACCOUNT_ID:document/AWS-RunShellScript",
+        "arn:aws:ssm:ap-south-1:ACCOUNT_ID:instance/*",
+        "arn:aws:ec2:ap-south-1:ACCOUNT_ID:instance/*"
+      ],
+      "Condition": {
+        "ArnEquals": {
+          "ssm:ResourceTag/Name": "filebrsr-prod"
+        }
+      }
+    },
+    {
+      "Sid": "ResolveEIPToInstance",
+      "Effect": "Allow",
+      "Action": "ec2:DescribeAddresses",
+      "Resource": "*"
+    }
+  ]
+}
