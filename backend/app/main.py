@@ -51,6 +51,7 @@ from app.router_platform import router as platform_router
 from app.router_tally import router as tally_router
 from app.router_verify import router as verify_router
 from app.router_assurance import router as assurance_router
+from app.router_brsr_core import router as brsr_core_router
 from app.router_trends import router as trends_router
 from app.router_v2 import router as v2_router
 from app.sebi_pdf_filing import router as sebi_pdf_router
@@ -146,6 +147,7 @@ app.include_router(trends_router)
 app.include_router(tally_router)
 app.include_router(verify_router)
 app.include_router(assurance_router)
+app.include_router(brsr_core_router)
 app.include_router(api_keys_router)
 
 app.add_middleware(
@@ -682,6 +684,22 @@ class SEBIFilingRequest(BaseModel):
     company_name: str = "Company"
     financial_year: str = "FY 2024-25"
     cin: str = ""
+    enforce_assurance: bool = False  # opt-in BRSR Core assurance gate (409 on gaps)
+
+
+def _resolve_gate_user(authorization: str) -> str:
+    """Resolve the Supabase user id from a bearer JWT (main auth convention)."""
+    import jwt as pyjwt
+
+    token = authorization.replace("Bearer ", "").strip()
+    jwt_secret = settings.SUPABASE_JWT_SECRET
+    if jwt_secret:
+        payload = pyjwt.decode(
+            token, jwt_secret, algorithms=["HS256"], audience="authenticated"
+        )
+        return payload.get("sub", "")
+    payload = pyjwt.decode(token, options={"verify_signature": False})
+    return payload.get("sub", token)
 
 
 @app.post("/api/report/sebi-filing")
@@ -689,6 +707,7 @@ async def generate_sebi_filing(req: SEBIFilingRequest, authorization: str = Head
     """Generate SEBI BRSR Annexure II format PDF — the actual stock exchange filing."""
     from fastapi.responses import Response
 
+    from app.brsr_core_assurance import assurance_gate, resolve_org_for_gate
     from app.sebi_pdf_generator import generate_sebi_brsr_filing
 
     expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
@@ -697,6 +716,25 @@ async def generate_sebi_filing(req: SEBIFilingRequest, authorization: str = Head
         token = authorization.replace("Bearer ", "")
         if not token:
             raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # Optional BRSR Core assurance gate — resolves only for user JWTs;
+    # service-key / org-less callers are never blocked (gate not applicable).
+    if req.enforce_assurance:
+        try:
+            user_id = _resolve_gate_user(authorization)
+            org_id, tier, _ = resolve_org_for_gate(get_supabase_admin(), user_id)
+            if tier and org_id:
+                gate = assurance_gate(get_supabase_admin(), org_id, req.financial_year, tier=tier)
+                if gate["blockers"]:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="BRSR Core assurance required before filing: "
+                        + ", ".join(b["kpi_code"] for b in gate["blockers"]),
+                    )
+        except HTTPException:
+            raise
+        except Exception:  # noqa: BLE001 — never break the legacy formatter on lookup noise
+            pass
 
     pdf_bytes = generate_sebi_brsr_filing(
         extracted_data=req.extracted_data,

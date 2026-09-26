@@ -89,6 +89,7 @@ const navGroups = [
     items: [
       { name: "Board Dashboard", href: "/platform/board", icon: PieChart },
       { name: "XBRL Filing", href: "/platform/xbrl", icon: Code },
+      { name: "Core Assurance", href: "/platform/assurance-core", icon: BadgeCheck },
       { name: "Frameworks", href: "/platform/frameworks", icon: Layers },
       { name: "ESG Ratings", href: "/platform/esg-ratings", icon: Star },
     ],

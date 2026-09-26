@@ -13,16 +13,16 @@ Usage:
 """
 
 import xml.etree.ElementTree as ET
-from datetime import date
-from typing import Optional
 from io import BytesIO
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import Response
 
 from app.auth import get_user_id_from_header as get_user_id
-from app.config import get_settings
+from app.brsr_core_assurance import assurance_gate, resolve_org_for_gate
 from app.brsr_datapoints import BRSR_DATAPOINTS
+from app.config import get_settings
 
 router = APIRouter(prefix="/api/v2/filing", tags=["XBRL Filing"])
 settings = get_settings()
@@ -66,7 +66,7 @@ def build_xbrl_xml(
 ) -> bytes:
     """
     Build a complete XBRL XML instance document from BRSR data entries.
-    
+
     Returns XML bytes ready for NEAPS/BSE upload.
     """
     # Parse financial year
@@ -90,7 +90,7 @@ def build_xbrl_xml(
     schema_ref.set(f"{{{NAMESPACES['xlink']}}}href", "http://www.sebi.gov.in/xbrl/brsr/2024/brsr-2024.xsd")
 
     # === CONTEXTS ===
-    
+
     # Duration context (for the full financial year)
     ctx_duration = ET.SubElement(root, f"{{{NAMESPACES['xbrli']}}}context")
     ctx_duration.set("id", "Duration_CurrentYear")
@@ -116,7 +116,7 @@ def build_xbrl_xml(
     instant_el.text = instant_date
 
     # === UNITS ===
-    
+
     # INR unit
     unit_inr = ET.SubElement(root, f"{{{NAMESPACES['xbrli']}}}unit")
     unit_inr.set("id", "INR")
@@ -148,7 +148,7 @@ def build_xbrl_xml(
     measure_gj.text = "brsr:gigajoule"
 
     # === FACTS ===
-    
+
     # Build datapoint lookup
     dp_lookup = {dp["id"]: dp for dp in BRSR_DATAPOINTS}
 
@@ -209,22 +209,32 @@ async def export_xbrl_xml(
     financial_year: str = "FY2025-26",
     company_name: Optional[str] = None,
     cin: Optional[str] = None,
+    enforce_assurance: bool = False,
+    assurance_tier: Optional[str] = None,
     authorization: str = Header(...),
 ):
     """
     Generate XBRL XML instance document for BSE/NSE filing.
-    
+
     Returns a downloadable .xml file that can be directly uploaded to:
     - NEAPS (NSE Electronic Application Processing System)
     - BSE Listing Centre
-    
+
     The file follows the SEBI BRSR taxonomy (2024) with proper:
     - Contexts (duration for FY, instant for point-in-time)
     - Units (INR, percentages, mass, energy)
     - Facts (mapped to in-brsr: namespace concepts)
+
+    ``enforce_assurance=true`` turns the BRSR Core assurance coverage into a
+    hard gate: the export is rejected (409) while assurance gaps exist for the
+    applicable market-cap tier (derived from the profile's reporting category,
+    or overridden with ``assurance_tier``).
     """
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
+
+    # Resolve org + assurance tier (gate only once we can scope to an org).
+    org_id, tier, _profile = resolve_org_for_gate(sb, user_id, explicit_tier=assurance_tier)
 
     # Fetch all data entries for this user + FY
     entries_result = sb.table("brsr_entries").select(
@@ -237,19 +247,27 @@ async def export_xbrl_xml(
             detail="No data entries found. Complete the Data Entry section first."
         )
 
-    # Get entity details
-    profile = sb.table("profiles").select(
-        "company_name, cin"
-    ).eq("id", user_id).single().execute()
-
-    entity_name = company_name or (profile.data or {}).get("company_name", "Unknown")
-    entity_cin = cin or (profile.data or {}).get("cin", "L00000MH2020PLC000000")
+    # Get entity details (resolved with the org + tier above)
+    entity_name = company_name or (_profile or {}).get("company_name") or "Unknown"
+    entity_cin = cin or (_profile or {}).get("cin") or "L00000MH2020PLC000000"
 
     # Validate completeness
-    dp_lookup = {dp["id"]: dp for dp in BRSR_DATAPOINTS}
     filled_ids = {e["datapoint_id"] for e in entries_result.data}
     mandatory_ids = {dp["id"] for dp in BRSR_DATAPOINTS if dp.get("mandatory")}
     missing_mandatory = mandatory_ids - filled_ids
+
+    # BRSR Core assurance gate
+    gate = assurance_gate(sb, org_id, financial_year, tier) if org_id else None
+    if enforce_assurance and gate and not gate["ready"]:
+        blockers = gate["blockers"]
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"BRSR Core assurance not complete for {financial_year} "
+                f"({gate['tier']}: {gate['coverage']['assured_kpis']}/{gate['coverage']['total_kpis']} assured). "
+                f"Blocking KPIs: {', '.join(b['kpi_code'] for b in blockers)}."
+            ),
+        )
 
     # Generate XBRL XML
     xml_bytes = build_xbrl_xml(
@@ -270,6 +288,8 @@ async def export_xbrl_xml(
             "X-FileBRSR-Facts-Count": str(len(entries_result.data)),
             "X-FileBRSR-Mandatory-Missing": str(len(missing_mandatory)),
             "X-FileBRSR-Completion": f"{round((1 - len(missing_mandatory)/len(mandatory_ids)) * 100, 1)}%",
+            "X-FileBRSR-Assurance-Ready": "1" if (gate or {}).get("ready") else "0",
+            "X-FileBRSR-Assurance-Coverage": f"{((gate or {}).get('coverage') or {}).get('coverage_pct', 0.0)}%",
         },
     )
 
@@ -277,24 +297,29 @@ async def export_xbrl_xml(
 @router.get("/xbrl-xml/validate")
 async def validate_xbrl_readiness(
     financial_year: str = "FY2025-26",
+    assurance_tier: Optional[str] = None,
     authorization: str = Header(...),
 ):
     """
     Check if the data entry is complete enough to generate a valid XBRL filing.
-    Returns completeness stats and lists missing mandatory fields.
+    Returns completeness stats and lists missing mandatory fields, plus BRSR
+    Core assurance coverage for the applicable market-cap tier.
     """
     user_id = await get_user_id(authorization)
     sb = get_supabase_admin()
+
+    org_id, tier, _profile = resolve_org_for_gate(sb, user_id, explicit_tier=assurance_tier)
+    gate = assurance_gate(sb, org_id, financial_year, tier) if org_id else None
 
     entries_result = sb.table("brsr_entries").select(
         "datapoint_id"
     ).eq("user_id", user_id).eq("financial_year", financial_year).execute()
 
     filled_ids = {e["datapoint_id"] for e in (entries_result.data or [])}
-    
+
     mandatory_dps = [dp for dp in BRSR_DATAPOINTS if dp.get("mandatory")]
     core_dps = [dp for dp in BRSR_DATAPOINTS if dp.get("core")]
-    
+
     missing_mandatory = [dp for dp in mandatory_dps if dp["id"] not in filled_ids]
     missing_core = [dp for dp in core_dps if dp["id"] not in filled_ids]
 
@@ -329,6 +354,18 @@ async def validate_xbrl_readiness(
         "missing_mandatory_count": len(missing_mandatory),
         "missing_core_count": len(missing_core),
         "missing_by_section": missing_by_section,
+        "assurance": {
+            "applicable": bool((gate or {}).get("applicable")),
+            "tier": (gate or {}).get("tier") if (gate or {}).get("tier") else None,
+            "ready": gate is None or bool((gate or {}).get("ready")),
+            "coverage_pct": ((gate or {}).get("coverage") or {}).get("coverage_pct", 0.0),
+            "assured_kpis": ((gate or {}).get("coverage") or {}).get("assured_kpis", 0),
+            "total_kpis": ((gate or {}).get("coverage") or {}).get("total_kpis", 43),
+            "required_mode": ((gate or {}).get("coverage") or {}).get("required_mode", ""),
+            "required_by_year": ((gate or {}).get("coverage") or {}).get("required_by_year"),
+            "blockers": ((gate or {}).get("blockers") or [])[:25],
+            "blocker_count": len((gate or {}).get("blockers") or []),
+        },
         "filing_targets": {
             "neaps_nse": "Upload .xml to NEAPS → Corporate Filing → BRSR",
             "bse_listing": "Upload .xml to BSE Listing Centre → Compliance → BRSR Annual",
