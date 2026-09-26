@@ -34,6 +34,7 @@ import {
   PieChart,
   Menu,
   X,
+  Waypoints,
 } from "lucide-react";
 
 const FOUNDER_EMAILS = [
@@ -79,6 +80,7 @@ const navGroups = [
     label: "Supply Chain & Compliance",
     items: [
       { name: "Supply Chain ESG", href: "/platform/supply-chain", icon: Network },
+      { name: "Value Chain Partners", href: "/platform/value-chain", icon: Waypoints },
       { name: "Documents & Evidence", href: "/platform/documents", icon: FolderOpen },
       { name: "Carbon Assurance", href: "/platform/assurance", icon: BadgeCheck },
       { name: "Compliance Tracker", href: "/platform/compliance", icon: Shield },
