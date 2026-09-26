@@ -113,7 +113,7 @@ def _resolve_guest_org(supabase, token: str) -> str:
         .maybe_single()
         .execute()
     )
-    if not row.data:
+    if row is None or not row.data:
         raise HTTPException(status_code=401, detail="Invalid or expired guest session")
     raw_exp = row.data.get("expires_at")
     try:

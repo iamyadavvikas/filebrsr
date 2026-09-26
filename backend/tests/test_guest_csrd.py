@@ -278,6 +278,48 @@ async def test_guest_session_expired_and_unknown_fail_closed(client, db):
     assert db.tables["esrs_guest_sessions"] == []  # expired row pruned on access
 
 
+class _NoneSingleQuery(_Query):
+    def execute(self):
+        if self._single_mode == "maybe" and not self._op:
+            match = [r for r in self._store if all(r.get(c) == v for c, v in self._filters)]
+            if not match:
+                return None  # supabase-py returns None for an empty maybe_single
+            return _Resp(match[0])
+        return super().execute()
+
+
+class _NoneSingleDB(_FakeDB):
+    def table(self, name: str) -> _Query:
+        if name not in self.tables:
+            self.tables[name] = []
+        return _NoneSingleQuery(self.tables[name])
+
+
+@pytest.mark.asyncio
+async def test_guest_unknown_token_401_when_maybe_single_returns_none(settings, monkeypatch):
+    """Guard against the real supabase-py shape: maybe_single() -> None on no row.
+
+    The in-repo fake returned a response object with ``data=None``; prod's
+    python client returns the bare ``None``, which used to raise AttributeError
+    (500) instead of the designed fails-closed 401.
+    """
+    import app.router_csrd as csrd
+    from app.main import app
+
+    cfg, _ = settings
+    db = _NoneSingleDB()
+    app.dependency_overrides.clear()
+    monkeypatch.setattr(csrd, "get_supabase_admin", lambda: db)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        resp = await c.get(
+            "/api/platform/csrd/entries",
+            params={"financial_year": "FY2025"},
+            headers=_auth("guest_never"),
+        )
+    assert resp.status_code == 401
+
+
 @pytest.mark.asyncio
 async def test_guest_disabled_config_404s(settings, monkeypatch):
     import app.router_csrd as csrd
