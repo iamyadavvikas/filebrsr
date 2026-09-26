@@ -134,7 +134,7 @@ export default function ProductsPage() {
             <h1 className="fade-up" style={{ color: "#0F172A", fontSize: "clamp(34px, 5vw, 56px)", fontWeight: 800, lineHeight: 1.08, marginBottom: 20, letterSpacing: -1.5, animationDelay: "80ms", animationFillMode: "both" }}>
               Everything you need for
               <span className="gradient-text" style={{ display: "block", backgroundImage: "linear-gradient(110deg, #10B981 0%, #06B6D4 45%, #6366F1 100%)" }}>
-                ESG compliance in India
+                ESG compliance
               </span>
             </h1>
             <p className="fade-up" style={{ fontSize: 18, color: "#475569", maxWidth: 640, lineHeight: 1.7, margin: "0 auto", animationDelay: "160ms", animationFillMode: "both" }}>
