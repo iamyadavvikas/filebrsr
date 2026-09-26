@@ -4,7 +4,8 @@ Canonical SEBI BRSR Core registry.
 Source of truth for what actually falls under BRSR Core assurance — derived from
 SEBI's BRSR Core format (Annexure I, sebi_doc/brsr_core_text.txt) and the
 assurance phase-in of CIR no. 2023/122 (sebi_doc/1689166456465.pdf), with the
-ISF reporting standards of CIR no. 2024/177 (sebi_doc/1734693844962.pdf).
+ISF reporting standards of CIR no. 2024/177 (sebi_doc/1734693844962.pdf) and
+the value-chain revisions of CIR no. 2025/42 (voluntary from FY2025-26).
 
 Background: the legacy `core=True` flags on BRSR_DATAPOINTS over-flag (~121 data
 points) because they treat most mandatory fields as "Core". The actual BRSR Core
@@ -360,16 +361,27 @@ ASSURANCE_PHASEIN: dict[str, dict[str, str]] = {
     "limited": {"top_1000": "FY2024-25"},
 }
 
-# Value-chain surface (SEBI/HO/CFD/CFD-SEC-2/P/CIR/2023/122 cl.4): the top-250
-# entities additionally report the SAME 43 BRSR Core KPIs for their top
-# upstream/downstream partners (~75% of purchases/sales), comply-or-explain.
-# That is a separate obligation on a subset of entities — it does NOT defer any
-# entity's own (entity-level) assurance of the 43 KPIs. We record the original
-# circular's value-chain assurance watch for FY2025-26 for reference; the
-# filing gate enforces entity-level assurance (see kpi_required_mode).
+# Value-chain surface (CIR/2023/122 cl.4 as revised by CIR/2025/42, effective
+# for disclosures FY2024-25 onwards): the top-250 entities report the SAME 43
+# BRSR Core KPIs for value-chain partners individually comprising >=2% of
+# purchases/sales (by value), and may cap cumulative disclosure at 75%.
+# CIR/2025/42 deferred value-chain reporting by one year and made it voluntary:
+#     disclosures:        voluntary from FY2025-26 (prior-year numbers optional)
+#     assessment/assurance: voluntary from FY2026-27 ("assessment or assurance")
+# That is a SEPARATE obligation on a subset of entities — it does NOT defer any
+# entity's own (entity-level) assurance of the 43 KPIs. The filing gate enforces
+# entity-level assurance (see kpi_required_mode); value_chain_kpi remains a
+# tagging flag for which KPIs the entity must also attribute to its partners.
 VALUE_CHAIN_ASSURANCE: dict[str, str] = {
-    "reporting": "FY2024-25",  # top-250 value-chain disclosures (comply-or-explain)
-    "limited": "FY2025-26",    # top-250 value-chain limited assurance (comply-or-explain)
+    "reporting": "FY2025-26",            # top-250 value-chain disclosures (voluntary)
+    "assessment_or_assurance": "FY2026-27",  # value-chain assessment/assurance (voluntary)
+}
+# CIR/2023/122 cl.4.1, as revised by CIR/2025/42: a partner is in-scope if it is
+# a top upstream/downstream partner individually comprising >=2% of the entity's
+# purchases/sales (by value); coverage may be capped at 75% of purchases/sales.
+VALUE_CHAIN_COVERAGE: dict[str, float] = {
+    "partner_threshold_pct": 2.0,
+    "cumulative_cap_pct": 75.0,
 }
 
 
