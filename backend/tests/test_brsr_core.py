@@ -10,6 +10,7 @@ from app.brsr_core import (
     DATAPOINT_TO_BRSC,
     NON_CORE_LEGACY_KPI_CODES,
     VALUE_CHAIN_ASSURANCE,
+    VALUE_CHAIN_COVERAGE,
     assurance_mode_for,
     catalog_gaps,
     core_kpi_codes,
@@ -127,10 +128,13 @@ def test_assurance_mode_for(tier, fy, expected):
 
 
 def test_value_chain_surface_reference():
-    # Top-250 value-chain surface per CIR 2023/122: reporting from FY24-25,
-    # limited assurance FY25-26 (comply-or-explain). Informational only.
-    assert VALUE_CHAIN_ASSURANCE["reporting"] == "FY2024-25"
-    assert VALUE_CHAIN_ASSURANCE["limited"] == "FY2025-26"
+    # Top-250 value-chain surface as revised by CIR 2025/42 (effective FY2024-25
+    # onwards): disclosures voluntary from FY25-26, assessment/assurance
+    # voluntary from FY26-27. Informational only; the gate enforces entity level.
+    assert VALUE_CHAIN_ASSURANCE["reporting"] == "FY2025-26"
+    assert VALUE_CHAIN_ASSURANCE["assessment_or_assurance"] == "FY2026-27"
+    assert VALUE_CHAIN_COVERAGE["partner_threshold_pct"] == 2.0
+    assert VALUE_CHAIN_COVERAGE["cumulative_cap_pct"] == 75.0
 
 
 def test_value_chain_kpi_subset():
