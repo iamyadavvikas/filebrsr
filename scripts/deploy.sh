@@ -6,7 +6,12 @@
 #   - cwd = ~/filebrsr (where docker-compose.prod.yml lives)
 #   - ~/filebrsr/.env contains runtime secrets
 #   - awscli + docker installed; EC2 instance role has ECR pull permission
-#   - .current_tag records the live tag (used for rollback)
+#   - .current_tag records the live tag; .tag_history keeps the last N
+#
+# Backup story: Supabase runs managed daily backups + PITR (dashboard) for the
+# DB; ECR keeps every :sha image; .tag_history + scripts/rollback.sh give
+# image-level rollback. The post-deploy smoke gate (scripts/smoke.sh, run from
+# CI) is the point at which a release is deemed good.
 
 set -euo pipefail
 
@@ -85,8 +90,8 @@ if [[ "$ok" != "1" ]]; then
   exit 1
 fi
 
-# 6. TLS renewal — non-fatal: app is already healthy; a failed renewal logs here
-#    and retries on the next deploy (certbot sidecar also retries every 12h).
+# 6. TLS renewal — non-fatal: app is already healthy; certbot renews only when
+#    near expiry (no --force-renewal, which would re-issue on every deploy).
 echo "→ Checking disk (certbot renew needs room to write new certs)"
 DISK_PCT="$(df -h / | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
 echo "   Root disk usage: ${DISK_PCT}%"
@@ -102,17 +107,25 @@ echo "→ Renewing Let's Encrypt certificate"
 # hang the deploy (and both instances fight over the letsencrypt lock).
 docker compose -f docker-compose.prod.yml stop certbot >/dev/null 2>&1 || true
 timeout 10m docker compose -f docker-compose.prod.yml run --rm \
-  --entrypoint certbot certbot renew --force-renewal -v \
-  && echo "   ✓ certificate renewed" \
+  --entrypoint certbot certbot renew -v \
+  && echo "   ✓ certificate checked/renewed" \
   || echo "⚠ certbot renew failed — cert unchanged; will retry next deploy (see CI log)"
 docker compose -f docker-compose.prod.yml start certbot >/dev/null 2>&1 || true
 docker compose -f docker-compose.prod.yml exec nginx nginx -s reload || true
 
-# 7. Record the new live tag and prune old images
+# 7. Record the new live tag and prune old images (keep last 5 in history,
+#    newest first, excluding the (now) current tag).
 if [[ -n "$PREV_TAG" ]]; then
   echo "$PREV_TAG" > .previous_tag
 fi
 echo "$TAG" > .current_tag
+touch .tag_history
+if [[ -n "$PREV_TAG" ]]; then
+  { printf '%s\n' "$PREV_TAG"; grep -vx "$PREV_TAG" .tag_history; } \
+    | grep -v '^$' | head -5 > .tag_history.tmp
+  mv .tag_history.tmp .tag_history
+fi
 docker image prune -af --filter "until=168h" >/dev/null 2>&1 || true
 
 echo "✓ Deploy complete. Live tag: $TAG"
+echo "  history: $(tr '\n' ' ' < .tag_history)"
