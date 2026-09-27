@@ -1187,6 +1187,42 @@ export async function frameworkLinks(standard?: string): Promise<{ groups: Recor
   return { groups: data.groups || {}, count: data.count || 0 };
 }
 
+// ─────────────────────────────────────────────────────── year rollover ───
+
+export interface RolloverResult {
+  from_fy: string;
+  to_fy: string;
+  entries_copied: number;
+  entries_skipped: number;
+  iros_copied: number;
+}
+
+export async function runRollover(fromFy: string, toFy: string): Promise<RolloverResult> {
+  if (!isServerMode(await detectMode())) {
+    throw new Error("Rollover needs the sandbox or sign-in — demo mode is browser-only.");
+  }
+  return cloudJSON<RolloverResult>("/rollover", {
+    method: "POST",
+    body: JSON.stringify({ from_fy: fromFy, to_fy: toFy }),
+  });
+}
+
+export interface VarianceFlag {
+  datapoint_id: string;
+  from_value: unknown;
+  to_value: unknown;
+  pct_change?: number | null;
+  changed: boolean;
+  flagged: boolean;
+}
+
+export async function rolloverVariance(fromFy: string, toFy: string, threshold = 10): Promise<{ compared: number; flagged: number; flags: VarianceFlag[] }> {
+  if (!isServerMode(await detectMode())) {
+    throw new Error("Variance needs the sandbox or sign-in.");
+  }
+  return cloudJSON(`/rollover/variance?from_fy=${encodeURIComponent(fromFy)}&to_fy=${encodeURIComponent(toFy)}&threshold_pct=${threshold}`);
+}
+
 // ──────────────────────────────────────────────────────────── sample seed ─
 
 export async function seedDemo(financialYear: string): Promise<void> {

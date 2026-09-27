@@ -61,6 +61,7 @@ ORDER=(
   migration_v37_entry_ai_provenance.sql
   migration_v38_entry_source_values.sql
   migration_v39_auditor_portal.sql
+  migration_v40_fy_rollovers.sql
 )
 
 STARTED_CONTAINER=0

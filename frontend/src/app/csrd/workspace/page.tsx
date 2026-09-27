@@ -90,6 +90,10 @@ import {
   extractPdf,
   confirmCandidate,
   sessionToken,
+  runRollover,
+  rolloverVariance,
+  type RolloverResult,
+  type VarianceFlag,
   vsmeCatalog,
   vsmeUpgrade,
   applyVsmePrefill,
@@ -515,6 +519,8 @@ function OverviewTab({
         </div>
       )}
 
+      <RolloverCard financialYear={financialYear} mode={mode} notify={notify} />
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* readiness ring card */}
         <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 flex items-center gap-6">
@@ -644,8 +650,57 @@ function FrameworkLinksPanel() {
   );
 }
 
-function StatCard({ label, value, hint, color }: { label: string; value: string | number; hint: string; color: string }) {
+function RolloverCard({ financialYear, mode, notify }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void }) {
+  const [toFy, setToFy] = useState("FY2026");
+  const [result, setResult] = useState<RolloverResult | null>(null);
+  const [flags, setFlags] = useState<VarianceFlag[]>([]);
+  const [working, setWorking] = useState(false);
+
+  const run = async () => {
+    setWorking(true);
+    try {
+      const r = await runRollover(financialYear, toFy);
+      setResult(r);
+      const v = await rolloverVariance(financialYear, toFy).catch(() => null);
+      setFlags((v?.flags || []).filter((f) => f.flagged).slice(0, 8));
+      notify(`Carried ${r.entries_copied} entries + ${r.iros_copied} IROs into ${toFy}`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  if (mode === "demo") return null;
   return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex-1">
+        <p className="text-sm font-bold text-slate-800">Start {toFy} from {financialYear}</p>
+        <p className="text-xs text-slate-500 mt-0.5">Carries values forward as in-progress (nothing overwritten), IROs as draft, methodology unlocked. Reruns only fill gaps.</p>
+        {result && (
+          <p className="text-xs text-emerald-700 font-semibold mt-1.5">
+            {result.entries_copied} copied · {result.entries_skipped} already present · {result.iros_copied} IROs
+          </p>
+        )}
+        {flags.length > 0 && (
+          <p className="text-[11px] text-amber-600 mt-1">
+            Variance ≥10%: {flags.map((f) => `${f.datapoint_id} (${f.pct_change}%)`).join(", ")}
+          </p>
+        )}
+      </div>
+      <div className="flex gap-2 flex-shrink-0">
+        <select value={toFy} onChange={(e) => setToFy(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm">
+          {FY_OPTIONS.filter((f) => f !== financialYear).map((f) => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <button onClick={run} disabled={working} className="rounded-xl text-white text-sm font-bold px-4 py-2 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+          {working ? "Carrying…" : `Rollover → ${toFy}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, hint, color }: { label: string; value: string | number; hint: string; color: string }) {  return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 flex flex-col justify-between">
       <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
       <p className="text-3xl font-extrabold mt-2" style={{ color }}>{value}</p>

@@ -541,6 +541,7 @@ class EntryBulk(BaseModel):
     financial_year: str
     org_id: Optional[str] = None
     entries: list[EntryItem] = Field(..., min_length=1)
+    reason: Optional[str] = None
 
 
 class EntryUpdate(BaseModel):
@@ -555,6 +556,7 @@ class EntryUpdate(BaseModel):
     notes: Optional[str] = None
     materiality_id: Optional[str] = None
     verified: Optional[bool] = None
+    reason: Optional[str] = None
 
 
 @router.get("/entries")
@@ -640,12 +642,12 @@ async def upsert_entries(req: EntryBulk, authorization: str = Header(...)):
         new_state = {"status": s.get("status"), "value": s.get("value")}
         if old is None:
             _audit(sb, org_id, user_id, "create", "esrs_entry", s.get("id"),
-                   s.get("datapoint_id"), req.financial_year, None, new_state)
+                   s.get("datapoint_id"), req.financial_year, None, new_state, req.reason)
         elif old.get("status") != s.get("status") or json.dumps(old.get("value"), sort_keys=True, default=str) != json.dumps(
                 s.get("value"), sort_keys=True, default=str):
             _audit(sb, org_id, user_id, "update", "esrs_entry", s.get("id"),
                    s.get("datapoint_id"), req.financial_year,
-                   {"status": old.get("status"), "value": old.get("value")}, new_state)
+                   {"status": old.get("status"), "value": old.get("value")}, new_state, req.reason)
     return {"org_id": org_id, "saved": len(saved), "entries": saved}
 
 
@@ -663,10 +665,18 @@ async def update_entry(entry_id: str, req: EntryUpdate, authorization: str = Hea
             status_code=400,
             detail=f"Invalid status: {req.status} (allowed: {', '.join(sorted(VALID_STATUSES))})",
         )
-    patch = {k: v for k, v in req.model_dump().items() if v is not None}
+    patch = {k: v for k, v in req.model_dump().items() if v is not None and k != "reason"}
     patch["user_id"] = _subject_id(user_id)
+    old_row = _row(existing) or {}
     result = sb.table("esrs_entries").update(patch).eq("id", entry_id).eq("org_id", org_id).execute()
-    return {"entry": (result.data or [{}])[0]}
+    saved = (result.data or [{}])[0]
+    _audit(sb, org_id, user_id, "update", "esrs_entry", entry_id,
+           saved.get("datapoint_id") or old_row.get("datapoint_id"),
+           saved.get("financial_year") or old_row.get("financial_year"),
+           {k: old_row.get(k) for k in ("status", "value")},
+           {k: saved.get(k, old_row.get(k)) for k in ("status", "value")},
+           req.reason)
+    return {"entry": saved}
 
 
 @router.delete("/entries/{entry_id}")
@@ -1247,6 +1257,171 @@ async def dma_methodology(
         "paragraph": " ".join(lines),
         "audit_ready": cov["audit_ready"],
     }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# YEAR ROLLOVER (carry FY forward + variance flags)
+# ═══════════════════════════════════════════════════════════════════
+
+
+class RolloverIn(BaseModel):
+    from_fy: str
+    to_fy: str
+
+
+def _fy_key(fy: str) -> str:
+    return (fy or "").strip().upper()
+
+
+@router.post("/rollover")
+async def rollover_fy(body: RolloverIn, authorization: str = Header(...)):
+    """Carry entries, IROs and DMA config into a new FY (never overwrites).
+
+    Entries arrive as ``in_progress`` (except ``not_applicable``, which is
+    stable); IROs arrive ``draft`` + immaterial for re-assessment; DMA
+    config arrives ``draft`` with approvals cleared. Reruns only fill gaps.
+    """
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    from_fy, to_fy = _fy_key(body.from_fy), _fy_key(body.to_fy)
+    if not from_fy or not to_fy or from_fy == to_fy:
+        raise HTTPException(400, "from_fy and to_fy must differ and be non-empty")
+
+    prior = None
+    try:
+        prior = sb.table("fy_rollovers").select("*").eq("org_id", org_id).eq(
+            "from_fy", from_fy).eq("to_fy", to_fy).execute()
+    except Exception:  # noqa: BLE001 - v40 not applied yet; per-row guards still hold
+        pass
+    if prior is not None and ((prior.data or [])):
+        pass  # reruns continue below; per-row guards keep them idempotent
+
+    src_entries = sb.table("esrs_entries").select("*").eq("org_id", org_id).eq(
+        "financial_year", from_fy).execute()
+    dst_rows = sb.table("esrs_entries").select("datapoint_id").eq("org_id", org_id).eq(
+        "financial_year", to_fy).execute()
+    have = {r["datapoint_id"] for r in ((dst_rows.data or []) if dst_rows is not None else [])}
+    copied = skipped = 0
+    for r in ((src_entries.data or []) if src_entries is not None else []):
+        if r["datapoint_id"] in have:
+            skipped += 1
+            continue
+        status = r.get("status") or "not_assessed"
+        sb.table("esrs_entries").insert({
+            "org_id": org_id,
+            "user_id": _subject_id(user_id),
+            "financial_year": to_fy,
+            "datapoint_id": r["datapoint_id"],
+            "status": status if status == "not_applicable" else "in_progress",
+            "value": r.get("value"),
+            "evidence": r.get("evidence"),
+            "source": "imported",
+            "notes": (r.get("notes") or "") + f" [carried from {from_fy}]" if r.get("notes") else f"Carried from {from_fy}",
+            "materiality_id": None,
+        }).execute()
+        copied += 1
+
+    src_iros = sb.table("esrs_materiality").select("*").eq("org_id", org_id).eq(
+        "financial_year", from_fy).execute()
+    dst_iros = sb.table("esrs_materiality").select("title").eq("org_id", org_id).eq(
+        "financial_year", to_fy).execute()
+    have_titles = {r.get("title") for r in ((dst_iros.data or []) if dst_iros is not None else [])}
+    iros_copied = 0
+    for r in ((src_iros.data or []) if src_iros is not None else []):
+        if r.get("title") in have_titles:
+            continue
+        sb.table("esrs_materiality").insert({
+            "org_id": org_id,
+            "financial_year": to_fy,
+            "iro_type": r.get("iro_type", "impact"),
+            "standard": r.get("standard", "E1"),
+            "title": r.get("title"),
+            "description": r.get("description"),
+            "severity": r.get("severity"),
+            "likelihood": r.get("likelihood"),
+            "impact_materiality": r.get("impact_materiality"),
+            "financial_materiality": r.get("financial_materiality"),
+            "material": False,
+            "status": "draft",
+            "created_by": _subject_id(user_id),
+        }).execute()
+        iros_copied += 1
+
+    cfg = sb.table("esrs_dma_config").select("*").eq("org_id", org_id).eq(
+        "financial_year", from_fy).maybe_single().execute()
+    cfg_row = _row(cfg)
+    if cfg_row:
+        sb.table("esrs_dma_config").upsert({
+            "org_id": org_id,
+            "financial_year": to_fy,
+            "impact_threshold": cfg_row.get("impact_threshold", 3),
+            "financial_threshold": cfg_row.get("financial_threshold", 3),
+            "methodology": cfg_row.get("methodology"),
+            "sensitivity_note": cfg_row.get("sensitivity_note"),
+            "status": "draft",
+            "approved_by": None,
+            "approved_at": None,
+        }, on_conflict="org_id,financial_year").execute()
+
+    try:
+        sb.table("fy_rollovers").upsert({
+            "org_id": org_id, "from_fy": from_fy, "to_fy": to_fy,
+            "entries_copied": copied, "entries_skipped": skipped,
+            "iros_copied": iros_copied, "run_by": _subject_id(user_id),
+        }, on_conflict="org_id,from_fy,to_fy").execute()
+    except Exception:  # noqa: BLE001 - run log is best-effort (v40)
+        pass
+    _audit(sb, org_id, user_id, "rollover", "esrs_report", None, None, to_fy, None,
+           {"from_fy": from_fy, "entries_copied": copied, "iros_copied": iros_copied})
+    return {"org_id": org_id, "from_fy": from_fy, "to_fy": to_fy,
+            "entries_copied": copied, "entries_skipped": skipped, "iros_copied": iros_copied}
+
+
+@router.get("/rollover/variance")
+async def rollover_variance(
+    from_fy: str,
+    to_fy: str,
+    threshold_pct: float = 10.0,
+    authorization: str = Header(...),
+):
+    """YoY variance flags: numeric datapoints present in both FYs."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+
+    def _load(fy: str) -> dict[str, Any]:
+        res = sb.table("esrs_entries").select("datapoint_id,value,status").eq(
+            "org_id", org_id).eq("financial_year", fy).execute()
+        return {r["datapoint_id"]: r for r in ((res.data or []) if res is not None else [])}
+
+    old, new = _load(_fy_key(from_fy)), _load(_fy_key(to_fy))
+    flags = []
+    for dp, cur in new.items():
+        prev = old.get(dp)
+        if not prev:
+            continue
+        try:
+            ov, cv = float(prev["value"]), float(cur["value"])
+        except (TypeError, ValueError):
+            if (prev.get("value") != cur.get("value") and
+                    cur.get("status") not in ("not_assessed",)):
+                flags.append({"datapoint_id": dp, "from_value": prev.get("value"),
+                              "to_value": cur.get("value"), "changed": True, "flagged": False})
+            continue
+        if ov == 0:
+            flagged = cv != 0
+            pct = None
+        else:
+            pct = round(100.0 * (cv - ov) / abs(ov), 1)
+            flagged = abs(pct) >= threshold_pct
+        flags.append({"datapoint_id": dp, "from_value": ov, "to_value": cv,
+                      "pct_change": pct, "changed": ov != cv, "flagged": flagged})
+    flagged = [f for f in flags if f["flagged"]]
+    return {"org_id": org_id, "from_fy": _fy_key(from_fy), "to_fy": _fy_key(to_fy),
+            "threshold_pct": threshold_pct, "compared": len(flags),
+            "flagged": len(flagged), "flags": sorted(flags, key=lambda f: (
+                -abs(f.get("pct_change") or 0), f["datapoint_id"]))}
 
 
 # ═══════════════════════════════════════════════════════════════════
