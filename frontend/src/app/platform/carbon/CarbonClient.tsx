@@ -774,6 +774,8 @@ export default function CarbonClient() {
                 </div>
               </div>
             </div>
+            {/* Climate resilience snapshot (IFRS S2) */}
+            <ResiliencePanel totalEmissions={results.total_emissions_tco2e} revenueCrores={revenueCrores} />
             {/* Verifiable certificate (signed Scope-2) */}
             <div className="mt-6 pt-4 border-t border-gray-100">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3">
@@ -870,6 +872,92 @@ function ResultCard({
         {value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
       </p>
       <p className="text-xs text-gray-400">tCO2e</p>
+    </div>
+  );
+}
+
+function ResiliencePanel({ totalEmissions, revenueCrores }: { totalEmissions: number; revenueCrores: number }) {
+  const [scenario, setScenario] = useState("net_zero_2050");
+  const [fx, setFx] = useState("83");
+  const [baseYear, setBaseYear] = useState("2020");
+  const [baseEmissions, setBaseEmissions] = useState("");
+  const [statedPct, setStatedPct] = useState("");
+  const [snap, setSnap] = useState<any | null>(null);
+  const [sbti, setSbti] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const run = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const fxRate = Number(fx) || 83;
+      const revenueUsd = ((Number(revenueCrores) || 0) * 1e7) / fxRate;
+      if (revenueUsd <= 0) throw new Error("Enter revenue (₹ Cr) to compute exposure intensity.");
+      const r1 = await fetch("/backend/api/climate/resilience", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emissions_tco2e: totalEmissions, revenue: revenueUsd, assets: [], scenario, year: 2030 }),
+      });
+      if (!r1.ok) throw new Error(`Resilience failed (${r1.status})`);
+      setSnap(await r1.json());
+      if (baseEmissions) {
+        const r2 = await fetch("/backend/api/climate/sbti-target", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base_emissions: Number(baseEmissions),
+            base_year: Number(baseYear) || 2020,
+            target_year: 2030,
+            ambition: "1.5C",
+            stated_target_pct: statedPct ? Number(statedPct) : null,
+          }),
+        });
+        if (r2.ok) setSbti(await r2.json());
+      } else {
+        setSbti(null);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 pt-4 border-t border-gray-100">
+      <h4 className="text-sm font-semibold text-gray-700 mb-1">Climate resilience snapshot (IFRS S2)</h4>
+      <p className="text-xs text-gray-400 mb-3">Transition exposure + SBTi check from this footprint. Scenario numbers are illustrative defaults — replace with licensed NGFS data before filing.</p>
+      <div className="flex flex-wrap gap-2 items-center">
+        <select value={scenario} onChange={(e) => setScenario(e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-xs">
+          <option value="net_zero_2050">Net Zero 2050 (orderly)</option>
+          <option value="delayed_transition">Delayed Transition</option>
+          <option value="current_policies">Current Policies</option>
+        </select>
+        <input value={fx} onChange={(e) => setFx(e.target.value)} title="INR per USD" placeholder="FX ₹/$" className="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-xs" />
+        <input value={baseEmissions} onChange={(e) => setBaseEmissions(e.target.value)} placeholder="Base-year tCO2e (for SBTi)" className="w-44 rounded-lg border border-gray-300 px-2 py-1.5 text-xs" />
+        <input value={statedPct} onChange={(e) => setStatedPct(e.target.value)} placeholder="Stated target % (optional)" className="w-44 rounded-lg border border-gray-300 px-2 py-1.5 text-xs" />
+        <button onClick={run} disabled={loading} className="px-4 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold disabled:opacity-50">
+          {loading ? "Running…" : "Run snapshot"}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {snap && (
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+          <div className="rounded-lg bg-amber-50 px-3 py-2">
+            <p className="text-[11px] text-amber-600 font-semibold uppercase">2030 carbon cost</p>
+            <p className="font-bold text-gray-900">${snap.transition.carbon_cost_usd.toLocaleString()} <span className="text-xs font-medium text-gray-500">({snap.transition.cost_to_revenue_pct}% of revenue · {snap.transition.band})</span></p>
+          </div>
+          <div className="rounded-lg bg-blue-50 px-3 py-2">
+            <p className="text-[11px] text-blue-600 font-semibold uppercase">Scenario price</p>
+            <p className="font-bold text-gray-900">${snap.transition.carbon_price_usd}/tCO2e <span className="text-xs font-medium text-gray-500">· {snap.scenario}</span></p>
+          </div>
+          <div className="rounded-lg bg-emerald-50 px-3 py-2">
+            <p className="text-[11px] text-emerald-600 font-semibold uppercase">SBTi 1.5°C by 2030</p>
+            <p className="font-bold text-gray-900">{sbti ? `${sbti.required_reduction_pct}% required${sbti.meets_sbti !== undefined ? (sbti.meets_sbti ? " · stated target meets it" : " · stated target falls short") : ""}` : "enter base-year emissions"}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
