@@ -856,8 +856,24 @@ const VSME_AREA_NAMES: Record<string, string> = {
 };
 
 function VsmeTab({ financialYear, notify }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void }) {
+  const draftKey = `csrd.vsme.draft.${financialYear}`;
   const [metrics, setMetrics] = useState<VSMEMetric[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>(() => {
+    try {
+      if (typeof window === "undefined") return {};
+      return JSON.parse(window.localStorage.getItem(draftKey) || "{}");
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(draftKey, JSON.stringify(answers));
+    } catch {
+      /* quota exceeded — draft stays in memory */
+    }
+  }, [answers, draftKey]);
   const [preview, setPreview] = useState<VSMEPrefill[]>([]);
   const [unmapped, setUnmapped] = useState<string[]>([]);
   const [working, setWorking] = useState(false);
@@ -961,13 +977,18 @@ function VsmeTab({ financialYear, notify }: { financialYear: string; notify: (m:
           </div>
         </div>
       ))}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         <button onClick={runPreview} disabled={working} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-bold px-5 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
           {working ? "Computing…" : "Preview ESRS prefill"}
         </button>
         {preview.length > 0 && (
           <button onClick={saveAll} disabled={saving} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-bold px-5 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}>
             {saving ? "Saving…" : `Save ${preview.length} to registry`}
+          </button>
+        )}
+        {answered > 0 && (
+          <button onClick={() => { setAnswers({}); setPreview([]); setUnmapped([]); }} className="text-[11px] font-bold text-slate-400 hover:text-red-500 ml-auto">
+            Clear draft
           </button>
         )}
       </div>
@@ -992,12 +1013,53 @@ function VsmeTab({ financialYear, notify }: { financialYear: string; notify: (m:
   );
 }
 
+// Bulk-assess the loaded page (skips already-handled rows)
+// ───────────────────────────────────────────────────────────────────────────
+
+function BulkAssess({ items, entriesByDp, persist, notify }: {
+  items: RegistryItem[];
+  entriesByDp: Record<string, EntryRow>;
+  persist: (item: RegistryItem, status: string, value?: unknown, evidence?: string, notes?: string, materialityId?: string) => Promise<void>;
+  notify: (m: string | Error, ok?: boolean) => void;
+}) {
+  const [working, setWorking] = useState(false);
+  const pending = items.filter((i) => !HANDLED.has(entriesByDp[i.id]?.status || ""));
+  if (pending.length === 0) return null;
+
+  const run = async (status: "assessed" | "reported") => {
+    if (!window.confirm(`Mark ${pending.length} visible datapoint(s) as ${STATUS_LABELS[status]}? Values stay empty — add them per row after.`)) return;
+    setWorking(true);
+    let done = 0;
+    try {
+      for (const item of pending) {
+        const e = entriesByDp[item.id];
+        await persist(item, status, e?.value ?? null, e?.evidence || "", e?.notes || "", e?.materiality_id || "");
+        done += 1;
+      }
+      notify(`${done} datapoint(s) marked ${STATUS_LABELS[status]}`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1 text-[11px]">
+      <span className="text-slate-400 font-semibold">{pending.length} open</span>
+      <button onClick={() => void run("assessed")} disabled={working} className="font-bold text-blue-700 hover:underline disabled:opacity-50">Mark assessed</button>
+      <button onClick={() => void run("reported")} disabled={working} className="font-bold text-blue-700 hover:underline disabled:opacity-50">Mark reported</button>
+    </div>
+  );
+}
+
 // Upload & Extract (PDF annual report -> reviewable ESRS candidates)
 // ───────────────────────────────────────────────────────────────────────────
 
 function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void; onConfirmed: () => void }) {
   const [candidates, setCandidates] = useState<ExtractCandidate[]>([]);
   const [company, setCompany] = useState<string>("");
+  const [fileMeta, setFileMeta] = useState<{ name: string; kb: number; seconds: number; capped: boolean } | null>(null);
   const [working, setWorking] = useState(false);
   const [confirming, setConfirming] = useState<string>("");
   const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
@@ -1027,10 +1089,18 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
     setWorking(true);
     setConfirmed(new Set());
     setCollapsed(new Set());
+    setFileMeta(null);
+    const started = Date.now();
     try {
       const out = await extractPdf(file);
       setCandidates(out.candidates);
       setCompany(out.company_name || "");
+      setFileMeta({
+        name: file.name,
+        kb: Math.round(file.size / 1024),
+        seconds: Math.round((Date.now() - started) / 100) / 10,
+        capped: out.stats?.capped ?? out.candidates.length >= 200,
+      });
       notify(out.candidates.length ? `${out.candidates.length} candidate(s) from ${file.name} — review and confirm` : `No mappable figures found in ${file.name}`);
       onConfirmed();
       refreshDrift();
@@ -1108,6 +1178,12 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
         )}
       </div>
       {company && <p className="mt-2 text-xs text-slate-500">Detected company: <b>{company}</b></p>}
+      {fileMeta && (
+        <p className="mt-1 text-[11px] text-slate-400">
+          {fileMeta.name} · {fileMeta.kb} KB · extracted in {fileMeta.seconds}s
+          {fileMeta.capped && <span className="ml-1 font-bold text-amber-600">Showing first 200 — refine by standard or re-upload a narrower report for full coverage.</span>}
+        </p>
+      )}
       {drift && drift.ai_confirmed > 0 && (
         <div className="mt-1.5">
           <p className="text-[11px] text-slate-400">
@@ -1549,6 +1625,7 @@ function RegistryTab({ financialYear, mode, notify, initialQuery, initialFocus, 
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
               <p className="text-sm font-semibold text-slate-700">{total} datapoints</p>
               <div className="flex items-center gap-2">
+                <BulkAssess items={items} entriesByDp={entriesByDp} persist={persist} notify={notify} />
                 <button onClick={() => void startFocus()} className="text-[11px] font-bold text-white bg-slate-900 rounded-lg px-3 py-1.5 hover:bg-slate-700" title="Walk unassessed datapoints one by one (Ctrl+Enter saves, Esc exits)">
                   Assess in focus
                 </button>
@@ -2200,6 +2277,73 @@ function MaterialityMatrix({ iro, material, onSelect }: { iro: IRO[]; material: 
 // Reports
 // ───────────────────────────────────────────────────────────────────────────
 
+// Validation findings with remediation hints
+// ───────────────────────────────────────────────────────────────────────────
+
+const REMEDIATION_HINTS: { match: RegExp; hint: string }[] = [
+  { match: /no_facts|no tagged facts/i, hint: "Add reported values to at least one mapped datapoint (e.g. E1 Scope 1+2) and regenerate." },
+  { match: /assurance_missing|assurance/i, hint: "Record a limited or reasonable assurance opinion on the report before submitting." },
+  { match: /mapped_untagged/i, hint: "These datapoints map to ESRS concepts but have no values — assess them in the Registry or mark not-material with an IRO link." },
+  { match: /^message:ea_/i, hint: "ESRS completeness advisory from the taxonomy (informational — filing still proceeds)." },
+  { match: /ix11|header/i, hint: "Inline-XBRL packaging note — regenerate the statement to clear it." },
+];
+
+function remediationFor(code: string, message: string): string | null {
+  const hay = `${code} ${message}`;
+  for (const r of REMEDIATION_HINTS) {
+    if (r.match.test(hay)) return r.hint;
+  }
+  return null;
+}
+
+function ValidationFindings({ summary, validatedAt, passed }: {
+  summary: ReportRow["validation_summary"];
+  validatedAt?: string | null;
+  passed: boolean;
+}) {
+  if (!summary) return null;
+  const errors = summary.errors || [];
+  const warnings = summary.warnings || [];
+  return (
+    <div className="w-full">
+      <span
+        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-full`}
+        style={{ background: passed ? "#D1FAE5" : "#FEE2E2", color: passed ? "#065F46" : "#991B1B" }}
+      >
+        {passed ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+        {passed ? "ESEF valid" : "ESEF needs fixes"} · {summary.summary ?? ""}
+        {validatedAt ? ` · ${new Date(validatedAt).toLocaleString()}` : ""}
+      </span>
+      {errors.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {errors.slice(0, 6).map((e, i) => (
+            <li key={i} className="text-xs text-red-700 rounded-lg bg-red-50 border border-red-100 px-2.5 py-1.5">
+              <span className="font-mono text-[10px] text-red-400 mr-1.5">{e.code}</span>{e.message}
+              {remediationFor(e.code, e.message) && (
+                <span className="block mt-0.5 text-red-600/80">→ {remediationFor(e.code, e.message)}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {warnings.length > 0 && (
+        <details className="mt-2">
+          <summary className="text-[11px] font-bold text-amber-600 cursor-pointer">
+            {warnings.length} advisor{warnings.length > 1 ? "ies" : "y"} (non-blocking)
+          </summary>
+          <ul className="mt-1.5 space-y-1">
+            {warnings.slice(0, 8).map((w, i) => (
+              <li key={i} className="text-[11px] text-amber-700 rounded-lg bg-amber-50 border border-amber-100 px-2.5 py-1.5">
+                <span className="font-mono text-[10px] text-amber-400 mr-1.5">{w.code}</span>{w.message}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
 function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void }) {
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
@@ -2485,23 +2629,7 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
               </div>
             )}
             {(r.validation_status === "pass" || r.validation_status === "fail") && r.report_type === "esef" && (
-              <div className="w-full">
-                <span
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-full"
-                  style={{ background: r.validation_status === "pass" ? "#D1FAE5" : "#FEE2E2", color: r.validation_status === "pass" ? "#065F46" : "#991B1B" }}
-                >
-                  {r.validation_status === "pass" ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
-                  {r.validation_status === "pass" ? "ESEF valid" : "ESEF needs fixes"} · {r.validation_summary?.summary ?? ""}
-                  {r.validated_at ? ` · ${new Date(r.validated_at).toLocaleString()}` : ""}
-                </span>
-                {r.validation_status === "fail" && r.validation_summary?.errors.length ? (
-                  <ul className="mt-2 space-y-1 text-xs text-red-700 list-disc list-inside">
-                    {r.validation_summary.errors.slice(0, 4).map((e, i) => (
-                      <li key={i}>{e.message}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
+              <ValidationFindings summary={r.validation_summary} validatedAt={r.validated_at} passed={r.validation_status === "pass"} />
             )}
             {assuring === r.id && r.report_type === "esef" && (
               <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">
