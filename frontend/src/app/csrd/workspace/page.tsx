@@ -679,7 +679,7 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
           <Upload className="w-4 h-4" /> {working ? "Extracting…" : "Import from PDF"}
           <input type="file" accept="application/pdf" className="hidden" disabled={working} onChange={(e) => upload(e.target.files?.[0])} />
         </label>
-        <p className="text-xs text-slate-400">AI reads the annual report, maps BRSR hits to ESRS datapoints — you review each one before it lands in the registry.</p>
+        <p className="text-xs text-slate-400">AI reads the annual report and proposes ESRS datapoint values — you review each one before it lands in the registry.</p>
         {candidates.length > 0 && (
           <button onClick={confirmAll} className="ml-auto rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Confirm all ({candidates.length - confirmed.size} left)</button>
         )}

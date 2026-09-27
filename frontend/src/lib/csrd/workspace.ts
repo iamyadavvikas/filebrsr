@@ -1109,7 +1109,7 @@ export async function confirmCandidate(
     status,
     value: c.value,
     evidence: null,
-    notes: `AI-extracted from ${c.source_brsr_id || "annual report"}${c.confidence != null ? ` (confidence ${c.confidence})` : ""} — verify before filing.`,
+    notes: `AI-extracted from annual report${c.confidence != null ? ` (confidence ${c.confidence})` : ""} — verify before filing.`,
     source: "ai-extract",
   });
 }
