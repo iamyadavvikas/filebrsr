@@ -4,9 +4,10 @@ Handles: assessment invites, filing reminders, deadline alerts, team notificatio
 Uses Resend API (free tier: 100 emails/day).
 """
 
+from typing import Optional
+
 import httpx
-from datetime import datetime, timedelta
-from typing import Optional, List
+
 from app.config import get_settings
 
 settings = get_settings()
@@ -16,6 +17,29 @@ FROM_EMAIL = "FileBRSR <notifications@filebrsr.com>"
 
 # Email templates
 TEMPLATES = {
+    "auditor_invite": {
+        "subject": "Assurance access invited: {org_name} on FileBRSR",
+        "html": """
+        <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #1B4D3E; font-size: 24px; margin: 0;">FileBRSR</h1>
+                <p style="color: #6B7280; font-size: 14px;">Assurance Portal</p>
+            </div>
+            <div style="background: #EFF6FF; border-radius: 12px; padding: 30px; border: 1px solid #BFDBFE;">
+                <h2 style="color: #1B4D3E; margin-top: 0;">Auditor access invited</h2>
+                <p style="color: #374151; line-height: 1.6;">
+                    <strong>{inviter_name}</strong> has invited you to review
+                    <strong>{org_name}</strong> ({financial_year}) with read-only
+                    assurance access, expiring in {ttl_days} days.
+                </p>
+                <p style="text-align: center; margin: 28px 0;">
+                    <a href="{invite_url}" style="background: #1B4D3E; color: #fff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">Open assurance workspace</a>
+                </p>
+                <p style="color: #6B7280; font-size: 12px;">No password needed — the link is your credential. Do not forward it.</p>
+            </div>
+        </div>
+        """,
+    },
     "team_invite": {
         "subject": "You've been invited to join {org_name} on FileBRSR",
         "html": """
