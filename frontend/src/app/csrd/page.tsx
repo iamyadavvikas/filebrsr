@@ -87,7 +87,7 @@ const features = [
   {
     icon: ListChecks,
     title: "ISSB bridging",
-    desc: "Live in a group that consolidates into an EU parent, or gearing up for SEBI/ISSB adoption? We map ESRS to ISSB and your existing BRSR data.",
+    desc: "Reporting under IFRS S1/S2 elsewhere in the group? We map ESRS disclosures to their ISSB counterparts so one dataset serves both statements.",
     color: "#D97706",
   },
 ];
@@ -125,11 +125,11 @@ const faqs = [
   },
   {
     q: "Is this another framework file?",
-    a: "The CSRD module is a standalone ESRS workspace built on the full EFRAG datapoint set — not just cross-references. Your BRSR data can flow in to avoid re-entering overlapping disclosures, but nothing is forced.",
+    a: "The CSRD module is a standalone ESRS workspace built on the full EFRAG datapoint set — not just cross-references. Import your annual report to prefill values, or start from the VSME on-ramp if you're coming up from SME-scale reporting.",
   },
   {
     q: "Does this prepare the official XBRL-tagged report?",
-    a: "Today we export Word and PDF drafts and an EFRAG-friendly structure you can take to your advisor. ESRS digital tagging (ESEF style) filing is on the roadmap — the datapoint registry is built to map to the ESRS XBRL taxonomy when we ship it.",
+    a: "Yes. The workspace generates an inline-XBRL (ESEF) statement tagged to the EFRAG ESRS taxonomy, with built-in validation, limited/reasonable assurance tracking, attestation, and a sandbox submission preview before you file.",
   },
 ];
 
