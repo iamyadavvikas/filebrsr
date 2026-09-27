@@ -927,7 +927,7 @@ function ResiliencePanel({ totalEmissions, revenueCrores }: { totalEmissions: nu
   return (
     <div className="mt-6 pt-4 border-t border-gray-100">
       <h4 className="text-sm font-semibold text-gray-700 mb-1">Climate resilience snapshot (IFRS S2)</h4>
-      <p className="text-xs text-gray-400 mb-3">Transition exposure + SBTi check from this footprint. Scenario numbers are illustrative defaults — replace with licensed NGFS data before filing.</p>
+      <p className="text-xs text-gray-400 mb-3">Transition exposure + SBTi check from this footprint. Scenario numbers are illustrative defaults — replace with licensed NGFS data before filing. <a href="/csrd/workspace?tab=registry&q=E1-6" className="text-blue-600 hover:underline font-semibold">Assess E1 in the CSRD registry →</a></p>
       <div className="flex flex-wrap gap-2 items-center">
         <select value={scenario} onChange={(e) => setScenario(e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-xs">
           <option value="net_zero_2050">Net Zero 2050 (orderly)</option>

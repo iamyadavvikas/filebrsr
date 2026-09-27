@@ -105,6 +105,44 @@ def _row(res):
     return res.data if res is not None else None
 
 
+def _audit(
+    sb,
+    org_id: str,
+    user_id: str,
+    action: str,
+    entity_type: str,
+    entity_id: str | None = None,
+    datapoint_id: str | None = None,
+    financial_year: str | None = None,
+    old_value: Any = None,
+    new_value: Any = None,
+    reason: str | None = None,
+) -> None:
+    """Append a CSRD row to the shared audit_trail (best-effort, never fatal).
+
+    Guest sandbox sessions have no profiles row, and audit_trail.user_id is
+    NOT NULL, so sandbox writes are skipped: the sandbox is explicitly not
+    assurance-grade. Real users always land a trail row.
+    """
+    if _is_guest(user_id):
+        return
+    try:
+        sb.table("audit_trail").insert({
+            "org_id": org_id,
+            "user_id": user_id,
+            "action": action,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "datapoint_id": datapoint_id,
+            "financial_year": financial_year,
+            "old_value": old_value,
+            "new_value": new_value,
+            "change_reason": reason,
+        }).execute()
+    except Exception as exc:  # noqa: BLE001 - audit must never break the request
+        logger.warning("CSRD audit write failed: %s", exc)
+
+
 def _subject_id(user_id: str) -> str | None:
     """Provenance user id for a row; guests have none (real profiles FK)."""
     return None if _is_guest(user_id) else user_id
@@ -578,8 +616,30 @@ async def upsert_entries(req: EntryBulk, authorization: str = Header(...)):
                 "materiality_id": e.materiality_id,
             }
         )
+    old_rows = sb.table("esrs_entries").select("datapoint_id,status,value").eq("org_id", org_id).eq(
+        "financial_year", req.financial_year).execute()
+    # Snapshot old states as plain values: result rows may alias live store
+    # objects (and must never be mutated by the upsert below).
+    old_by_dp = {
+        r["datapoint_id"]: {
+            "status": r.get("status"),
+            "value": json.loads(json.dumps(r.get("value"), sort_keys=True, default=str)),
+        }
+        for r in ((old_rows.data or []) if old_rows is not None else [])
+    }
     result = sb.table("esrs_entries").upsert(rows, on_conflict="org_id,financial_year,datapoint_id").execute()
     saved = result.data or []
+    for s in saved:
+        old = old_by_dp.get(s["datapoint_id"])
+        new_state = {"status": s.get("status"), "value": s.get("value")}
+        if old is None:
+            _audit(sb, org_id, user_id, "create", "esrs_entry", s.get("id"),
+                   s.get("datapoint_id"), req.financial_year, None, new_state)
+        elif old.get("status") != s.get("status") or json.dumps(old.get("value"), sort_keys=True, default=str) != json.dumps(
+                s.get("value"), sort_keys=True, default=str):
+            _audit(sb, org_id, user_id, "update", "esrs_entry", s.get("id"),
+                   s.get("datapoint_id"), req.financial_year,
+                   {"status": old.get("status"), "value": old.get("value")}, new_state)
     return {"org_id": org_id, "saved": len(saved), "entries": saved}
 
 
@@ -642,7 +702,11 @@ async def gap_analysis(
         raise HTTPException(status_code=400, detail="financial_year is required")
 
     in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(sb, org_id, financial_year, value_chain)
+    return _gap_report(sb, org_id, financial_year, in_scope_ids, entries_map, scope, has_material_iro)
 
+
+def _gap_report(sb, org_id: str, financial_year: str, in_scope_ids, entries_map, scope, has_material_iro) -> dict:
+    """Gap numbers shared by the gap-analysis endpoint and the board pack."""
     standards = []
     for std_id, m in ESRS_STANDARDS.items():
         scoped = [d for d in by_standard(std_id) if d["id"] in in_scope_ids]
@@ -804,7 +868,11 @@ async def create_iro(req: IROItem, authorization: str = Header(...)):
         "created_by": _subject_id(user_id),
     }
     result = sb.table("esrs_materiality").insert(row).execute()
-    return {"iro": (result.data or [{}])[0]}
+    saved_iro = (result.data or [{}])[0]
+    _audit(sb, org_id, user_id, "create", "esrs_iro", saved_iro.get("id"),
+           None, req.financial_year, None,
+           {"title": req.title, "material": saved_iro.get("material")})
+    return {"iro": saved_iro}
 
 
 @router.get("/materiality")
@@ -843,7 +911,11 @@ async def update_iro(iro_id: str, req: IROUpdate, authorization: str = Header(..
         financial = patch.get("financial_materiality", (_row(existing) or {}).get("financial_materiality"))
         patch["material"] = _material_flag(impact, financial, None)
     result = sb.table("esrs_materiality").update(patch).eq("id", iro_id).eq("org_id", org_id).execute()
-    return {"iro": (result.data or [{}])[0]}
+    saved_iro = (result.data or [{}])[0]
+    _audit(sb, org_id, user_id, "update", "esrs_iro", iro_id,
+           None, saved_iro.get("financial_year"), None,
+           {"title": saved_iro.get("title"), "material": saved_iro.get("material")})
+    return {"iro": saved_iro}
 
 
 @router.delete("/materiality/{iro_id}")
@@ -862,6 +934,7 @@ async def delete_iro(iro_id: str, authorization: str = Header(...)):
         raise HTTPException(status_code=404, detail="IRO not found")
     sb.table("esrs_materiality").delete().eq("id", iro_id).execute()
     sb.table("esrs_entries").update({"materiality_id": None}).eq("materiality_id", iro_id).execute()
+    _audit(sb, org_id, user_id, "delete", "esrs_iro", iro_id)
     return {"deleted": iro_id}
 
 
@@ -1040,7 +1113,10 @@ async def approve_dma_config(req: DMAApprovalIn, authorization: str = Header(...
         result = sb.table("esrs_dma_config").update(patch).eq("org_id", org_id).eq("financial_year", req.financial_year).execute()
     else:
         result = sb.table("esrs_dma_config").insert({"org_id": org_id, "financial_year": req.financial_year, **patch}).execute()
-    return {"config": (result.data or [{}])[0]}
+    saved_cfg = (result.data or [{}])[0]
+    _audit(sb, org_id, user_id, "approve", "esrs_dma_config", saved_cfg.get("id"),
+           None, req.financial_year, {"status": "draft"}, {"status": "approved", "approved_by": req.approved_by.strip()})
+    return {"config": saved_cfg}
 
 
 @router.post("/materiality/{iro_id}/drs")
@@ -1214,6 +1290,119 @@ async def extract_pdf_to_candidates(
         "filename": file.filename,
         **bridged,
     }
+
+
+@router.get("/board-pack")
+async def board_pack(
+    financial_year: str,
+    authorization: str = Header(...),
+):
+    """Board readiness pack PDF built from live workspace data."""
+    from app.esrs_board_pack import build_board_pack
+
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(sb, org_id, financial_year, None)
+    gap = _gap_report(sb, org_id, financial_year, in_scope_ids, entries_map, scope, has_material_iro)
+    cov = await dma_coverage(financial_year, org_id, authorization)
+    method = await dma_methodology(financial_year, org_id, authorization)
+    iros = sb.table("esrs_materiality").select("title,iro_type,standard").eq("org_id", org_id).eq(
+        "financial_year", financial_year).eq("material", True).execute()
+    material_iros = list(iros.data or []) if iros is not None else []
+    org = sb.table("organizations").select("name").eq("id", org_id).maybe_single().execute()
+    org_row = _row(org) or {}
+    pdf = build_board_pack(
+        org_name=org_row.get("name") or "Organisation",
+        financial_year=financial_year,
+        gap=gap,
+        dma_coverage=cov,
+        methodology_paragraph=(method or {}).get("paragraph", ""),
+        material_iros=material_iros,
+    )
+    _audit(sb, org_id, user_id, "export", "esrs_report", None, None, financial_year, None,
+           {"artifact": "board_pack", "coverage_pct": gap.get("coverage_pct")})
+    return StreamingResponse(
+        io.BytesIO(pdf),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="CSRD_Board_Pack_{financial_year}.pdf"'},
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# AUDIT TRAIL + EVIDENCE + FRAMEWORK LINKS
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/audit-trail")
+async def audit_trail(
+    financial_year: Optional[str] = None,
+    datapoint_id: Optional[str] = None,
+    entity_type: Optional[str] = None,
+    limit: int = 100,
+    authorization: str = Header(...),
+):
+    """Org-scoped CSRD change history (entries, IROs, DMA, reports).
+
+    Sandbox sessions see an empty trail: audit_trail.user_id is NOT NULL and
+    the sandbox is explicitly not assurance-grade (see _audit).
+    """
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    query = sb.table("audit_trail").select("*").eq("org_id", org_id)
+    if financial_year:
+        query = query.eq("financial_year", financial_year)
+    if datapoint_id:
+        query = query.eq("datapoint_id", datapoint_id)
+    if entity_type:
+        query = query.eq("entity_type", entity_type)
+    query = query.order("created_at", desc=True).limit(max(1, min(limit, 200)))
+    result = query.execute()
+    rows = list(result.data or []) if result is not None else []
+    # CSRD rows only — the table is shared with the BRSR platform.
+    rows = [r for r in rows if str(r.get("entity_type") or "").startswith("esrs_")]
+    return {"org_id": org_id, "count": len(rows), "entries": rows}
+
+
+@router.get("/evidence-documents")
+async def evidence_documents(
+    financial_year: Optional[str] = None,
+    authorization: str = Header(...),
+):
+    """Org documents attachable as entry evidence (shared Documents store)."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    query = sb.table("documents").select(
+        "id,file_name,file_url,mime_type,category,description,financial_year,created_at"
+    ).eq("org_id", org_id)
+    if financial_year:
+        query = query.eq("financial_year", financial_year)
+    result = query.order("created_at", desc=True).limit(200).execute()
+    rows = list(result.data or []) if result is not None else []
+    return {"org_id": org_id, "count": len(rows), "documents": rows}
+
+
+@router.get("/framework-links")
+async def framework_links(standard: Optional[str] = None):
+    """ESRS -> GRI/ISSB/TCFD/SDG cross-references per standard (public)."""
+    from app.cross_framework_mapping import get_all_mappings
+
+    out: dict[str, list[dict[str, str]]] = {}
+    for m in get_all_mappings():
+        ref = str(m.get("esrs_ref") or "")
+        std = (ref.split(" ")[1:2] or [""])[0]
+        std = std.split("-")[0] if "-" in std else std
+        if standard and std != standard and m.get("principle") != standard:
+            continue
+        entry = {"brsr_id": m.get("brsr_id", "")}
+        for fw in ("gri_ref", "issb_ref", "tcfd_ref", "sdg_ref"):
+            if m.get(fw):
+                entry[fw] = m[fw]
+        if len(entry) > 1:
+            out.setdefault(ref or "unmapped", []).append(entry)
+    return {"standard": standard, "groups": out, "count": sum(len(v) for v in out.values())}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -2098,6 +2287,9 @@ async def submit_report(report_id: str, req: SubmitRequest, authorization: str =
     }
     result = sb.table("esrs_submissions").insert(sub_row).execute()
     submission = (result.data or [{}])[0]
+    _audit(sb, org_id, user_id, "submit", "esrs_report", report_id,
+           None, row["financial_year"], None,
+           {"status": status, "channel": channel, "submission_ref": submission.get("submission_ref")})
     return {
         "submission_id": submission.get("id"),
         "status": status,

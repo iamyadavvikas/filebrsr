@@ -1114,6 +1114,69 @@ export async function confirmCandidate(
   });
 }
 
+// ───────────────────────────────────────── evidence, history, board pack ───
+
+export interface EvidenceDoc {
+  id: string;
+  file_name: string;
+  file_url: string;
+  mime_type?: string | null;
+  category?: string | null;
+  description?: string | null;
+  financial_year?: string | null;
+}
+
+export async function listEvidenceDocuments(financialYear: string): Promise<EvidenceDoc[]> {
+  if (!isServerMode(await detectMode())) return [];
+  const data = await cloudJSON<{ documents: EvidenceDoc[] }>(
+    `/evidence-documents?financial_year=${encodeURIComponent(financialYear)}`
+  );
+  return data.documents || [];
+}
+
+export interface AuditRow {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id?: string | null;
+  datapoint_id?: string | null;
+  financial_year?: string | null;
+  old_value?: unknown;
+  new_value?: unknown;
+  change_reason?: string | null;
+  created_at: string;
+}
+
+export async function fetchAuditTrail(
+  financialYear: string,
+  opts?: { datapoint_id?: string; entity_type?: string }
+): Promise<AuditRow[]> {
+  if (!isServerMode(await detectMode())) return [];
+  const qs = new URLSearchParams({ financial_year: financialYear });
+  if (opts?.datapoint_id) qs.set("datapoint_id", opts.datapoint_id);
+  if (opts?.entity_type) qs.set("entity_type", opts.entity_type);
+  const data = await cloudJSON<{ entries: AuditRow[] }>(`/audit-trail?${qs.toString()}`);
+  return data.entries || [];
+}
+
+/** Download the board readiness pack PDF as a blob. */
+export async function downloadBoardPack(financialYear: string): Promise<Blob> {
+  const res = await cloudFetch(`/board-pack?financial_year=${encodeURIComponent(financialYear)}`);
+  if (!res.ok) {
+    if (isAuthFailure(res)) throw new AuthSessionError();
+    throw new Error(`Board pack failed (${res.status})`);
+  }
+  return res.blob();
+}
+
+export async function frameworkLinks(standard?: string): Promise<{ groups: Record<string, { brsr_id: string }[]>; count: number }> {
+  const qs = standard ? `?standard=${encodeURIComponent(standard)}` : "";
+  const res = await fetch(`${API}/framework-links${qs}`);
+  if (!res.ok) throw new Error(`Framework links failed (${res.status})`);
+  const data = await res.json();
+  return { groups: data.groups || {}, count: data.count || 0 };
+}
+
 // ──────────────────────────────────────────────────────────── sample seed ─
 
 export async function seedDemo(financialYear: string): Promise<void> {

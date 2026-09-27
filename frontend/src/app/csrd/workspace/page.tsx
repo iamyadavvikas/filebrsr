@@ -88,11 +88,17 @@ import {
   dmaMethodology,
   extractPdf,
   confirmCandidate,
+  listEvidenceDocuments,
+  fetchAuditTrail,
+  downloadBoardPack,
+  frameworkLinks,
   type Stakeholder,
   type DMAConfig,
   type DMACoverage,
   type IRODRLink,
   type ExtractCandidate,
+  type EvidenceDoc,
+  type AuditRow,
   STAKEHOLDER_GROUPS,
   ENGAGEMENT_METHODS,
 } from "@/lib/csrd/workspace";
@@ -394,7 +400,7 @@ function CsrdWorkspace() {
         ) : (
           <>
             {tab === "overview" && <OverviewTab financialYear={financialYear} mode={mode} notify={notify} goToRegistry={() => changeTab("registry")} valueChainScope={valueChainScope} />}
-            {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} />}
+            {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} initialQuery={searchParams.get("q") || ""} />}
             {tab === "materiality" && <MaterialityTab financialYear={financialYear} mode={mode} notify={notify} />}
             {tab === "reports" && <ReportsTab financialYear={financialYear} mode={mode} notify={notify} />}
           </>
@@ -588,6 +594,43 @@ function OverviewTab({
           ))}
         </div>
       </div>
+
+      <FrameworkLinksPanel />
+    </div>
+  );
+}
+
+function FrameworkLinksPanel() {
+  const [groups, setGroups] = useState<Record<string, { brsr_id: string }[]>>({});
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    frameworkLinks()
+      .then((d) => {
+        const keys = Object.keys(d.groups).slice(0, 8);
+        const subset: Record<string, { brsr_id: string }[]> = {};
+        for (const k of keys) subset[k] = d.groups[k];
+        setGroups(subset);
+        setCount(d.count);
+      })
+      .catch(() => undefined);
+  }, []);
+  const keys = Object.keys(groups);
+  if (keys.length === 0) return null;
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6">
+      <h2 className="font-bold text-slate-900">Same data, more frameworks</h2>
+      <p className="text-xs text-slate-400 mt-0.5 mb-4">{count} ESRS references already mapped to GRI / ISSB / TCFD / SDG — one assessment serves every statement.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {keys.map((ref) => (
+          <div key={ref} className="rounded-xl border border-slate-200 p-4">
+            <p className="text-xs font-bold text-blue-700">{ref}</p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              {groups[ref].length} linked disclosure{groups[ref].length > 1 ? "s" : ""}:{" "}
+              {Array.from(new Set(groups[ref].flatMap((g) => Object.keys(g).filter((k) => k.endsWith("_ref"))))).join(", ").replaceAll("_ref", "").toUpperCase()}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -703,9 +746,75 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
   );
 }
 
-function RegistryTab({ financialYear, mode, notify }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void }) {  const [items, setItems] = useState<RegistryItem[]>([]);
+// Evidence attach + per-datapoint history
+// ───────────────────────────────────────────────────────────────────────────
+
+function EvidenceHistory({ financialYear, datapointId, evidence, onAttach, notify }: {
+  financialYear: string;
+  datapointId: string;
+  evidence: string;
+  onAttach: (url: string) => void;
+  notify: (m: string | Error, ok?: boolean) => void;
+}) {
+  const [docs, setDocs] = useState<EvidenceDoc[]>([]);
+  const [history, setHistory] = useState<AuditRow[]>([]);
+  const [open, setOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [d, h] = await Promise.all([
+        listEvidenceDocuments(financialYear),
+        fetchAuditTrail(financialYear, { datapoint_id: datapointId }),
+      ]);
+      setDocs(d.filter((x) => x.file_url !== evidence));
+      setHistory(h);
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  }, [financialYear, datapointId, evidence, notify]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div className="mt-3">
+      {docs.length > 0 && (
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 mb-1">Attach from Documents</label>
+          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+            {docs.map((d) => (
+              <button key={d.id} onClick={() => onAttach(d.file_url)} className="w-full text-left flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs hover:border-blue-300 hover:bg-blue-50/50">
+                <span className="truncate text-slate-700">{d.file_name}</span>
+                {d.category && <span className="shrink-0 text-[10px] text-slate-400">{d.category}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <button onClick={() => { setOpen(!open); if (!open) load(); }} className="mt-2 text-[11px] font-bold text-slate-500 hover:text-blue-700">
+        {open ? "Hide" : "Show"} change history ({history.length})
+      </button>
+      {open && (
+        <ul className="mt-1.5 space-y-1.5 max-h-40 overflow-y-auto">
+          {history.length === 0 && <li className="text-[11px] text-slate-400">No recorded changes yet.</li>}
+          {history.map((h) => (
+            <li key={h.id} className="text-[11px] text-slate-500 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1.5">
+              <b className="text-slate-700">{h.action}</b>
+              {h.new_value && typeof h.new_value === "object" && "status" in (h.new_value as object)
+                ? ` → ${(h.new_value as { status: string }).status}` : ""}
+              <span className="text-slate-400"> · {new Date(h.created_at).toLocaleString()}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+function RegistryTab({ financialYear, mode, notify, initialQuery }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void; initialQuery?: string }) {
+  const [items, setItems] = useState<RegistryItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery || "");
   const [standard, setStandard] = useState("");
   const [statusF, setStatusF] = useState("");
   const [offset, setOffset] = useState(0);
@@ -979,6 +1088,15 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
                   placeholder="Link or document reference"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {selected && (
+                  <EvidenceHistory
+                    financialYear={financialYear}
+                    datapointId={selected.id}
+                    evidence={draftEvidence}
+                    onAttach={(url) => setDraftEvidence(url)}
+                    notify={notify}
+                  />
+                )}
 
                 <label className="block mt-4 text-xs font-semibold text-slate-500 mb-1">Notes</label>
                 <textarea
@@ -1502,8 +1620,7 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
     a.remove();
   };
 
-  const generate = async (format: "word" | "pdf" | "esef") => {
-    setGenerating(format);
+  const generate = async (format: "word" | "pdf" | "esef") => {    setGenerating(format);
     try {
       const data = await generateCloudReport(financialYear, format);
       await load();
@@ -1538,6 +1655,19 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
       downloadBlob(blob, `esrs_statement_${financialYear}.${REPORT_EXT[report?.report_type ?? "word"] ?? "docx"}`);
     } catch (e) {
       notify(e as Error, false);
+    }
+  };
+
+  const downloadPack = async () => {
+    setBusy("pack");
+    try {
+      const blob = await downloadBoardPack(financialYear);
+      downloadBlob(blob, `CSRD_Board_Pack_${financialYear}.pdf`);
+      notify("Board pack downloaded");
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -1650,6 +1780,21 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
               </button>
             </>
           )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="font-bold text-slate-900">Board readiness pack</h2>
+          <p className="text-sm text-slate-500 mt-1">One-document briefing for the board: coverage, DMA status, material IROs and top gaps for {financialYear}.</p>
+          {mode === "demo" && (
+            <p className="text-xs text-amber-700 mt-1.5">Demo mode is browser-only — enter the sandbox or sign in to generate the pack.</p>
+          )}
+        </div>
+        <div className="flex-shrink-0">
+          <button onClick={downloadPack} disabled={!!busy} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-semibold px-4 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #7C3AED, #4F46E5)" }}>
+            {busy === "pack" ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} Board pack (PDF)
+          </button>
         </div>
       </div>
 

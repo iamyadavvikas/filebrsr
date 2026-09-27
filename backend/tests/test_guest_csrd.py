@@ -68,6 +68,10 @@ class _Query:
         self._order = (col, desc)
         return self
 
+    def limit(self, n):
+        self._filters.append(("__limit__", n))
+        return self
+
     def maybe_single(self):
         self._single_mode = "maybe"
         return self
@@ -93,7 +97,16 @@ class _Query:
     def execute(self):
         op = self._op
         if op is None:
-            rows = [r for r in self._store if all(r.get(c) == v for c, v in self._filters)]
+            limit = None
+            filters = []
+            for c, v in self._filters:
+                if c == "__limit__":
+                    limit = v
+                else:
+                    filters.append((c, v))
+            rows = [r for r in self._store if all(r.get(c) == v for c, v in filters)]
+            if limit is not None:
+                rows = rows[:limit]
             if self._single_mode == "maybe":
                 return _Resp(rows[0] if rows else None)
             return _Resp(rows)
