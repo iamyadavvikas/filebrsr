@@ -53,6 +53,18 @@ class ResilienceIn(BaseModel):
     year: int = 2030
 
 
+class PCAFLine(BaseModel):
+    asset_class: str
+    outstanding: float = Field(ge=0)
+    denominator: float = Field(gt=0)
+    borrower_emissions_tco2e: float = Field(ge=0)
+    data_quality: int | None = Field(None, ge=1, le=5)
+
+
+class PCAFIn(BaseModel):
+    lines: list[PCAFLine] = []
+
+
 def _safe(fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
@@ -101,3 +113,34 @@ async def resilience(body: ResilienceIn) -> dict:
         cs.resilience_summary,
         body.emissions_tco2e, body.revenue, body.assets, body.scenario, body.year,
     )
+
+
+@router.get("/pcaf/method")
+async def pcaf_method() -> dict:
+    """PCAF attribution formula + data-quality hierarchy (public standard)."""
+    from app import pcaf as pcaf_mod
+
+    return {
+        "method": "financed = (outstanding / denominator) x borrower emissions",
+        "denominators": {
+            "listed_equity": "EVIC",
+            "corporate_loans": "EVIC",
+            "project_finance": "total project cost",
+            "commercial_real_estate": "property value at origination",
+            "mortgages": "property value at origination",
+            "motor_loans": "vehicle value at origination",
+            "sovereign_debt": "GDP (production approach)",
+        },
+        "asset_classes": list(pcaf_mod.ASSET_CLASSES),
+        "default_data_quality": pcaf_mod.DEFAULT_DQ,
+    }
+
+
+@router.post("/pcaf")
+async def pcaf_compute(body: PCAFIn) -> dict:
+    from app import pcaf as pcaf_mod
+
+    try:
+        return pcaf_mod.financed_portfolio([ln.model_dump() for ln in body.lines])
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc

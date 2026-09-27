@@ -54,6 +54,7 @@ from app.router_assurance import router as assurance_router
 from app.router_brsr_core import router as brsr_core_router
 from app.router_brsr_value_chain import router as value_chain_router
 from app.router_climate import router as climate_router
+from app.router_connectors import router as connectors_router
 from app.router_trends import router as trends_router
 from app.router_v2 import router as v2_router
 from app.sebi_pdf_filing import router as sebi_pdf_router
@@ -152,6 +153,7 @@ app.include_router(assurance_router)
 app.include_router(brsr_core_router)
 app.include_router(value_chain_router)
 app.include_router(climate_router)
+app.include_router(connectors_router)
 app.include_router(api_keys_router)
 
 app.add_middleware(
