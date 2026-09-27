@@ -787,17 +787,28 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
                   {!shut && (
                     <ul className="divide-y divide-slate-100">
                       {list.map((c) => (
-                        <li key={c.datapoint_id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                          <span className="font-mono text-xs text-slate-500 w-32 shrink-0 truncate" title={c.datapoint_id}>{c.datapoint_id}</span>
-                          <span className="flex-1 text-slate-700 truncate" title={String(c.value ?? "")}>{String(c.value ?? "—")}</span>
-                          {c.confidence != null && (
-                            <span className={`text-[11px] font-bold ${c.confidence < 0.5 ? "text-amber-600" : "text-slate-400"}`}>
-                              {Math.round(c.confidence * 100)}%
+                        <li key={c.datapoint_id} className="px-3 py-2 text-sm">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-xs text-slate-500 w-32 shrink-0 truncate" title={c.datapoint_id}>{c.datapoint_id}</span>
+                            <span className="flex-1 text-slate-700 truncate" title={String(c.value ?? "")}>
+                              {String(c.value ?? "—")}
+                              {c.unit && <span className="ml-1 text-[10px] text-slate-400">{c.unit}{c.unit_converted ? " · converted" : ""}</span>}
                             </span>
+                            {c.source_page != null && (
+                              <span className="shrink-0 text-[10px] font-bold text-slate-400" title={c.snippet || ""}>p.{c.source_page}</span>
+                            )}
+                            {c.confidence != null && (
+                              <span className={`text-[11px] font-bold ${c.confidence < 0.5 ? "text-amber-600" : "text-slate-400"}`}>
+                                {Math.round(c.confidence * 100)}%
+                              </span>
+                            )}
+                            {confirmed.has(c.datapoint_id)
+                              ? <span className="text-[11px] font-bold text-emerald-600">Confirmed</span>
+                              : <button onClick={() => confirmOne(c)} disabled={confirming === c.datapoint_id} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold disabled:opacity-50">Confirm</button>}
+                          </div>
+                          {c.snippet && (
+                            <p className="mt-1 pl-0 text-[11px] text-slate-400 truncate" title={c.snippet}>“{c.snippet}”</p>
                           )}
-                          {confirmed.has(c.datapoint_id)
-                            ? <span className="text-[11px] font-bold text-emerald-600">Confirmed</span>
-                            : <button onClick={() => confirmOne(c)} disabled={confirming === c.datapoint_id} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold disabled:opacity-50">Confirm</button>}
                         </li>
                       ))}
                     </ul>

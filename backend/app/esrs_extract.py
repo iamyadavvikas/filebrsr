@@ -84,14 +84,15 @@ def parse_esrs_ref(ref: str) -> tuple[str, str] | None:
     return std, dr
 
 
-def _flat_fields(extracted_data: dict[str, Any]) -> dict[str, Any]:
-    flat: dict[str, Any] = {}
-    for section in ("section_a", "section_b", "section_c", "normalised"):
+def _flat_fields(extracted_data: dict[str, Any]) -> dict[str, tuple[str, Any]]:
+    """Flatten sections to field -> (section, value), skipping empties."""
+    flat: dict[str, tuple[str, Any]] = {}
+    for section in ("section_a", "section_b", "section_c"):
         part = (extracted_data or {}).get(section)
         if isinstance(part, dict):
             for k, v in part.items():
-                if k not in flat and v is not None:
-                    flat[k] = v
+                if k not in flat and v is not None and v != "":
+                    flat[k] = (section, v)
     return flat
 
 
@@ -106,6 +107,8 @@ def brsr_fields_to_esrs_candidates(
     from app.esrs_datapoints import ESRS_DATAPOINTS
 
     confidence_scores = confidence_scores or {}
+    citations = (extracted_data or {}).get("citations") or {}
+    normalised = (extracted_data or {}).get("normalised") or {}
     by_std_dr: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for dp in ESRS_DATAPOINTS:
         by_std_dr.setdefault((dp.get("standard"), dp.get("dr")), []).append(dp)
@@ -113,9 +116,7 @@ def brsr_fields_to_esrs_candidates(
     candidates: list[dict[str, Any]] = []
     fields_seen = 0
     fields_mapped = 0
-    for field, value in _flat_fields(extracted_data).items():
-        if value is None or value == "":
-            continue
+    for field, (section, value) in _flat_fields(extracted_data).items():
         brsr_id = FIELD_TO_BRSR.get(field)
         if not brsr_id:
             continue
@@ -135,14 +136,24 @@ def brsr_fields_to_esrs_candidates(
             conf_f = float(conf) if conf is not None else None
         except (TypeError, ValueError):
             conf_f = None
+        cite = (citations.get(section) or {}).get(field) or {}
+        norm = (normalised.get(section) or {}).get(field) or {}
+        unit = norm.get("unit") or ""
+        display_value = norm.get("value", value) if isinstance(norm.get("value"), (int, float)) else value
         for dp in dps:
             candidates.append({
                 "datapoint_id": dp["id"],
                 "dr": dp.get("dr"),
                 "standard": dp.get("standard"),
                 "name": dp.get("name"),
-                "value": value,
+                "value": display_value,
+                "raw_value": value if display_value != value else None,
+                "unit": unit or None,
+                "unit_converted": bool(unit),
                 "confidence": conf_f,
+                "source_page": cite.get("source_page"),
+                "snippet": cite.get("snippet"),
+                "match_kind": cite.get("match_kind"),
                 "source_brsr_id": brsr_id,
                 "source_field": field,
                 "status": "reported",

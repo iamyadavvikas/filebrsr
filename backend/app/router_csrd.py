@@ -531,6 +531,8 @@ class EntryItem(BaseModel):
     source: Optional[str] = None
     source_document: Optional[str] = None
     confidence_score: Optional[float] = Field(None, ge=0, le=1)
+    ai_value: Optional[Any] = None
+    ai_confidence: Optional[float] = Field(None, ge=0, le=1)
     notes: Optional[str] = None
     materiality_id: Optional[str] = None
 
@@ -548,6 +550,8 @@ class EntryUpdate(BaseModel):
     source: Optional[str] = None
     source_document: Optional[str] = None
     confidence_score: Optional[float] = Field(None, ge=0, le=1)
+    ai_value: Optional[Any] = None
+    ai_confidence: Optional[float] = Field(None, ge=0, le=1)
     notes: Optional[str] = None
     materiality_id: Optional[str] = None
     verified: Optional[bool] = None
@@ -612,6 +616,8 @@ async def upsert_entries(req: EntryBulk, authorization: str = Header(...)):
                 "source": e.source,
                 "source_document": e.source_document,
                 "confidence_score": e.confidence_score,
+                "ai_value": e.ai_value,
+                "ai_confidence": e.ai_confidence,
                 "notes": e.notes,
                 "materiality_id": e.materiality_id,
             }
@@ -1403,6 +1409,91 @@ async def framework_links(standard: Optional[str] = None):
         if len(entry) > 1:
             out.setdefault(ref or "unmapped", []).append(entry)
     return {"standard": standard, "groups": out, "count": sum(len(v) for v in out.values())}
+
+
+@router.get("/extract/mining")
+async def extract_mining(
+    financial_year: Optional[str] = None,
+    authorization: str = Header(...),
+):
+    """Flywheel miss-pattern report: AI-proposed vs human-kept values.
+
+    Entries confirmed from extraction carry ``ai_value``/``ai_confidence``;
+    any later edit shows up as drift. Grouped per datapoint with confidence
+    calibration (avg confidence of drifted vs clean) so pattern work starts
+    where the model is both wrong and confident.
+    """
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    query = sb.table("esrs_entries").select(
+        "datapoint_id,value,ai_value,ai_confidence,confidence_score,status"
+    ).eq("org_id", org_id).eq("source", "ai-extract")
+    if financial_year:
+        query = query.eq("financial_year", financial_year)
+    result = query.execute()
+    rows = list(result.data or []) if result is not None else []
+
+    def _norm(v):
+        return json.dumps(v, sort_keys=True, default=str)
+
+    total = len(rows)
+    drifted_total = 0
+    conf_drifted: list[float] = []
+    conf_clean: list[float] = []
+    by_dp: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        ai = r.get("ai_value")
+        if ai is None:
+            continue
+        drifted = _norm(r.get("value")) != _norm(ai)
+        conf = r.get("ai_confidence")
+        try:
+            conf_f = float(conf) if conf is not None else None
+        except (TypeError, ValueError):
+            conf_f = None
+        if drifted:
+            drifted_total += 1
+            if conf_f is not None:
+                conf_drifted.append(conf_f)
+        elif conf_f is not None:
+            conf_clean.append(conf_f)
+        slot = by_dp.setdefault(r["datapoint_id"], {"n": 0, "drifted": 0, "confs_drifted": [], "confs_clean": []})
+        slot["n"] += 1
+        if drifted:
+            slot["drifted"] += 1
+            if conf_f is not None:
+                slot["confs_drifted"].append(conf_f)
+        elif conf_f is not None:
+            slot["confs_clean"].append(conf_f)
+
+    def _avg(xs):
+        return round(sum(xs) / len(xs), 3) if xs else None
+
+    ranking = sorted(
+        (
+            {
+                "datapoint_id": dp,
+                "n": s["n"],
+                "drifted": s["drifted"],
+                "drift_rate": round(s["drifted"] / s["n"], 3),
+                "avg_conf_drifted": _avg(s["confs_drifted"]),
+                "avg_conf_clean": _avg(s["confs_clean"]),
+            }
+            for dp, s in by_dp.items()
+        ),
+        key=lambda x: (-x["drift_rate"], -x["n"]),
+    )
+    return {
+        "org_id": org_id,
+        "financial_year": financial_year,
+        "ai_confirmed": total,
+        "drifted": drifted_total,
+        "drift_rate": round(drifted_total / total, 3) if total else 0.0,
+        "avg_conf_drifted": _avg(conf_drifted),
+        "avg_conf_clean": _avg(conf_clean),
+        "by_datapoint": ranking,
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════

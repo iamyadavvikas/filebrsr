@@ -43,6 +43,8 @@ export interface EntryRow {
   notes: string | null;
   source?: string | null;
   materiality_id?: string | null;
+  ai_value?: unknown;
+  ai_confidence?: number | null;
 }
 
 export interface GapSummary {
@@ -465,7 +467,7 @@ export async function saveEntry(financialYear: string, item: EntryRow): Promise<
       method: "POST",
       body: JSON.stringify({
         financial_year: financialYear,
-        entries: [{ datapoint_id: item.datapoint_id, status: item.status, value: item.value, evidence: item.evidence || null, notes: item.notes || null, source: item.source || "manual", materiality_id: item.materiality_id || null }],
+        entries: [{ datapoint_id: item.datapoint_id, status: item.status, value: item.value, evidence: item.evidence || null, notes: item.notes || null, source: item.source || "manual", materiality_id: item.materiality_id || null, ai_value: item.ai_value ?? null, ai_confidence: item.ai_confidence ?? null }],
       }),
     });
     return;
@@ -1056,7 +1058,13 @@ export interface ExtractCandidate {
   standard?: string | null;
   name?: string | null;
   value: unknown;
+  raw_value?: unknown;
+  unit?: string | null;
+  unit_converted?: boolean;
   confidence?: number | null;
+  source_page?: number | null;
+  snippet?: string | null;
+  match_kind?: string | null;
   source_brsr_id?: string | null;
   source_field?: string | null;
   status: string;
@@ -1111,6 +1119,8 @@ export async function confirmCandidate(
     evidence: null,
     notes: `AI-extracted from annual report${c.confidence != null ? ` (confidence ${c.confidence})` : ""} — verify before filing.`,
     source: "ai-extract",
+    ai_value: c.value,
+    ai_confidence: typeof c.confidence === "number" ? c.confidence : null,
   });
 }
 
