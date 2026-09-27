@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -433,6 +434,32 @@ function CsrdWorkspace() {
 // Guided journey: stepper + next action (Overview)
 // ───────────────────────────────────────────────────────────────────────────
 
+const GLOSSARY: Record<string, string> = {
+  datapoint: "One question the EU requires an answer to. There are 664 in total; only the ones in your scope count.",
+  readiness: "Share of in-scope questions you have answered (reported, assessed, not-material or not-applicable).",
+  handled: "Questions already answered or ruled out — they no longer block you.",
+  "effective gap": "In-scope questions still waiting for an answer. This number going down is progress.",
+  IRO: "Impact, Risk or Opportunity — the sustainability topics you declare material. They decide which questions count.",
+  DR: "Disclosure Requirement — a themed group of questions (e.g. E1 covers climate).",
+  "phase-in": "EU relief: smaller companies may skip some questions for the first years. Skipped ones don't count against you.",
+  "in-scope": "Applies to you this year, given your size, phase-in reliefs and value-chain boundary.",
+  material: "Important enough to disclose — either by impact on people/environment or by financial effect on you.",
+  assurance: "Independent check of your statement by an auditor: limited (lighter touch) or reasonable (deep testing).",
+  attestation: "A named person signing that the statement is approved — required before filing.",
+  sandbox: "A throwaway workspace: full features, nothing filed, auto-deleted. Safe to experiment.",
+};
+
+function HelpTerm({ term, children }: { term: keyof typeof GLOSSARY | string; children?: ReactNode }) {
+  const key = String(term).toLowerCase();
+  const tip = (GLOSSARY as Record<string, string>)[key];
+  if (!tip) return <>{children || term}</>;
+  return (
+    <span title={tip} className="underline decoration-dotted decoration-slate-300 underline-offset-2 cursor-help">
+      {children || term}
+    </span>
+  );
+}
+
 function StepTracker({ state, go }: {
   state: import("@/lib/csrd/journey").JourneyState;
   go: (tab: "overview" | "registry" | "materiality" | "reports" | "vsme") => void;
@@ -574,6 +601,25 @@ function OverviewTab({
 
   return (
     <div className="space-y-6">
+      <NextActionHero
+        state={{
+          entriesAssessed: gap.handled,
+          entriesTotal: gap.total_datapoints,
+          iroCount: iroList.length,
+          orphanIroIds: coverage?.orphan_iro_ids || [],
+          methodologyStatus: coverage?.methodology_status || "draft",
+          stakeholderRecords: coverage?.stakeholder_records || 0,
+          reportsGenerated: reportCount,
+        }}
+        coverage={coverage}
+        go={(tab) =>
+          tab === "registry" ? goToRegistry()
+          : tab === "materiality" ? goToMateriality()
+          : tab === "reports" ? goToReports()
+          : goToVsme()
+        }
+      />
+
       {mode !== "cloud" && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-5">
           <div className="flex items-start gap-3">
@@ -617,26 +663,30 @@ function OverviewTab({
         </div>
       )}
 
-      <RolloverCard financialYear={financialYear} mode={mode} notify={notify} />
+      {(gap.handled > 0 || reportCount > 0) && (
+        <RolloverCard financialYear={financialYear} mode={mode} notify={notify} />
+      )}
 
-      <NextActionHero
-        state={{
-          entriesAssessed: gap.handled,
-          entriesTotal: gap.total_datapoints,
-          iroCount: iroList.length,
-          orphanIroIds: coverage?.orphan_iro_ids || [],
-          methodologyStatus: coverage?.methodology_status || "draft",
-          stakeholderRecords: coverage?.stakeholder_records || 0,
-          reportsGenerated: reportCount,
-        }}
-        coverage={coverage}
-        go={(tab) =>
-          tab === "registry" ? goToRegistry()
-          : tab === "materiality" ? goToMateriality()
-          : tab === "reports" ? goToReports()
-          : goToVsme()
-        }
-      />
+      {gap.handled === 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6">
+          <p className="text-sm font-bold text-slate-800">Three ways to start — pick one</p>
+          <p className="text-xs text-slate-500 mt-1">Any path lands answers in the same registry. Nothing is filed until you generate a statement in Reports.</p>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button onClick={goToRegistry} className="rounded-xl border border-slate-200 p-4 text-left hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
+              <p className="text-sm font-bold text-slate-800">Import your report</p>
+              <p className="text-xs text-slate-500 mt-1">Upload the annual report — AI proposes values, you confirm each one.</p>
+            </button>
+            <button onClick={seed} className="rounded-xl border border-slate-200 p-4 text-left hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
+              <p className="text-sm font-bold text-slate-800">Explore sample data</p>
+              <p className="text-xs text-slate-500 mt-1">A realistic 20% workspace to click through in 2 minutes.</p>
+            </button>
+            <button onClick={goToVsme} className="rounded-xl border border-slate-200 p-4 text-left hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
+              <p className="text-sm font-bold text-slate-800">Answer 30 SME questions</p>
+              <p className="text-xs text-slate-500 mt-1">The VSME on-ramp prefills matching ESRS answers for you.</p>
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* readiness ring card */}
@@ -662,9 +712,9 @@ function OverviewTab({
             </div>
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-800">Overall readiness</p>
+            <p className="text-sm font-bold text-slate-800">Overall <HelpTerm term="readiness">readiness</HelpTerm></p>
             <p className="text-xs text-slate-500 mt-1 leading-5">
-              {gap.handled} of {gap.total_datapoints} datapoints assessed for {financialYear}.
+              {gap.handled} of {gap.total_datapoints} <HelpTerm term="datapoint">datapoints</HelpTerm> assessed for {financialYear}.
             </p>
             <button onClick={goToRegistry} className="mt-3 text-xs font-semibold text-blue-700 hover:underline">
               Start with ESRS 2 → BP-1 / BP-2 &raquo;
@@ -672,9 +722,9 @@ function OverviewTab({
           </div>
         </div>
 
-        <StatCard label="Handled" value={gap.handled} hint="reported · assessed · not applicable" color="#059669" />
+        <StatCard label={<HelpTerm term="handled">Handled</HelpTerm>} value={gap.handled} hint="reported · assessed · not applicable" color="#059669" />
         <StatCard
-          label="Effective gap"
+          label={<HelpTerm term="effective gap">Effective gap</HelpTerm>}
           value={gap.effective_gap}
           hint="still to assess for your FY"
           color={gap.effective_gap > 0 ? "#D97706" : "#059669"}
@@ -714,8 +764,8 @@ function OverviewTab({
 
       {/* priority shortlist */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6">
-        <h2 className="font-bold text-slate-900">Start here — ESRS 2 cornerstone datapoints</h2>
-        <p className="text-xs text-slate-400 mt-0.5 mb-4">These disclosures anchor the whole statement. Assess them first, then move to the topical standards.</p>
+        <h2 className="font-bold text-slate-900">Start here — ESRS 2 cornerstone <HelpTerm term="datapoint">datapoints</HelpTerm></h2>
+        <p className="text-xs text-slate-400 mt-0.5 mb-4">These company-profile disclosures anchor the whole statement — everything else references them. Click one to assess it directly, then move to the topical standards.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {PRIORITY_DPS.map((id) => (
             <button key={id} onClick={() => goToFocus(id)} className="text-left rounded-xl border border-slate-200 p-4 hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
@@ -817,7 +867,7 @@ function RolloverCard({ financialYear, mode, notify }: { financialYear: string; 
   );
 }
 
-function StatCard({ label, value, hint, color }: { label: string; value: string | number; hint: string; color: string }) {  return (
+function StatCard({ label, value, hint, color }: { label: ReactNode; value: string | number; hint: ReactNode; color: string }) {  return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 flex flex-col justify-between">
       <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
       <p className="text-3xl font-extrabold mt-2" style={{ color }}>{value}</p>
@@ -1908,7 +1958,7 @@ function MethodologyPanel({ financialYear, notify, refreshKey }: { financialYear
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-bold text-slate-900">DMA methodology</h2>
+        <h2 className="font-bold text-slate-900">DMA <HelpTerm term="material">methodology</HelpTerm></h2>
         {cfg && (
           <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${approved ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
             {approved ? `Approved${cfg.approved_by ? ` · ${cfg.approved_by}` : ""}` : "Draft"}
