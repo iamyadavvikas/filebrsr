@@ -118,15 +118,13 @@ def test_bridge_inr_magnitude_uses_normalised_value():
 
 def test_field_map_every_id_has_esrs_ref():
     """CI gate: no dead-end bridge fields (each maps to a real ESRS ref)."""
-    from app.cross_framework_mapping import get_mapping_for_brsr_id
-    from app.esrs_extract import FIELD_TO_BRSR, parse_esrs_ref
+    from app.esrs_extract import FIELD_TO_BRSR, _resolve_esrs
     from app.esrs_datapoints import ESRS_DATAPOINTS
 
     by_std_dr = {(d.get("standard"), d.get("dr")) for d in ESRS_DATAPOINTS}
     dead = []
     for field, brsr_id in FIELD_TO_BRSR.items():
-        m = get_mapping_for_brsr_id(brsr_id)
-        parsed = parse_esrs_ref((m or {}).get("esrs_ref") or "")
+        parsed = _resolve_esrs(brsr_id)
         if not parsed or parsed not in by_std_dr:
             dead.append((field, brsr_id))
     assert dead == [], f"bridge fields with no ESRS target: {dead}"

@@ -24,41 +24,78 @@ FIELD_TO_BRSR: dict[str, str] = {
     "renewable_energy_pct": "C.P6.E.2",
     "ghg_scope1": "C.P6.E.3",
     "ghg_scope2": "C.P6.E.4",
-    "ghg_scope3": "C.P6.E.5",
-    "ghg_intensity": "C.P6.E.6",
-    "water_withdrawal": "C.P6.E.6",
-    "water_consumption": "C.P6.E.7",
-    "water_discharge": "C.P6.E.8",
-    "waste_generated": "C.P6.E.8",
-    "waste_recycled_pct": "C.P6.E.9",
-    "waste_disposed": "C.P6.E.10",
-    "employee_turnover_rate": "A.IV.19-22",
-    "employee_headcount": "A.IV.1-3",
+    "ghg_scope3": "C.P6.L.2",
+    "ghg_intensity": "C.P6.E.18",
+    "water_withdrawal": "C.P6.E.8",
+    "water_consumption": "C.P6.E.8",
+    "water_discharge": "C.P6.E.53",
+    "waste_generated": "C.P6.E.29",
+    "waste_recycled_pct": "C.P6.E.70",
+    "waste_disposed": "C.P6.E.71",
+    "employee_turnover_rate": "A.IV.19",
+    "turnover_rate_male": "A.IV.19",
+    "turnover_rate_female": "A.IV.20",
+    "net_worth": "A.VI.3",
+    "principle_complaints_filed": "A.VII.1",
+    "plants_national": "A.III.1",
+    "plants_international": "A.III.2",
+    "offices_national": "A.III.3",
+    "offices_international": "A.III.4",
+    "states_served": "A.III.5",
+    "countries_served": "A.III.6",
+    "export_contribution_pct": "A.III.7",
+    "employees_perm_male": "A.IV.1",
+    "employees_perm_female": "A.IV.2",
+    "employees_perm_total": "A.IV.3",
+    "employees_other_male": "A.IV.4",
+    "employees_other_female": "A.IV.5",
+    "employees_other_total": "A.IV.6",
+    "workers_perm_male": "A.IV.7",
+    "workers_perm_female": "A.IV.8",
+    "workers_perm_total": "A.IV.9",
+    "policy_translated_to_procedures": "B.4",
+    "policy_extends_value_chain": "B.5",
+    "sustainability_in_board_committees": "B.11",
+    "policy_external_assessment": "B.13",
+    "top10_supplier_concentration_pct": "C.P1.E.13",
+    "top10_customer_concentration_pct": "C.P1.E.14",
+    "trading_house_purchases_pct": "C.P1.E.15",
+    "trading_house_count": "C.P1.E.16",
+    "dealer_sales_pct": "C.P1.E.17",
+    "dealer_count": "C.P1.E.18",
+    "rpt_purchases_pct": "C.P1.E.20",
+    "rpt_sales_pct": "C.P1.E.21",
+    "ghg_intensity_turnover": "C.P6.E.18",
+    "energy_intensity_turnover": "C.P6.E.5",
+    "water_intensity_turnover": "C.P6.E.13",
+    "waste_intensity_turnover": "C.P6.E.30",
     "women_board_pct": "A.IV.17",
     "women_employees_pct": "A.IV.18",
     "training_hours_per_employee": "C.P3.E.3",
-    "safety_incidents": "C.P3.E.2",
-    "fatalities": "C.P3.E.2",
-    "ltifr": "C.P3.E.2",
-    "median_salary_male": "C.P3.E.4",
-    "median_salary_female": "C.P3.E.4",
-    "minimum_wage_compliance_pct": "C.P3.E.5",
+    "safety_incidents": "C.P3.E.22",
+    "fatalities": "C.P3.E.21",
+    "ltifr": "C.P3.E.20",
+    "minimum_wage_compliance_pct": "C.P5.E.3",
     "human_rights_training_pct": "C.P5.E.1",
     "child_labor_complaints": "C.P5.E.2",
-    "posh_complaints": "C.P5.E.3",
+    "posh_complaints": "C.P5.E.7",
+    "posh_filed": "C.P5.E.7",
+    "posh_upheld": "C.P5.E.18",
+    "posh_pct_female": "C.P5.E.17",
+    "parental_return_rate_pct": "C.P3.E.11",
+    "grievance_mechanism_employees": "C.P3.E.12",
     "code_of_conduct": "C.P1.E.1",
     "anti_corruption_policy": "C.P1.E.1",
-    "corruption_incidents": "C.P1.E.2",
+    "corruption_incidents": "C.P1.E.8",
     "r_and_d_spend": "C.P2.E.1",
     "sustainable_sourcing_pct": "C.P2.E.2",
     "recycled_input_pct": "C.P2.E.3",
     "msme_sourcing_pct": "C.P8.E.1",
     "csr_spend": "C.P8.E.2",
     "consumer_complaints": "C.P9.E.1",
-    "data_breach_incidents": "C.P9.E.2",
+    "data_breach_incidents": "C.P9.E.19",
 }
 
-# "ESRS S1-6.50(a)" -> ("S1", "S1-6"); "ESRS 2 BP-1" -> ("2", "BP-1").
 # "ESRS E1-6.44(a)" -> ("E1", "E1-6"); "ESRS 2 BP-1" -> ("2", "BP-1").
 _ESRS_REF_RE = re.compile(r"ESRS\s+(2|[A-Z]+\d*(?:-[A-Za-z0-9]+)?)")
 
@@ -84,6 +121,26 @@ def parse_esrs_ref(ref: str) -> tuple[str, str] | None:
     return std, dr
 
 
+def _resolve_esrs(brsr_id: str) -> tuple[str, str] | None:
+    """Resolve a BRSR id to (standard, DR): catalog first, cross-map fallback.
+
+    The catalog carries 242 esrs_refs; the curated cross-framework table
+    covers ids the catalog misses (and legacy range ids).
+    """
+    from app.brsr_datapoints import BRSR_DATAPOINTS
+    from app.cross_framework_mapping import get_mapping_for_brsr_id
+
+    for dp in BRSR_DATAPOINTS:
+        if dp.get("id") == brsr_id and dp.get("esrs_ref"):
+            parsed = parse_esrs_ref(dp["esrs_ref"])
+            if parsed:
+                return parsed
+    mapping = get_mapping_for_brsr_id(brsr_id)
+    if mapping and mapping.get("esrs_ref"):
+        return parse_esrs_ref(mapping["esrs_ref"])
+    return None
+
+
 def _flat_fields(extracted_data: dict[str, Any]) -> dict[str, tuple[str, Any]]:
     """Flatten sections to field -> (section, value), skipping empties."""
     flat: dict[str, tuple[str, Any]] = {}
@@ -103,7 +160,6 @@ def brsr_fields_to_esrs_candidates(
     max_candidates: int = 200,
 ) -> dict[str, Any]:
     """Convert pipeline output into reviewable ESRS candidates."""
-    from app.cross_framework_mapping import get_mapping_for_brsr_id
     from app.esrs_datapoints import ESRS_DATAPOINTS
 
     confidence_scores = confidence_scores or {}
@@ -121,17 +177,14 @@ def brsr_fields_to_esrs_candidates(
         if not brsr_id:
             continue
         fields_seen += 1
-        mapping = get_mapping_for_brsr_id(brsr_id)
-        if not mapping or not mapping.get("esrs_ref"):
-            continue
-        parsed = parse_esrs_ref(mapping["esrs_ref"])
+        parsed = _resolve_esrs(brsr_id)
         if not parsed:
             continue
         dps = by_std_dr.get(parsed, [])
         if not dps:
             continue
         fields_mapped += 1
-        conf = confidence_scores.get(field)
+        conf = confidence_scores.get(field, confidence_scores.get(f"{section}.{field}"))
         try:
             conf_f = float(conf) if conf is not None else None
         except (TypeError, ValueError):
