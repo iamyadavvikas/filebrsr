@@ -57,6 +57,9 @@ ORDER=(
   migration_v33_value_chain.sql
   migration_v34_dma_pack.sql
   migration_v35_assurance_registry.sql
+  migration_v36_audit_trail_columns.sql
+  migration_v37_entry_ai_provenance.sql
+  migration_v38_entry_source_values.sql
 )
 
 STARTED_CONTAINER=0
