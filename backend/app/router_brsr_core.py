@@ -233,3 +233,119 @@ async def assurance_get(
     if row is None:
         raise HTTPException(404, f"no assurance row for {kpi_code} / {financial_year}")
     return row
+
+
+# ── assurance provider registry + ISAE 3000 workpapers (migration v35) ──
+
+
+class ProviderIn(BaseModel):
+    firm_name: str
+    partner_name: str | None = None
+    registration_no: str | None = None
+    peer_review_valid_until: str | None = None
+    independence_declared_on: str | None = None
+    rotation_started_on: str | None = None
+    contact_email: str | None = None
+    status: str | None = None
+    notes: str | None = None
+
+
+class WorkpaperInstantiate(BaseModel):
+    financial_year: str
+    kpi_codes: list[str]
+    level: str = "limited"
+
+
+class WorkpaperUpdate(BaseModel):
+    status: str | None = None
+    evidence_ref: str | None = None
+    detail: str | None = None
+    prepared_by: str | None = None
+    reviewed_by: str | None = None
+
+
+@router.get("/providers")
+async def providers_list(authorization: str = Header(...)) -> dict:
+    from app.brsr_workpapers import list_providers, rotation_due
+
+    sb, org_id = _resolve_org(authorization)
+    rows = list_providers(sb, org_id)
+    return {
+        "org_id": org_id,
+        "count": len(rows),
+        "providers": [{**p, "rotation": rotation_due(p)} for p in rows],
+    }
+
+
+@router.put("/providers", status_code=200)
+async def provider_upsert(body: ProviderIn, authorization: str = Header(...)) -> dict:
+    from app.brsr_workpapers import list_providers, rotation_due, upsert_provider
+
+    sb, org_id = _resolve_org(authorization)
+    if body.status is not None and body.status not in ("active", "rotated", "suspended"):
+        raise HTTPException(400, f"invalid status {body.status!r}")
+    saved = upsert_provider(sb, org_id, body.model_dump(exclude_none=True))
+    current = next((p for p in list_providers(sb, org_id) if p.get("id") == saved.get("id")), saved)
+    return {"provider": {**current, "rotation": rotation_due(current)}}
+
+
+@router.delete("/providers/{provider_id}", status_code=200)
+async def provider_delete(provider_id: str, authorization: str = Header(...)) -> dict:
+    sb, org_id = _resolve_org(authorization)
+    sb.table("assurance_providers").delete().eq("id", provider_id).eq("org_id", org_id).execute()
+    return {"deleted": provider_id}
+
+
+@router.post("/workpapers/instantiate", status_code=200)
+async def workpapers_instantiate(body: WorkpaperInstantiate, authorization: str = Header(...)) -> dict:
+    from app.brsr_core import core_kpi_codes
+    from app.brsr_workpapers import LEVELS, instantiate
+
+    sb, org_id = _resolve_org(authorization)
+    if body.level not in LEVELS:
+        raise HTTPException(400, f"level must be one of {LEVELS}")
+    known = set(core_kpi_codes())
+    unknown = [c for c in body.kpi_codes if c not in known]
+    if unknown:
+        raise HTTPException(400, f"unknown KPI codes: {', '.join(unknown)}")
+    from app.brsr_core import BRSC
+
+    by_code = {k["code"]: k for k in BRSC}
+    out = instantiate(sb, org_id, body.financial_year, body.kpi_codes, body.level, by_code.get)
+    return {"financial_year": body.financial_year, "level": body.level, **out}
+
+
+@router.get("/workpapers")
+async def workpapers_list(
+    financial_year: str, kpi_code: str | None = None, authorization: str = Header(...)
+) -> dict:
+    from app.brsr_workpapers import list_workpapers
+
+    sb, org_id = _resolve_org(authorization)
+    rows = list_workpapers(sb, org_id, financial_year, kpi_code)
+    return {"financial_year": financial_year, "count": len(rows), "workpapers": rows}
+
+
+@router.put("/workpapers/{kpi_code}/{checkpoint}", status_code=200)
+async def workpaper_update(
+    kpi_code: str, checkpoint: str, financial_year: str, body: WorkpaperUpdate,
+    authorization: str = Header(...),
+) -> dict:
+    from app.brsr_workpapers import update_workpaper
+
+    sb, org_id = _resolve_org(authorization)
+    try:
+        row = update_workpaper(sb, org_id, financial_year, kpi_code, checkpoint, body.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if row is None:
+        raise HTTPException(404, f"no workpaper for {kpi_code} / {checkpoint} / {financial_year}")
+    return {"workpaper": row}
+
+
+@router.get("/workpapers/progress")
+async def workpapers_progress(financial_year: str, authorization: str = Header(...)) -> dict:
+    from app.brsr_workpapers import progress
+
+    sb, org_id = _resolve_org(authorization)
+    return {"org_id": org_id, **progress(sb, org_id, financial_year)}
