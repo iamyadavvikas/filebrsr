@@ -24,7 +24,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, File, Header, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -1164,6 +1164,55 @@ async def dma_methodology(
         "financial_year": financial_year,
         "paragraph": " ".join(lines),
         "audit_ready": cov["audit_ready"],
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# UPLOAD & EXTRACT (PDF annual report -> reviewable ESRS candidates)
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.post("/extract")
+async def extract_pdf_to_candidates(
+    file: UploadFile = File(...),
+    authorization: str = Header(...),
+):
+    """Run the BRSR extraction pipeline and bridge hits to ESRS candidates.
+
+    Nothing is saved — the workspace shows candidates for human review and
+    confirms through ``POST /entries`` (``source="ai-extract"``).
+    """
+    from app.esrs_extract import brsr_fields_to_esrs_candidates
+    from app.extraction_pipeline import run_full_extraction
+
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    _resolve_org(sb, user_id, None)  # membership/sandbox check only
+    settings = get_settings()
+    content = await file.read()
+    if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large")
+    try:
+        result = await run_full_extraction(
+            file_bytes=content,
+            settings=settings,
+            report_id="csrd-extract",
+            user_id=None if _is_guest(user_id) else user_id,
+            supabase_client=sb,
+        )
+    except Exception as exc:  # noqa: BLE001 - pipeline failures surface as 422
+        raise HTTPException(status_code=422, detail=f"extraction failed: {exc}") from exc
+    if result.get("status") != "completed":
+        raise HTTPException(status_code=422, detail=f"extraction failed: {result.get('error')}")
+    bridged = brsr_fields_to_esrs_candidates(
+        result.get("extracted_data") or {}, result.get("confidence_scores") or {}
+    )
+    return {
+        "status": "completed",
+        "company_name": result.get("company_name"),
+        "financial_year_hint": result.get("financial_year"),
+        "filename": file.filename,
+        **bridged,
     }
 
 

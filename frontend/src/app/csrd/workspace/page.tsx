@@ -27,6 +27,7 @@ import {
   PenTool,
   FlaskConical,
   X,
+  Upload,
 } from "lucide-react";
 import {
   detectMode,
@@ -85,10 +86,13 @@ import {
   unlinkIroDr,
   dmaCoverage,
   dmaMethodology,
+  extractPdf,
+  confirmCandidate,
   type Stakeholder,
   type DMAConfig,
   type DMACoverage,
   type IRODRLink,
+  type ExtractCandidate,
   STAKEHOLDER_GROUPS,
   ENGAGEMENT_METHODS,
 } from "@/lib/csrd/workspace";
@@ -612,8 +616,94 @@ function Loader({ center }: { center?: boolean }) {
 
 const STANDARD_OPTIONS = ["", "2", "E1", "E2", "E3", "E4", "E5", "S1", "S2", "S3", "S4", "G1"];
 
-function RegistryTab({ financialYear, mode, notify }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void }) {
-  const [items, setItems] = useState<RegistryItem[]>([]);
+// Upload & Extract (PDF annual report -> reviewable ESRS candidates)
+// ───────────────────────────────────────────────────────────────────────────
+
+function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void; onConfirmed: () => void }) {
+  const [candidates, setCandidates] = useState<ExtractCandidate[]>([]);
+  const [company, setCompany] = useState<string>("");
+  const [working, setWorking] = useState(false);
+  const [confirming, setConfirming] = useState<string>("");
+  const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
+
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    setWorking(true);
+    setConfirmed(new Set());
+    try {
+      const out = await extractPdf(file);
+      setCandidates(out.candidates);
+      setCompany(out.company_name || "");
+      notify(out.candidates.length ? `${out.candidates.length} candidate(s) from ${file.name} — review and confirm` : `No mappable figures found in ${file.name}`);
+      onConfirmed();
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const confirmOne = async (c: ExtractCandidate) => {
+    setConfirming(c.datapoint_id);
+    try {
+      await confirmCandidate(financialYear, c, "reported");
+      setConfirmed((prev) => new Set(prev).add(c.datapoint_id));
+      onConfirmed();
+      notify(`Confirmed ${c.datapoint_id}`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setConfirming("");
+    }
+  };
+
+  const confirmAll = async () => {
+    for (const c of candidates) {
+      if (confirmed.has(c.datapoint_id)) continue;
+      try {
+        await confirmCandidate(financialYear, c, "reported");
+        setConfirmed((prev) => new Set(prev).add(c.datapoint_id));
+      } catch (e) {
+        notify(e as Error, false);
+        break;
+      }
+    }
+    onConfirmed();
+    notify("All visible candidates confirmed — verify values before filing");
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-bold px-4 py-2 cursor-pointer" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+          <Upload className="w-4 h-4" /> {working ? "Extracting…" : "Import from PDF"}
+          <input type="file" accept="application/pdf" className="hidden" disabled={working} onChange={(e) => upload(e.target.files?.[0])} />
+        </label>
+        <p className="text-xs text-slate-400">AI reads the annual report, maps BRSR hits to ESRS datapoints — you review each one before it lands in the registry.</p>
+        {candidates.length > 0 && (
+          <button onClick={confirmAll} className="ml-auto rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Confirm all ({candidates.length - confirmed.size} left)</button>
+        )}
+      </div>
+      {company && <p className="mt-2 text-xs text-slate-500">Detected company: <b>{company}</b></p>}
+      {candidates.length > 0 && (
+        <ul className="mt-3 divide-y divide-slate-100 max-h-72 overflow-y-auto">
+          {candidates.map((c) => (
+            <li key={c.datapoint_id} className="flex items-center gap-3 py-2 text-sm">
+              <span className="font-mono text-xs text-slate-500 w-32 shrink-0">{c.datapoint_id}</span>
+              <span className="flex-1 text-slate-700 truncate" title={String(c.value ?? "")}>{String(c.value ?? "—")}</span>
+              {c.confidence != null && <span className="text-[11px] text-slate-400">{Math.round(c.confidence * 100)}%</span>}
+              {confirmed.has(c.datapoint_id)
+                ? <span className="text-[11px] font-bold text-emerald-600">Confirmed</span>
+                : <button onClick={() => confirmOne(c)} disabled={confirming === c.datapoint_id} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold disabled:opacity-50">Confirm</button>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function RegistryTab({ financialYear, mode, notify }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void }) {  const [items, setItems] = useState<RegistryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState("");
   const [standard, setStandard] = useState("");
@@ -726,6 +816,7 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
 
   return (
     <div className="space-y-4">
+      <ExtractImport financialYear={financialYear} notify={notify} onConfirmed={refreshEntries} />
       {/* filter bar */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex flex-col lg:flex-row gap-3">

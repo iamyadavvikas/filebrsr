@@ -1048,6 +1048,72 @@ export async function applyVsmePrefill(financialYear: string, entries: VSMEPrefi
   return saved;
 }
 
+// ─────────────────────────────────────────────────── upload & extract ───
+
+export interface ExtractCandidate {
+  datapoint_id: string;
+  dr?: string | null;
+  standard?: string | null;
+  name?: string | null;
+  value: unknown;
+  confidence?: number | null;
+  source_brsr_id?: string | null;
+  source_field?: string | null;
+  status: string;
+}
+
+export interface ExtractResult {
+  company_name?: string | null;
+  financial_year_hint?: string | null;
+  filename?: string | null;
+  candidates: ExtractCandidate[];
+  stats: { fields_seen: number; fields_mapped: number; candidates: number; capped: boolean };
+}
+
+/** Upload a PDF annual report; returns reviewable ESRS candidates (nothing saved). */
+export async function extractPdf(file: File): Promise<ExtractResult> {
+  const mode = await detectMode();
+  if (!isServerMode(mode)) {
+    throw new AuthSessionError("Sign in or enter the open sandbox to extract from PDFs — demo mode is browser-only.");
+  }
+  const token = await sessionToken();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API}/extract`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) {
+    if (isAuthFailure(res)) throw new AuthSessionError();
+    let detail = `Extraction failed (${res.status})`;
+    try {
+      const body = await res.json();
+      if (typeof body?.detail === "string") detail = body.detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return res.json() as Promise<ExtractResult>;
+}
+
+/** Confirm one reviewed candidate into the workspace entries. */
+export async function confirmCandidate(
+  financialYear: string,
+  c: ExtractCandidate,
+  status: string
+): Promise<void> {
+  await saveEntry(financialYear, {
+    datapoint_id: c.datapoint_id,
+    status,
+    value: c.value,
+    evidence: null,
+    notes: `AI-extracted from ${c.source_brsr_id || "annual report"}${c.confidence != null ? ` (confidence ${c.confidence})` : ""} — verify before filing.`,
+    source: "ai-extract",
+  });
+}
+
 // ──────────────────────────────────────────────────────────── sample seed ─
 
 export async function seedDemo(financialYear: string): Promise<void> {
