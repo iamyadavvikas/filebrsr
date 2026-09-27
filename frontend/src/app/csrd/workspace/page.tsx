@@ -27,6 +27,8 @@ import {
   PenTool,
   FlaskConical,
   X,
+  Upload,
+  Sprout,
 } from "lucide-react";
 import {
   detectMode,
@@ -74,12 +76,44 @@ import {
   submitEsefReport,
   validateEsefReport,
   REPORT_EXT,
+  listStakeholders,
+  addStakeholder,
+  deleteStakeholder,
+  getDMAConfig,
+  putDMAConfig,
+  approveDMAConfig,
+  listIroDrs,
+  linkIroDr,
+  unlinkIroDr,
+  dmaCoverage,
+  dmaMethodology,
+  extractPdf,
+  confirmCandidate,
+  sessionToken,
+  vsmeCatalog,
+  vsmeUpgrade,
+  applyVsmePrefill,
+  type VSMEMetric,
+  type VSMEPrefill,
+  listEvidenceDocuments,
+  fetchAuditTrail,
+  downloadBoardPack,
+  frameworkLinks,
+  type Stakeholder,
+  type DMAConfig,
+  type DMACoverage,
+  type IRODRLink,
+  type ExtractCandidate,
+  type EvidenceDoc,
+  type AuditRow,
+  STAKEHOLDER_GROUPS,
+  ENGAGEMENT_METHODS,
 } from "@/lib/csrd/workspace";
 import { AuthSessionError } from "@/lib/supabase/session";
 import { createClient } from "@/lib/supabase/client";
 
-type Tab = "overview" | "registry" | "materiality" | "reports";
-const TABS: Tab[] = ["overview", "registry", "materiality", "reports"];
+type Tab = "overview" | "registry" | "materiality" | "reports" | "vsme";
+const TABS: Tab[] = ["overview", "registry", "materiality", "reports", "vsme"];
 
 const FY_OPTIONS = ["FY2024", "FY2025", "FY2026", "FY2027", "FY2028"];
 
@@ -310,6 +344,7 @@ function CsrdWorkspace() {
             { key: "registry" as Tab, label: "Registry", icon: RegistryIcon },
             { key: "materiality" as Tab, label: "Materiality", icon: Scale },
             { key: "reports" as Tab, label: "Reports", icon: FileText },
+            { key: "vsme" as Tab, label: "VSME Start", icon: Sprout },
           ].map((t) => {
             const Icon = t.icon;
             const active = tab === t.key;
@@ -373,9 +408,10 @@ function CsrdWorkspace() {
         ) : (
           <>
             {tab === "overview" && <OverviewTab financialYear={financialYear} mode={mode} notify={notify} goToRegistry={() => changeTab("registry")} valueChainScope={valueChainScope} />}
-            {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} />}
+            {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} initialQuery={searchParams.get("q") || ""} goToReports={() => changeTab("reports")} />}
             {tab === "materiality" && <MaterialityTab financialYear={financialYear} mode={mode} notify={notify} />}
             {tab === "reports" && <ReportsTab financialYear={financialYear} mode={mode} notify={notify} />}
+            {tab === "vsme" && <VsmeTab financialYear={financialYear} notify={notify} />}
           </>
         )}
       </div>
@@ -567,6 +603,43 @@ function OverviewTab({
           ))}
         </div>
       </div>
+
+      <FrameworkLinksPanel />
+    </div>
+  );
+}
+
+function FrameworkLinksPanel() {
+  const [groups, setGroups] = useState<Record<string, { brsr_id: string }[]>>({});
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    frameworkLinks()
+      .then((d) => {
+        const keys = Object.keys(d.groups).slice(0, 8);
+        const subset: Record<string, { brsr_id: string }[]> = {};
+        for (const k of keys) subset[k] = d.groups[k];
+        setGroups(subset);
+        setCount(d.count);
+      })
+      .catch(() => undefined);
+  }, []);
+  const keys = Object.keys(groups);
+  if (keys.length === 0) return null;
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6">
+      <h2 className="font-bold text-slate-900">Same data, more frameworks</h2>
+      <p className="text-xs text-slate-400 mt-0.5 mb-4">{count} ESRS references already mapped to GRI / ISSB / TCFD / SDG — one assessment serves every statement.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {keys.map((ref) => (
+          <div key={ref} className="rounded-xl border border-slate-200 p-4">
+            <p className="text-xs font-bold text-blue-700">{ref}</p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              {groups[ref].length} linked disclosure{groups[ref].length > 1 ? "s" : ""}:{" "}
+              {Array.from(new Set(groups[ref].flatMap((g) => Object.keys(g).filter((k) => k.endsWith("_ref"))))).join(", ").replaceAll("_ref", "").toUpperCase()}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -595,10 +668,438 @@ function Loader({ center }: { center?: boolean }) {
 
 const STANDARD_OPTIONS = ["", "2", "E1", "E2", "E3", "E4", "E5", "S1", "S2", "S3", "S4", "G1"];
 
-function RegistryTab({ financialYear, mode, notify }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void }) {
+// VSME on-ramp (guided SME questionnaire -> ESRS prefill)
+// ───────────────────────────────────────────────────────────────────────────
+
+const VSME_AREA_NAMES: Record<string, string> = {
+  B1: "Basis for preparation",
+  B2: "Practices, policies & future initiatives",
+  B3: "Energy & GHG emissions",
+  B4: "Pollution",
+  B5: "Biodiversity",
+  B6: "Water",
+  B7: "Resource use, circularity & waste",
+  B8: "Workforce — general",
+  B9: "Workforce — health & safety",
+  B10: "Governance & anti-corruption",
+  B11: "Business conduct anchors",
+};
+
+function VsmeTab({ financialYear, notify }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void }) {
+  const [metrics, setMetrics] = useState<VSMEMetric[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [preview, setPreview] = useState<VSMEPrefill[]>([]);
+  const [unmapped, setUnmapped] = useState<string[]>([]);
+  const [working, setWorking] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    vsmeCatalog()
+      .then((d) => setMetrics(d.metrics))
+      .catch((e) => notify(e as Error, false));
+  }, [notify]);
+
+  const set = (code: string, value: string) => {
+    setAnswers((prev) => ({ ...prev, [code]: value }));
+    setPreview([]);
+  };
+
+  const parseAnswer = (m: VSMEMetric, raw: string): unknown => {
+    const t = raw.trim();
+    if (!t) return null;
+    if (m.data_type === "integer") {
+      const n = Number(t.replace(/,/g, ""));
+      return Number.isFinite(n) ? Math.round(n) : t;
+    }
+    if (m.data_type === "number") {
+      const n = Number(t.replace(/,/g, ""));
+      return Number.isFinite(n) ? n : t;
+    }
+    if (m.data_type === "boolean") return t === "true" || t.toLowerCase() === "yes";
+    return t;
+  };
+
+  const runPreview = async () => {
+    setWorking(true);
+    try {
+      const parsed: Record<string, unknown> = {};
+      for (const m of metrics) {
+        const v = parseAnswer(m, answers[m.code] || "");
+        if (v !== null && v !== "") parsed[m.code] = v;
+      }
+      const out = await vsmeUpgrade(parsed);
+      setPreview(out.entries);
+      setUnmapped(out.unmapped);
+      notify(out.entries.length ? `${out.entries.length} ESRS datapoint(s) prefilled from your answers` : "No mappable answers yet — fill a few fields first");
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const saveAll = async () => {
+    setSaving(true);
+    try {
+      const n = await applyVsmePrefill(financialYear, preview);
+      notify(`${n} prefilled value(s) saved to the registry — verify before filing`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const groups = new Map<string, VSMEMetric[]>();
+  for (const m of metrics) {
+    if (!groups.has(m.area)) groups.set(m.area, []);
+    groups.get(m.area)!.push(m);
+  }
+  const answered = Object.values(answers).filter((v) => v.trim() !== "").length;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6">
+        <h2 className="font-bold text-slate-900">VSME on-ramp</h2>
+        <p className="text-sm text-slate-500 mt-1">Answer the SME-scale questionnaire once ({metrics.length} metrics across B1–B11) — we prefill the matching ESRS datapoints so the registry starts populated. {answered} answered.</p>
+      </div>
+      {[...groups.entries()].map(([area, list]) => (
+        <div key={area} className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h3 className="text-sm font-extrabold text-slate-800">{area} — {VSME_AREA_NAMES[area] || area}</h3>
+          <div className="mt-3 space-y-3">
+            {list.map((m) => (
+              <div key={m.code} className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="flex-1 text-sm text-slate-700" title={m.maps_to.join(", ") || m.narrative_feeds || ""}>
+                  <span className="font-mono text-[11px] text-blue-700 mr-2">{m.code}</span>
+                  {m.name}
+                  {m.unit && <span className="ml-1 text-[11px] text-slate-400">({m.unit})</span>}
+                  {!m.required && <span className="ml-1 text-[10px] text-slate-400">optional</span>}
+                </label>
+                {m.data_type === "boolean" ? (
+                  <select value={answers[m.code] || ""} onChange={(e) => set(m.code, e.target.value)} className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm w-40">
+                    <option value="">—</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                ) : m.data_type === "narrative" || m.data_type === "composite" ? (
+                  <input value={answers[m.code] || ""} onChange={(e) => set(m.code, e.target.value)} placeholder="Text…" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm flex-1 sm:max-w-xs" />
+                ) : (
+                  <input value={answers[m.code] || ""} onChange={(e) => set(m.code, e.target.value)} placeholder={m.unit || "Value"} inputMode="decimal" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm w-40" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        <button onClick={runPreview} disabled={working} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-bold px-5 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+          {working ? "Computing…" : "Preview ESRS prefill"}
+        </button>
+        {preview.length > 0 && (
+          <button onClick={saveAll} disabled={saving} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-bold px-5 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}>
+            {saving ? "Saving…" : `Save ${preview.length} to registry`}
+          </button>
+        )}
+      </div>
+      {unmapped.length > 0 && (
+        <p className="text-[11px] text-slate-400">Narrative-only answers ({unmapped.length}) feed policy text, not numbers: {unmapped.slice(0, 6).join(", ")}{unmapped.length > 6 ? "…" : ""}</p>
+      )}
+      {preview.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 text-sm font-semibold text-slate-700">Prefill preview ({preview.length})</div>
+          <ul className="divide-y divide-slate-50 max-h-80 overflow-y-auto">
+            {preview.map((e) => (
+              <li key={e.datapoint_id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
+                <span className="font-mono text-xs text-slate-500 w-32 shrink-0 truncate" title={e.datapoint_id}>{e.datapoint_id}</span>
+                <span className="flex-1 text-slate-700 truncate" title={String(e.value ?? "")}>{String(e.value ?? "—")}</span>
+                <span className="text-[10px] text-slate-400">vsme-feeder</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Upload & Extract (PDF annual report -> reviewable ESRS candidates)
+// ───────────────────────────────────────────────────────────────────────────
+
+function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void; onConfirmed: () => void }) {
+  const [candidates, setCandidates] = useState<ExtractCandidate[]>([]);
+  const [company, setCompany] = useState<string>("");
+  const [working, setWorking] = useState(false);
+  const [confirming, setConfirming] = useState<string>("");
+  const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [lowFirst, setLowFirst] = useState(true);
+  const [hideDone, setHideDone] = useState(false);
+  const [drift, setDrift] = useState<{ ai_confirmed: number; drifted: number; by_datapoint: { datapoint_id: string; n: number; drifted: number; drift_rate: number; avg_conf_drifted: number | null }[] } | null>(null);
+  const [showRanking, setShowRanking] = useState(false);
+
+  const refreshDrift = useCallback(async () => {
+    try {
+      const token = await sessionToken().catch(() => "");
+      const res = await fetch(`/backend/api/platform/csrd/extract/miss-patterns?financial_year=${encodeURIComponent(financialYear)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setDrift({ ai_confirmed: d.ai_confirmed || 0, drifted: d.drifted || 0, by_datapoint: d.by_datapoint || [] });
+      }
+    } catch {
+      /* miss-pattern stats are advisory; never block review */
+    }
+  }, [financialYear]);
+
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    setWorking(true);
+    setConfirmed(new Set());
+    setCollapsed(new Set());
+    try {
+      const out = await extractPdf(file);
+      setCandidates(out.candidates);
+      setCompany(out.company_name || "");
+      notify(out.candidates.length ? `${out.candidates.length} candidate(s) from ${file.name} — review and confirm` : `No mappable figures found in ${file.name}`);
+      onConfirmed();
+      refreshDrift();
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const confirmOne = async (c: ExtractCandidate) => {
+    setConfirming(c.datapoint_id);
+    try {
+      await confirmCandidate(financialYear, c, "reported");
+      setConfirmed((prev) => new Set(prev).add(c.datapoint_id));
+      onConfirmed();
+      refreshDrift();
+      notify(`Confirmed ${c.datapoint_id}`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setConfirming("");
+    }
+  };
+
+  const confirmMany = async (list: ExtractCandidate[]) => {
+    for (const c of list) {
+      if (confirmed.has(c.datapoint_id)) continue;
+      try {
+        await confirmCandidate(financialYear, c, "reported");
+        setConfirmed((prev) => new Set(prev).add(c.datapoint_id));
+      } catch (e) {
+        notify(e as Error, false);
+        break;
+      }
+    }
+    onConfirmed();
+    notify("Section confirmed — verify values before filing");
+  };
+
+  const toggleSection = (key: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const confOf = (c: ExtractCandidate) => (c.confidence == null ? Number.POSITIVE_INFINITY : c.confidence);
+  const visible = hideDone ? candidates.filter((c) => !confirmed.has(c.datapoint_id)) : candidates;
+  const groups = new Map<string, ExtractCandidate[]>();
+  for (const c of visible) {
+    const key = c.standard || "other";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(c);
+  }
+  const ordered = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  for (const [, list] of ordered) {
+    list.sort((x, y) => (lowFirst ? confOf(x) - confOf(y) : confOf(y) - confOf(x)));
+  }
+  const doneCount = confirmed.size;
+  const pct = candidates.length ? Math.round((doneCount / candidates.length) * 100) : 0;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-bold px-4 py-2 cursor-pointer" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+          <Upload className="w-4 h-4" /> {working ? "Extracting…" : "Import from PDF"}
+          <input type="file" accept="application/pdf" className="hidden" disabled={working} onChange={(e) => upload(e.target.files?.[0])} />
+        </label>
+        <p className="text-xs text-slate-400">AI reads the annual report and proposes ESRS datapoint values — you review each one before it lands in the registry.</p>
+        {candidates.length > 0 && (
+          <button onClick={() => confirmMany(visible)} className="ml-auto rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Confirm all ({visible.length - visible.filter((c) => confirmed.has(c.datapoint_id)).length} left)</button>
+        )}
+      </div>
+      {company && <p className="mt-2 text-xs text-slate-500">Detected company: <b>{company}</b></p>}
+      {drift && drift.ai_confirmed > 0 && (
+        <div className="mt-1.5">
+          <p className="text-[11px] text-slate-400">
+            Miss-pattern report for {financialYear}: reviewers adjusted {drift.drifted} of {drift.ai_confirmed} AI-proposed values.
+            {drift.by_datapoint.length > 0 && (
+              <button onClick={() => setShowRanking(!showRanking)} className="ml-1 font-bold text-blue-700 hover:underline">
+                {showRanking ? "Hide ranking" : "Show ranking"}
+              </button>
+            )}
+          </p>
+          {showRanking && drift.by_datapoint.length > 0 && (
+            <ul className="mt-1.5 space-y-1 max-h-44 overflow-y-auto">
+              {drift.by_datapoint.slice(0, 10).map((r) => (
+                <li key={r.datapoint_id} className="flex items-center gap-2 text-[11px] text-slate-500 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1.5">
+                  <span className="font-mono text-slate-600">{r.datapoint_id}</span>
+                  <span>adjusted {r.drifted}/{r.n} ({Math.round(r.drift_rate * 100)}%)</span>
+                  {r.avg_conf_drifted != null && <span className="ml-auto text-amber-600 font-bold">avg conf {r.avg_conf_drifted}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {candidates.length > 0 && (
+        <div className="mt-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-[160px] h-2 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #2563EB, #059669)" }} />
+            </div>
+            <span className="text-[11px] font-bold text-slate-500">{doneCount}/{candidates.length} confirmed</span>
+            <button onClick={() => setLowFirst(!lowFirst)} className="text-[11px] font-bold text-blue-700 hover:underline">
+              {lowFirst ? "Lowest confidence first" : "Highest confidence first"}
+            </button>
+            <label className="text-[11px] text-slate-500 inline-flex items-center gap-1 cursor-pointer">
+              <input type="checkbox" checked={hideDone} onChange={(e) => setHideDone(e.target.checked)} /> Hide confirmed
+            </label>
+          </div>
+          <div className="mt-2 space-y-2 max-h-96 overflow-y-auto pr-1">
+            {ordered.map(([std, list]) => {
+              const left = list.filter((c) => !confirmed.has(c.datapoint_id));
+              const shut = collapsed.has(std);
+              return (
+                <div key={std} className="rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-slate-50">
+                    <button onClick={() => toggleSection(std)} className="text-slate-500 font-bold text-sm w-5">{shut ? "+" : "–"}</button>
+                    <span className="text-xs font-extrabold text-slate-800">ESRS {std}</span>
+                    <span className="text-[11px] text-slate-400">{left.length}/{list.length} left</span>
+                    {left.length > 0 && (
+                      <button onClick={() => confirmMany(list)} className="ml-auto text-[11px] font-bold text-blue-700 hover:underline">Confirm section</button>
+                    )}
+                  </div>
+                  {!shut && (
+                    <ul className="divide-y divide-slate-100">
+                      {list.map((c) => (
+                        <li key={c.datapoint_id} className="px-3 py-2 text-sm">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-xs text-slate-500 w-32 shrink-0 truncate" title={c.datapoint_id}>{c.datapoint_id}</span>
+                            <span className="flex-1 text-slate-700 truncate" title={String(c.value ?? "")}>
+                              {String(c.value ?? "—")}
+                              {c.unit && <span className="ml-1 text-[10px] text-slate-400">{c.unit}{c.unit_converted ? " · converted" : ""}</span>}
+                            </span>
+                            {c.source_page != null && (
+                              <span className="shrink-0 text-[10px] font-bold text-slate-400" title={c.snippet || ""}>p.{c.source_page}</span>
+                            )}
+                            {c.confidence != null && (
+                              <span className={`text-[11px] font-bold ${c.confidence < 0.5 ? "text-amber-600" : "text-slate-400"}`}>
+                                {Math.round(c.confidence * 100)}%
+                              </span>
+                            )}
+                            {confirmed.has(c.datapoint_id)
+                              ? <span className="text-[11px] font-bold text-emerald-600">Confirmed</span>
+                              : <button onClick={() => confirmOne(c)} disabled={confirming === c.datapoint_id} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold disabled:opacity-50">Confirm</button>}
+                          </div>
+                          {c.snippet && (
+                            <p className="mt-1 pl-0 text-[11px] text-slate-400 truncate" title={c.snippet}>“{c.snippet}”</p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+            {ordered.length === 0 && (
+              <p className="text-xs text-slate-400 py-4 text-center">All candidates confirmed — verify values in the registry before filing.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Evidence attach + per-datapoint history
+// ───────────────────────────────────────────────────────────────────────────
+
+function EvidenceHistory({ financialYear, datapointId, evidence, onAttach, notify }: {
+  financialYear: string;
+  datapointId: string;
+  evidence: string;
+  onAttach: (url: string) => void;
+  notify: (m: string | Error, ok?: boolean) => void;
+}) {
+  const [docs, setDocs] = useState<EvidenceDoc[]>([]);
+  const [history, setHistory] = useState<AuditRow[]>([]);
+  const [open, setOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [d, h] = await Promise.all([
+        listEvidenceDocuments(financialYear),
+        fetchAuditTrail(financialYear, { datapoint_id: datapointId }),
+      ]);
+      setDocs(d.filter((x) => x.file_url !== evidence));
+      setHistory(h);
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  }, [financialYear, datapointId, evidence, notify]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div className="mt-3">
+      {docs.length > 0 && (
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 mb-1">Attach from Documents</label>
+          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+            {docs.map((d) => (
+              <button key={d.id} onClick={() => onAttach(d.file_url)} className="w-full text-left flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs hover:border-blue-300 hover:bg-blue-50/50">
+                <span className="truncate text-slate-700">{d.file_name}</span>
+                {d.category && <span className="shrink-0 text-[10px] text-slate-400">{d.category}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <button onClick={() => { setOpen(!open); if (!open) load(); }} className="mt-2 text-[11px] font-bold text-slate-500 hover:text-blue-700">
+        {open ? "Hide" : "Show"} change history ({history.length})
+      </button>
+      {open && (
+        <ul className="mt-1.5 space-y-1.5 max-h-40 overflow-y-auto">
+          {history.length === 0 && <li className="text-[11px] text-slate-400">No recorded changes yet.</li>}
+          {history.map((h) => (
+            <li key={h.id} className="text-[11px] text-slate-500 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1.5">
+              <b className="text-slate-700">{h.action}</b>
+              {h.new_value && typeof h.new_value === "object" && "status" in (h.new_value as object)
+                ? ` → ${(h.new_value as { status: string }).status}` : ""}
+              <span className="text-slate-400"> · {new Date(h.created_at).toLocaleString()}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void; initialQuery?: string; goToReports: () => void }) {
   const [items, setItems] = useState<RegistryItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery || "");
   const [standard, setStandard] = useState("");
   const [statusF, setStatusF] = useState("");
   const [offset, setOffset] = useState(0);
@@ -709,6 +1210,18 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
 
   return (
     <div className="space-y-4">
+      <ExtractImport financialYear={financialYear} notify={notify} onConfirmed={refreshEntries} />
+      {(() => {
+        const done = Object.values(entriesByDp).filter((e) => e.status === "reported" || e.status === "assessed").length;
+        return done > 0 ? (
+          <button onClick={goToReports} className="w-full flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3.5 hover:bg-emerald-100/70 transition-colors text-left">
+            <span className="text-sm text-emerald-800"><b>{done} confirmed</b> — ready when you are. Generate your ESEF statement, validate, assure and file.</span>
+            <span className="shrink-0 inline-flex items-center gap-1.5 rounded-xl text-white text-xs font-bold px-4 py-2" style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}>
+              Go to Reports →
+            </span>
+          </button>
+        ) : null;
+      })()}
       {/* filter bar */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex flex-col lg:flex-row gap-3">
@@ -871,6 +1384,15 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
                   placeholder="Link or document reference"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {selected && (
+                  <EvidenceHistory
+                    financialYear={financialYear}
+                    datapointId={selected.id}
+                    evidence={draftEvidence}
+                    onAttach={(url) => setDraftEvidence(url)}
+                    notify={notify}
+                  />
+                )}
 
                 <label className="block mt-4 text-xs font-semibold text-slate-500 mb-1">Notes</label>
                 <textarea
@@ -900,6 +1422,213 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// Methodology pack (DMA audit trail)
+// ───────────────────────────────────────────────────────────────────────────
+
+function MethodologyPanel({ financialYear, notify, refreshKey }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void; refreshKey: number }) {
+  const [cfg, setCfg] = useState<DMAConfig | null>(null);
+  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
+  const [coverage, setCoverage] = useState<DMACoverage | null>(null);
+  const [paragraph, setParagraph] = useState<string>("");
+  const [impactT, setImpactT] = useState("3");
+  const [financialT, setFinancialT] = useState("3");
+  const [approver, setApprover] = useState("");
+  const [sgroup, setSgroup] = useState(STAKEHOLDER_GROUPS[5]);
+  const [smethod, setSmethod] = useState(ENGAGEMENT_METHODS[1]);
+  const [ssummary, setSsummary] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const [c, s] = await Promise.all([getDMAConfig(financialYear), listStakeholders(financialYear)]);
+      setCfg(c);
+      setImpactT(String(c.impact_threshold));
+      setFinancialT(String(c.financial_threshold));
+      setStakeholders(s);
+      const cov = await dmaCoverage(financialYear);
+      setCoverage(cov);
+      if (cov) {
+        const m = await dmaMethodology(financialYear);
+        setParagraph(m?.paragraph || "");
+      } else {
+        setParagraph("");
+      }
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  }, [financialYear, notify]);
+
+  useEffect(() => {
+    load();
+  }, [load, refreshKey]);
+
+  const saveThresholds = async () => {
+    try {
+      const c = await putDMAConfig(financialYear, { impact_threshold: Number(impactT) || 3, financial_threshold: Number(financialT) || 3 });
+      setCfg(c);
+      notify("Threshold methodology saved (draft)");
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  const approve = async () => {
+    if (!approver.trim()) {
+      notify("Name the approver to lock the scope.", false);
+      return;
+    }
+    try {
+      const c = await approveDMAConfig(financialYear, approver.trim());
+      setCfg(c);
+      await load();
+      notify("Methodology approved — assessment scope locked");
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  const addS = async () => {
+    try {
+      await addStakeholder(financialYear, { stakeholder_group: sgroup, method: smethod, summary: ssummary || null });
+      setSsummary("");
+      await load();
+      notify("Engagement logged");
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  const removeS = async (id: string) => {
+    try {
+      await deleteStakeholder(financialYear, id);
+      await load();
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  const approved = cfg?.status === "approved";
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-bold text-slate-900">DMA methodology</h2>
+        {cfg && (
+          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${approved ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+            {approved ? `Approved${cfg.approved_by ? ` · ${cfg.approved_by}` : ""}` : "Draft"}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-slate-400 mt-0.5 mb-4">Thresholds, stakeholder record and DR traceability — the auditor&apos;s methodology pack.</p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 mb-1">Impact threshold (0–5)</label>
+          <input type="number" min={0} max={5} step={0.1} value={impactT} disabled={approved} onChange={(e) => setImpactT(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 mb-1">Financial threshold (0–5)</label>
+          <input type="number" min={0} max={5} step={0.1} value={financialT} disabled={approved} onChange={(e) => setFinancialT(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50" />
+        </div>
+      </div>
+      {!approved && (
+        <div className="flex gap-2 mt-3">
+          <button onClick={saveThresholds} className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">Save draft</button>
+          <input value={approver} onChange={(e) => setApprover(e.target.value)} placeholder="Approver (e.g. Audit Committee)" className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs" />
+          <button onClick={approve} className="rounded-xl text-white px-4 py-2 text-xs font-bold" style={{ background: "linear-gradient(120deg, #059669, #10B981)" }}>Approve &amp; lock</button>
+        </div>
+      )}
+
+      {coverage && (
+        <div className={`mt-4 rounded-xl border px-3 py-2.5 text-xs font-semibold ${coverage.audit_ready ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+          {coverage.audit_ready
+            ? `Audit-ready: ${coverage.covered_iros}/${coverage.material_iros} material IROs traced, methodology approved, ${coverage.stakeholder_records} engagement record(s).`
+            : `Not audit-ready: ${coverage.orphan_iro_ids.length} material IRO(s) lack DR linkage${coverage.methodology_status !== "approved" ? ", methodology unapproved" : ""}${coverage.stakeholder_records === 0 ? ", no stakeholder record" : ""}.`}
+        </div>
+      )}
+      {paragraph && <p className="mt-3 text-[11px] leading-5 text-slate-500 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">{paragraph}</p>}
+
+      <h3 className="mt-5 mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Stakeholder engagements ({stakeholders.length})</h3>
+      <div className="flex flex-wrap gap-2">
+        <select value={sgroup} onChange={(e) => setSgroup(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs">
+          {STAKEHOLDER_GROUPS.map((g) => <option key={g} value={g}>{g.replace(/_/g, " ")}</option>)}
+        </select>
+        <select value={smethod} onChange={(e) => setSmethod(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs">
+          {ENGAGEMENT_METHODS.map((m) => <option key={m} value={m}>{m.replace(/_/g, " ")}</option>)}
+        </select>
+        <input value={ssummary} onChange={(e) => setSsummary(e.target.value)} placeholder="What they said / influence (optional)" className="flex-1 min-w-[140px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs" />
+        <button onClick={addS} className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-xs font-bold">Log</button>
+      </div>
+      {stakeholders.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {stakeholders.map((s) => (
+            <li key={s.id} className="flex items-center justify-between gap-2 text-xs text-slate-600 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1.5">
+              <span><b>{s.stakeholder_group.replace(/_/g, " ")}</b> · {s.method.replace(/_/g, " ")}{s.summary ? ` — ${s.summary}` : ""}</span>
+              <button onClick={() => removeS(s.id)} className="text-slate-300 hover:text-red-500" aria-label="remove"><X className="w-3.5 h-3.5" /></button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function IroDrChips({ iroId, notify }: { iroId: string; notify: (m: string | Error, ok?: boolean) => void }) {
+  const [links, setLinks] = useState<IRODRLink[]>([]);
+  const [dr, setDr] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      setLinks(await listIroDrs(iroId));
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  }, [iroId, notify]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const add = async () => {
+    const code = dr.trim();
+    if (!code) return;
+    try {
+      await linkIroDr(iroId, code);
+      setDr("");
+      await load();
+      notify(`Linked ${code}`);
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  const remove = async (code: string) => {
+    try {
+      await unlinkIroDr(iroId, code);
+      await load();
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
+      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Triggered disclosure requirements</div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {links.length === 0 && <span className="text-[11px] text-amber-600 font-semibold">Untraced — link at least one DR (e.g. E1, E1-6).</span>}
+        {links.map((l) => (
+          <span key={l.dr} className="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[11px] font-bold">
+            {l.dr}
+            <button onClick={() => remove(l.dr)} className="hover:text-red-500" aria-label="unlink"><X className="w-3 h-3" /></button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-1.5">
+        <input value={dr} onChange={(e) => setDr(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder="DR code, e.g. E1-6" className="flex-1 rounded-lg border border-slate-300 px-2 py-1 text-xs" />
+        <button onClick={add} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold">Link</button>
+      </div>
+    </div>
+  );
+}
+
 // Materiality (double materiality)
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -1017,6 +1746,7 @@ function MaterialityTab({ financialYear, mode, notify }: { financialYear: string
 
       {/* list + matrix */}
       <div className="lg:col-span-2 space-y-4">
+        <MethodologyPanel financialYear={financialYear} notify={notify} refreshKey={iro.length} />
         <MaterialityMatrix iro={iro} material={material} onSelect={(r) => notify(`${r.title} — ${material(r) ? "material" : "not material"}`)} />
 
         {iro.length === 0 && (
@@ -1050,6 +1780,7 @@ function MaterialityTab({ financialYear, mode, notify }: { financialYear: string
                 <ScoreEditor label="Severity" value={r.severity ?? 0} onChange={(v) => patchAll(r.id, { severity: v })} />
                 <ScoreEditor label="Likelihood" value={r.likelihood ?? 0} onChange={(v) => patchAll(r.id, { likelihood: v })} />
               </div>
+              {m && <IroDrChips iroId={r.id} notify={notify} />}
             </div>
           );
         })}
@@ -1185,8 +1916,7 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
     a.remove();
   };
 
-  const generate = async (format: "word" | "pdf" | "esef") => {
-    setGenerating(format);
+  const generate = async (format: "word" | "pdf" | "esef") => {    setGenerating(format);
     try {
       const data = await generateCloudReport(financialYear, format);
       await load();
@@ -1221,6 +1951,19 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
       downloadBlob(blob, `esrs_statement_${financialYear}.${REPORT_EXT[report?.report_type ?? "word"] ?? "docx"}`);
     } catch (e) {
       notify(e as Error, false);
+    }
+  };
+
+  const downloadPack = async () => {
+    setBusy("pack");
+    try {
+      const blob = await downloadBoardPack(financialYear);
+      downloadBlob(blob, `CSRD_Board_Pack_${financialYear}.pdf`);
+      notify("Board pack downloaded");
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -1333,6 +2076,21 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
               </button>
             </>
           )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="font-bold text-slate-900">Board readiness pack</h2>
+          <p className="text-sm text-slate-500 mt-1">One-document briefing for the board: coverage, DMA status, material IROs and top gaps for {financialYear}.</p>
+          {mode === "demo" && (
+            <p className="text-xs text-amber-700 mt-1.5">Demo mode is browser-only — enter the sandbox or sign in to generate the pack.</p>
+          )}
+        </div>
+        <div className="flex-shrink-0">
+          <button onClick={downloadPack} disabled={!!busy} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-semibold px-4 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #7C3AED, #4F46E5)" }}>
+            {busy === "pack" ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} Board pack (PDF)
+          </button>
         </div>
       </div>
 

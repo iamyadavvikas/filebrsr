@@ -5,3 +5,6 @@ httpx>=0.28.1
 ruff>=0.4.0
 hypothesis>=6.0
 arelle-release>=2.37
+# arelle >=2.45 needs pyparsing>=3.1 (DelimitedList); without the pin a stale
+# 3.0.x breaks arelleCmdLine at import and the conformance tier goes dark.
+pyparsing>=3.1

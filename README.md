@@ -350,7 +350,11 @@ Interactive API docs: <http://localhost:8000/docs> when running locally.
 ## Database
 
 - All schema in [supabase/](supabase/). `schema.sql` is the baseline; numbered `migration_v*.sql`
-  files are applied in order.
+  files are applied in order (canonical order lives in [scripts/migrate-check.sh](scripts/migrate-check.sh)).
+- Every push runs the **migration gate** (CI `migrations` job): all files apply cleanly on a
+  fresh `pgvector/pgvector:pg15` database with Supabase stubs (`auth.uid()`, `auth.role()`,
+  `storage` schema, service roles). Run it locally: `./scripts/migrate-check.sh`
+  (needs Docker; or point `PGHOST/PGUSER/PGPASSWORD/PGDATABASE` at any Postgres with `--no-docker`).
 - Row Level Security is on for tenant tables — see [supabase/migration_v3_rls_admin.sql](supabase/migration_v3_rls_admin.sql).
 - Backend connects with the **service role key** (bypasses RLS); frontend uses the **anon key**
   with cookie-bound JWT (RLS enforced).
@@ -472,6 +476,33 @@ cd ~/filebrsr
 ./scripts/rollback.sh <git-sha>      # roll back to a specific image tag
 ./scripts/rollback.sh                # with no .previous_tag → lists last 10 ECR tags
 ```
+
+---
+
+## Staging
+
+`docker-compose.staging.yml` overlays the prod stack with port offsets so a
+candidate build can run side-by-side (frontend `:3001`, backend `:8001`,
+grafana `:3002`; project name `filebrsr-staging`).
+
+```bash
+# on the staging host (or the prod box for a smoke check)
+TAG=<git-sha> ECR_REGISTRY=<acct>.dkr.ecr.ap-south-1.amazonaws.com \
+  docker compose -f docker-compose.prod.yml -f docker-compose.staging.yml \
+  -p filebrsr-staging up -d
+```
+
+Promotion gate (must pass before prod deploy):
+
+```bash
+curl localhost:8001/health   # database: ok
+# full CSRD sandbox loop: mint -> seed -> value -> ESEF -> assurance ->
+# validate -> attest -> submit (sandboxed) -> ack (see runbook below)
+```
+
+Manual steps remaining: `dev.filebrsr.com` DNS + edge TLS, and a staging
+`.env` (copy prod, rotate keys). Tear down with
+`docker compose -p filebrsr-staging down`.
 
 ---
 

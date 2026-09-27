@@ -124,6 +124,11 @@ export default function AssuranceCoreClient() {
 
   const [draft, setDraft] = useState<Record<string, Record<string, string>>>({});
 
+  const [providers, setProviders] = useState<any[]>([]);
+  const [wpProgress, setWpProgress] = useState<any | null>(null);
+  const [firmName, setFirmName] = useState("");
+  const [wpLevel, setWpLevel] = useState("limited");
+
   // initialize FY + tier from the profile
   useEffect(() => {
     let cancelled = false;
@@ -208,6 +213,70 @@ export default function AssuranceCoreClient() {
   useEffect(() => {
     load().catch(() => undefined);
   }, [load]);
+
+  const loadProviders = useCallback(async () => {
+    try {
+      const res = await authFetch("/api/brsr-core/providers");
+      if (!res.ok) return;
+      setProviders(((await res.json()).providers ?? []) as any[]);
+    } catch {
+      /* offline — providers stay empty */
+    }
+  }, [authFetch]);
+
+  const loadWpProgress = useCallback(async () => {
+    try {
+      const res = await authFetch(
+        `/api/brsr-core/workpapers/progress?financial_year=${encodeURIComponent(financialYear)}`
+      );
+      if (!res.ok) return;
+      setWpProgress(await res.json());
+    } catch {
+      /* offline */
+    }
+  }, [authFetch, financialYear]);
+
+  useEffect(() => {
+    loadProviders().catch(() => undefined);
+    loadWpProgress().catch(() => undefined);
+  }, [loadProviders, loadWpProgress]);
+
+  const addProvider = async () => {
+    if (!firmName.trim()) {
+      setMessage({ ok: false, text: "Enter the assurance firm's name." });
+      return;
+    }
+    try {
+      const res = await authFetch("/api/brsr-core/providers", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firm_name: firmName.trim() }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setFirmName("");
+      await loadProviders();
+      setMessage({ ok: true, text: "Assurance provider registered." });
+    } catch (e) {
+      setMessage({ ok: false, text: `Failed to save provider: ${(e as Error).message}` });
+    }
+  };
+
+  const instantiateWorkpapers = async () => {
+    try {
+      const codes = kpis.map((k) => k.code);
+      const res = await authFetch("/api/brsr-core/workpapers/instantiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ financial_year: financialYear, kpi_codes: codes, level: wpLevel }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const d = await res.json();
+      await loadWpProgress();
+      setMessage({ ok: true, text: `Workpapers ready: ${d.created} created, ${d.skipped} already existed.` });
+    } catch (e) {
+      setMessage({ ok: false, text: `Failed to instantiate workpapers: ${(e as Error).message}` });
+    }
+  };
 
   const saveRow = useCallback(
     async (kpiCode: string) => {
@@ -439,6 +508,63 @@ export default function AssuranceCoreClient() {
                 </ul>
               </div>
             )}
+
+            {/* providers + workpapers */}
+            <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5">
+              <p className="font-bold text-gray-800">Providers &amp; ISAE 3000 workpapers</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  value={firmName}
+                  onChange={(e) => setFirmName(e.target.value)}
+                  placeholder="Assurance firm (e.g. Verify LLP)"
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+                <button
+                  onClick={addProvider}
+                  className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700"
+                >
+                  Register provider
+                </button>
+                <select
+                  value={wpLevel}
+                  onChange={(e) => setWpLevel(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="limited">Limited assurance</option>
+                  <option value="reasonable">Reasonable assurance</option>
+                </select>
+                <button
+                  onClick={instantiateWorkpapers}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold hover:border-emerald-300 hover:text-emerald-700"
+                >
+                  Seed workpapers
+                </button>
+                {wpProgress && (
+                  <span className="text-xs text-gray-500">
+                    {wpProgress.closed}/{wpProgress.checkpoints} checkpoints closed ({wpProgress.coverage_pct}%)
+                  </span>
+                )}
+              </div>
+              {providers.length > 0 && (
+                <ul className="mt-3 divide-y divide-gray-100">
+                  {providers.map((p: any) => (
+                    <li key={p.id} className="flex items-center gap-3 py-2 text-sm">
+                      <span className="font-semibold text-gray-800 flex-1">
+                        {p.firm_name}
+                        {p.partner_name ? ` · ${p.partner_name}` : ""}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          p.rotation?.due ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"
+                        }`}
+                      >
+                        {p.rotation?.due ? `Rotation due (${p.rotation.tenure_years}y)` : "Within rotation limit"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
             {/* attribute cards */}
             <p className="mt-8 text-sm font-bold text-gray-800">Coverage by attribute</p>

@@ -35,6 +35,7 @@ import {
   Menu,
   X,
   Waypoints,
+  Banknote,
 } from "lucide-react";
 
 const FOUNDER_EMAILS = [
@@ -72,6 +73,7 @@ const navGroups = [
     label: "Analysis",
     items: [
       { name: "Carbon Calculator", href: "/platform/carbon", icon: Calculator },
+      { name: "Financed Emissions", href: "/platform/pcaf", icon: Banknote },
       { name: "Materiality", href: "/platform/materiality", icon: Compass },
       { name: "Benchmarks", href: "/platform/benchmarks", icon: BarChart3 },
     ],

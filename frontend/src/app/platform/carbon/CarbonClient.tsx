@@ -705,6 +705,16 @@ export default function CarbonClient() {
           </div>
         )}
 
+        {/* Bill connector: paste bill text -> prefill Scope 2 */}
+        <BillPanel
+          onUseMwh={(mwh, label) =>
+            setScope2Entries((prev) => [
+              ...prev,
+              { id: Date.now().toString(), category: "purchased_electricity", quantity: Math.round(mwh * 100) / 100, state: "national" },
+            ])
+          }
+        />
+
         {/* Results */}
         {results && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -774,6 +784,8 @@ export default function CarbonClient() {
                 </div>
               </div>
             </div>
+            {/* Climate resilience snapshot (IFRS S2) */}
+            <ResiliencePanel totalEmissions={results.total_emissions_tco2e} revenueCrores={revenueCrores} />
             {/* Verifiable certificate (signed Scope-2) */}
             <div className="mt-6 pt-4 border-t border-gray-100">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3">
@@ -870,6 +882,161 @@ function ResultCard({
         {value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
       </p>
       <p className="text-xs text-gray-400">tCO2e</p>
+    </div>
+  );
+}
+
+function ResiliencePanel({ totalEmissions, revenueCrores }: { totalEmissions: number; revenueCrores: number }) {
+  const [scenario, setScenario] = useState("net_zero_2050");
+  const [fx, setFx] = useState("83");
+  const [baseYear, setBaseYear] = useState("2020");
+  const [baseEmissions, setBaseEmissions] = useState("");
+  const [statedPct, setStatedPct] = useState("");
+  const [snap, setSnap] = useState<any | null>(null);
+  const [sbti, setSbti] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const run = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const fxRate = Number(fx) || 83;
+      const revenueUsd = ((Number(revenueCrores) || 0) * 1e7) / fxRate;
+      if (revenueUsd <= 0) throw new Error("Enter revenue (₹ Cr) to compute exposure intensity.");
+      const r1 = await fetch("/backend/api/climate/resilience", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emissions_tco2e: totalEmissions, revenue: revenueUsd, assets: [], scenario, year: 2030 }),
+      });
+      if (!r1.ok) throw new Error(`Resilience failed (${r1.status})`);
+      setSnap(await r1.json());
+      if (baseEmissions) {
+        const r2 = await fetch("/backend/api/climate/sbti-target", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base_emissions: Number(baseEmissions),
+            base_year: Number(baseYear) || 2020,
+            target_year: 2030,
+            ambition: "1.5C",
+            stated_target_pct: statedPct ? Number(statedPct) : null,
+          }),
+        });
+        if (r2.ok) setSbti(await r2.json());
+      } else {
+        setSbti(null);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 pt-4 border-t border-gray-100">
+      <h4 className="text-sm font-semibold text-gray-700 mb-1">Climate resilience snapshot (IFRS S2)</h4>
+      <p className="text-xs text-gray-400 mb-3">Transition exposure + SBTi check from this footprint. Scenario numbers are illustrative defaults — replace with licensed NGFS data before filing. <a href="/csrd/workspace?tab=registry&q=E1-6" className="text-blue-600 hover:underline font-semibold">Assess E1 in the CSRD registry →</a></p>
+      <div className="flex flex-wrap gap-2 items-center">
+        <select value={scenario} onChange={(e) => setScenario(e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1.5 text-xs">
+          <option value="net_zero_2050">Net Zero 2050 (orderly)</option>
+          <option value="delayed_transition">Delayed Transition</option>
+          <option value="current_policies">Current Policies</option>
+        </select>
+        <input value={fx} onChange={(e) => setFx(e.target.value)} title="INR per USD" placeholder="FX ₹/$" className="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-xs" />
+        <input value={baseEmissions} onChange={(e) => setBaseEmissions(e.target.value)} placeholder="Base-year tCO2e (for SBTi)" className="w-44 rounded-lg border border-gray-300 px-2 py-1.5 text-xs" />
+        <input value={statedPct} onChange={(e) => setStatedPct(e.target.value)} placeholder="Stated target % (optional)" className="w-44 rounded-lg border border-gray-300 px-2 py-1.5 text-xs" />
+        <button onClick={run} disabled={loading} className="px-4 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold disabled:opacity-50">
+          {loading ? "Running…" : "Run snapshot"}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {snap && (
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+          <div className="rounded-lg bg-amber-50 px-3 py-2">
+            <p className="text-[11px] text-amber-600 font-semibold uppercase">2030 carbon cost</p>
+            <p className="font-bold text-gray-900">${snap.transition.carbon_cost_usd.toLocaleString()} <span className="text-xs font-medium text-gray-500">({snap.transition.cost_to_revenue_pct}% of revenue · {snap.transition.band})</span></p>
+          </div>
+          <div className="rounded-lg bg-blue-50 px-3 py-2">
+            <p className="text-[11px] text-blue-600 font-semibold uppercase">Scenario price</p>
+            <p className="font-bold text-gray-900">${snap.transition.carbon_price_usd}/tCO2e <span className="text-xs font-medium text-gray-500">· {snap.scenario}</span></p>
+          </div>
+          <div className="rounded-lg bg-emerald-50 px-3 py-2">
+            <p className="text-[11px] text-emerald-600 font-semibold uppercase">SBTi 1.5°C by 2030</p>
+            <p className="font-bold text-gray-900">{sbti ? `${sbti.required_reduction_pct}% required${sbti.meets_sbti !== undefined ? (sbti.meets_sbti ? " · stated target meets it" : " · stated target falls short") : ""}` : "enter base-year emissions"}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BillPanel({ onUseMwh }: { onUseMwh: (mwh: number, label: string) => void }) {
+  const [text, setText] = useState("");
+  const [parsed, setParsed] = useState<any | null>(null);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState("");
+
+  const parse = async () => {
+    if (!text.trim()) {
+      setError("Paste bill text first.");
+      return;
+    }
+    setWorking(true);
+    setError("");
+    try {
+      const res = await fetch("/backend/api/connectors/utility-bill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, jurisdiction: "IN" }),
+      });
+      if (!res.ok) throw new Error(`Bill parse failed (${res.status})`);
+      setParsed(await res.json());
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const kwh = parsed?.parsed?.kwh;
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 className="font-semibold text-gray-900">Utility bill connector</h3>
+      <p className="text-xs text-gray-400 mt-1 mb-3">Paste electricity bill text (or OCR output) — we extract metered kWh, price it through the versioned CEA factor, and can drop it straight into Scope 2.</p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={3}
+        placeholder="Paste bill text, e.g. Total Consumption : 245 kWh … Billing Period: 01-Jan-2025 to 31-Jan-2025"
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-300"
+      />
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button onClick={parse} disabled={working} className="px-4 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold disabled:opacity-50">
+          {working ? "Parsing…" : "Parse bill"}
+        </button>
+        {error && <span className="text-xs text-red-600">{error}</span>}
+        {parsed && kwh != null && (
+          <>
+            <span className="text-xs text-gray-600">
+              <b>{kwh} kWh</b>
+              {parsed.parsed?.period_start ? ` · ${parsed.parsed.period_start} → ${parsed.parsed.period_end}` : ""}
+              {parsed.scope2 ? ` · ≈${parsed.scope2.emissions_tco2e} tCO2e` : ""}
+              <span className="text-gray-400"> ({parsed.parsed?.confidence} confidence)</span>
+            </span>
+            <button
+              onClick={() => onUseMwh(kwh / 1000, "bill")}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700"
+            >
+              Use as Scope 2 input ({(kwh / 1000).toFixed(2)} MWh)
+            </button>
+          </>
+        )}
+        {parsed && kwh == null && (
+          <span className="text-xs text-amber-600">No kWh figure found — check the text or scan quality.</span>
+        )}
+      </div>
     </div>
   );
 }

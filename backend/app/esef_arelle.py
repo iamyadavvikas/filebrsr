@@ -87,7 +87,8 @@ def run_arelle_validation(
 
     errors: list[dict] = []
     warnings: list[dict] = []
-    for line in (proc.stdout or "").splitlines():
+    raw = proc.stdout or ""
+    for line in raw.splitlines():
         parts = line.split("\t", 2)
         if len(parts) != 3:
             continue
@@ -113,6 +114,11 @@ def run_arelle_validation(
             errors.append(item)
         elif level == "WARNING" and len(warnings) < _AUTHORITY_MAX_WARNINGS:
             warnings.append(item)
+    if proc.returncode != 0 and not errors and not warnings:
+        # Arelle crashed (e.g. broken install, traceback on stdout) rather
+        # than validating — never report a crash as a clean pass.
+        # Callers treat None as "authority unavailable".
+        return None
     return {
         "available": True,
         "elapsed_ms": elapsed_ms,

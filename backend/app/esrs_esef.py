@@ -275,6 +275,7 @@ def build_esef_statement(
 
 def _make_header(*, entity_identifier, entity_scheme, start, end, ctx_duration) -> str:
     return (
+        '<div style="display:none">'
         "<ix:header>"
         "<ix:hidden><!-- non-inline content placeholder --></ix:hidden>"
         "<ix:resources>"
@@ -297,6 +298,7 @@ def _make_header(*, entity_identifier, entity_scheme, start, end, ctx_duration) 
         f'<link:schemaRef xlink:type="simple" xlink:href="{ESRS_NS}/esrs_all.xsd"/>'
         "</ix:references>"
         "</ix:header>"
+        "</div>"
     )
 
 

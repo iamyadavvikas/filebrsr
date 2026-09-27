@@ -4,7 +4,13 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, dev]
+    branches: [dev]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy (default: dev)'
+        required: false
+        default: 'dev'
 
 jobs:
   # Job IDs are 'frontend' / 'backend' to match the branch-protection
@@ -60,9 +66,33 @@ jobs:
           SUPABASE_SERVICE_KEY: test-service-key
           ALLOWED_ORIGINS: http://localhost:3000
 
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Apply all migrations in order on a fresh database
+        run: ./scripts/migrate-check.sh --no-docker
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: filebrsr_migrate_check
+
   # PR dry-run: prove both Docker images build before merge. No push, no
   # deploy — this is the "plan" equivalent for our build-and-deploy pipeline.
-  # Runs only on pull_request; the real build+push happens in `deploy` on main.
+  # Runs only on pull_request; actual deploy is manual via workflow_dispatch.
   docker-build:
     needs: [frontend, backend]
     if: github.event_name == 'pull_request'
@@ -90,8 +120,7 @@ jobs:
           push: false
 
   deploy:
-    needs: [frontend, backend]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ap-south-1
@@ -100,6 +129,8 @@ jobs:
       BACKEND_REPO: filebrsr-backend
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.branch || 'dev' }}
 
       - name: Compute image tag
         id: tag
@@ -152,7 +183,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.prod.yml,nginx/nginx.conf,scripts/deploy.sh,scripts/rollback.sh,observability/prometheus/prometheus.prod.yml,observability/grafana/provisioning,observability/grafana/dashboards"
+          source: "docker-compose.prod.yml,nginx/nginx.conf,scripts/deploy.sh,scripts/rollback.sh,scripts/fetch-secrets.sh,observability/prometheus/prometheus.prod.yml,observability/grafana/provisioning,observability/grafana/dashboards"
           target: "/home/ec2-user/filebrsr/"
           strip_components: 0
           overwrite: true
