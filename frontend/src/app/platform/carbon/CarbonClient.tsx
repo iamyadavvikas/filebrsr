@@ -705,6 +705,16 @@ export default function CarbonClient() {
           </div>
         )}
 
+        {/* Bill connector: paste bill text -> prefill Scope 2 */}
+        <BillPanel
+          onUseMwh={(mwh, label) =>
+            setScope2Entries((prev) => [
+              ...prev,
+              { id: Date.now().toString(), category: "purchased_electricity", quantity: Math.round(mwh * 100) / 100, state: "national" },
+            ])
+          }
+        />
+
         {/* Results */}
         {results && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -958,6 +968,75 @@ function ResiliencePanel({ totalEmissions, revenueCrores }: { totalEmissions: nu
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function BillPanel({ onUseMwh }: { onUseMwh: (mwh: number, label: string) => void }) {
+  const [text, setText] = useState("");
+  const [parsed, setParsed] = useState<any | null>(null);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState("");
+
+  const parse = async () => {
+    if (!text.trim()) {
+      setError("Paste bill text first.");
+      return;
+    }
+    setWorking(true);
+    setError("");
+    try {
+      const res = await fetch("/backend/api/connectors/utility-bill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, jurisdiction: "IN" }),
+      });
+      if (!res.ok) throw new Error(`Bill parse failed (${res.status})`);
+      setParsed(await res.json());
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const kwh = parsed?.parsed?.kwh;
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 className="font-semibold text-gray-900">Utility bill connector</h3>
+      <p className="text-xs text-gray-400 mt-1 mb-3">Paste electricity bill text (or OCR output) — we extract metered kWh, price it through the versioned CEA factor, and can drop it straight into Scope 2.</p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={3}
+        placeholder="Paste bill text, e.g. Total Consumption : 245 kWh … Billing Period: 01-Jan-2025 to 31-Jan-2025"
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-300"
+      />
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button onClick={parse} disabled={working} className="px-4 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold disabled:opacity-50">
+          {working ? "Parsing…" : "Parse bill"}
+        </button>
+        {error && <span className="text-xs text-red-600">{error}</span>}
+        {parsed && kwh != null && (
+          <>
+            <span className="text-xs text-gray-600">
+              <b>{kwh} kWh</b>
+              {parsed.parsed?.period_start ? ` · ${parsed.parsed.period_start} → ${parsed.parsed.period_end}` : ""}
+              {parsed.scope2 ? ` · ≈${parsed.scope2.emissions_tco2e} tCO2e` : ""}
+              <span className="text-gray-400"> ({parsed.parsed?.confidence} confidence)</span>
+            </span>
+            <button
+              onClick={() => onUseMwh(kwh / 1000, "bill")}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700"
+            >
+              Use as Scope 2 input ({(kwh / 1000).toFixed(2)} MWh)
+            </button>
+          </>
+        )}
+        {parsed && kwh == null && (
+          <span className="text-xs text-amber-600">No kWh figure found — check the text or scan quality.</span>
+        )}
+      </div>
     </div>
   );
 }

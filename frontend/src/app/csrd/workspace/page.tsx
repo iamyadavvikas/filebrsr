@@ -834,7 +834,8 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [lowFirst, setLowFirst] = useState(true);
   const [hideDone, setHideDone] = useState(false);
-  const [drift, setDrift] = useState<{ ai_confirmed: number; drifted: number } | null>(null);
+  const [drift, setDrift] = useState<{ ai_confirmed: number; drifted: number; by_datapoint: { datapoint_id: string; n: number; drifted: number; drift_rate: number; avg_conf_drifted: number | null }[] } | null>(null);
+  const [showRanking, setShowRanking] = useState(false);
 
   const refreshDrift = useCallback(async () => {
     try {
@@ -844,7 +845,7 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
       });
       if (res.ok) {
         const d = await res.json();
-        setDrift({ ai_confirmed: d.ai_confirmed || 0, drifted: d.drifted || 0 });
+        setDrift({ ai_confirmed: d.ai_confirmed || 0, drifted: d.drifted || 0, by_datapoint: d.by_datapoint || [] });
       }
     } catch {
       /* miss-pattern stats are advisory; never block review */
@@ -938,9 +939,27 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
       </div>
       {company && <p className="mt-2 text-xs text-slate-500">Detected company: <b>{company}</b></p>}
       {drift && drift.ai_confirmed > 0 && (
-        <p className="mt-1.5 text-[11px] text-slate-400">
-          Miss-pattern report for {financialYear}: reviewers adjusted {drift.drifted} of {drift.ai_confirmed} AI-proposed values.
-        </p>
+        <div className="mt-1.5">
+          <p className="text-[11px] text-slate-400">
+            Miss-pattern report for {financialYear}: reviewers adjusted {drift.drifted} of {drift.ai_confirmed} AI-proposed values.
+            {drift.by_datapoint.length > 0 && (
+              <button onClick={() => setShowRanking(!showRanking)} className="ml-1 font-bold text-blue-700 hover:underline">
+                {showRanking ? "Hide ranking" : "Show ranking"}
+              </button>
+            )}
+          </p>
+          {showRanking && drift.by_datapoint.length > 0 && (
+            <ul className="mt-1.5 space-y-1 max-h-44 overflow-y-auto">
+              {drift.by_datapoint.slice(0, 10).map((r) => (
+                <li key={r.datapoint_id} className="flex items-center gap-2 text-[11px] text-slate-500 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1.5">
+                  <span className="font-mono text-slate-600">{r.datapoint_id}</span>
+                  <span>adjusted {r.drifted}/{r.n} ({Math.round(r.drift_rate * 100)}%)</span>
+                  {r.avg_conf_drifted != null && <span className="ml-auto text-amber-600 font-bold">avg conf {r.avg_conf_drifted}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
       {candidates.length > 0 && (
         <div className="mt-3">
