@@ -62,6 +62,7 @@ ORDER=(
   migration_v38_entry_source_values.sql
   migration_v39_auditor_portal.sql
   migration_v40_fy_rollovers.sql
+  migration_v41_supplier_cascade.sql
 )
 
 STARTED_CONTAINER=0
@@ -172,7 +173,7 @@ for f in "${ORDER[@]}"; do
 done
 
 echo "-> post-checks"
-for t in esrs_stakeholders esrs_dma_config iro_dr_links assurance_providers assurance_workpapers esrs_guest_sessions brsr_core_assurance value_chain_partners esrs_reports auditor_grants assurance_findings; do
+for t in esrs_stakeholders esrs_dma_config iro_dr_links assurance_providers assurance_workpapers esrs_guest_sessions brsr_core_assurance value_chain_partners esrs_reports auditor_grants assurance_findings cascade_suppliers cascade_responses; do
   got="$(psql_run -tAc "select to_regclass('public.$t')")"
   if [[ "$got" != "$t" ]]; then
     echo "MISSING table after migrations: public.$t" >&2

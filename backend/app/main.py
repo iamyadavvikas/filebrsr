@@ -52,6 +52,7 @@ from app.router_tally import router as tally_router
 from app.router_verify import router as verify_router
 from app.router_assurance import router as assurance_router
 from app.router_auditors import router as auditors_router
+from app.router_suppliers import router as suppliers_router
 from app.router_brsr_core import router as brsr_core_router
 from app.router_brsr_value_chain import router as value_chain_router
 from app.router_climate import router as climate_router
@@ -152,6 +153,7 @@ app.include_router(tally_router)
 app.include_router(verify_router)
 app.include_router(assurance_router)
 app.include_router(auditors_router)
+app.include_router(suppliers_router)
 app.include_router(brsr_core_router)
 app.include_router(value_chain_router)
 app.include_router(climate_router)
