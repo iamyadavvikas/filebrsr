@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Clock, Shield, Download } from "lucide-react";
+import { getAccessToken } from "@/lib/supabase/token";
 interface DashboardData {
   financial_year: string;
   compliance_score: number;
@@ -55,7 +56,7 @@ export default function BoardClient({ userId }: { userId: string }) {
     setError("");
     try {
       const res = await fetch(`/backend/api/platform/board/dashboard?financial_year=${fy}`, {
-        headers: { Authorization: `Bearer ${userId}` },
+        headers: { Authorization: `Bearer ${(await getAccessToken()) || userId}` },
       });
       if (res.ok) {
         setData(await res.json());
@@ -72,7 +73,7 @@ export default function BoardClient({ userId }: { userId: string }) {
 
   async function downloadReport() {
     const res = await fetch(`/backend/api/platform/reports/brsr-pdf?financial_year=${fy}&report_type=brsr_full`, {
-      headers: { Authorization: `Bearer ${userId}` },
+      headers: { Authorization: `Bearer ${(await getAccessToken()) || userId}` },
     });
     if (res.ok) {
       const blob = await res.blob();

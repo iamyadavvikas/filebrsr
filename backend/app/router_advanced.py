@@ -11,6 +11,8 @@ import json
 import uuid
 import logging
 
+from app.auth import get_user_id_from_header as get_user_id
+from app.brsr_core_assurance import assurance_gate, resolve_org_for_gate
 from app.config import get_settings
 
 router = APIRouter(prefix="/api/platform", tags=["Advanced Platform"])
@@ -32,41 +34,6 @@ PLAN_SUPPLIER_LIMITS = {
 def get_supabase_admin():
     from supabase import create_client
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-
-
-async def get_user_id(authorization: str) -> str:
-    """Extract and verify user_id from Supabase JWT."""
-    token = authorization.replace("Bearer ", "")
-    if not token:
-        raise HTTPException(status_code=401, detail="Missing auth token")
-
-    import jwt as pyjwt
-
-    # If JWT secret is configured, verify the signature
-    jwt_secret = settings.SUPABASE_JWT_SECRET
-    if jwt_secret:
-        try:
-            payload = pyjwt.decode(
-                token,
-                jwt_secret,
-                algorithms=["HS256"],
-                audience="authenticated",
-            )
-            user_id = payload.get("sub")
-            if not user_id:
-                raise HTTPException(status_code=401, detail="Invalid token: no sub claim")
-            return user_id
-        except pyjwt.ExpiredSignatureError:
-            raise HTTPException(status_code=401, detail="Token expired")
-        except pyjwt.InvalidTokenError as e:
-            raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
-    else:
-        # Fallback: decode without verification (dev only)
-        try:
-            payload = pyjwt.decode(token, options={"verify_signature": False})
-            return payload.get("sub", token)
-        except Exception:
-            return token
 
 
 async def get_user_plan(user_id: str) -> str:
@@ -546,6 +513,7 @@ class XBRLFilingCreate(BaseModel):
     financial_year: str
     filing_type: str = "brsr_annual"
     exchange: str = "both"
+    enforce_assurance: bool = False  # opt-in BRSR Core assurance gate (409 on gaps)
 
 
 @router.get("/xbrl/filings")
@@ -563,6 +531,18 @@ async def generate_xbrl(req: XBRLFilingCreate, authorization: str = Header(...))
     """Generate XBRL filing from BRSR data."""
     user_id = await get_user_id(authorization)
     supabase = get_supabase_admin()
+
+    # Optional BRSR Core assurance gate (opt-in, non-breaking)
+    if req.enforce_assurance:
+        org_id, tier, _ = resolve_org_for_gate(supabase, user_id)
+        if tier:
+            gate = assurance_gate(supabase, org_id, req.financial_year, tier=tier)
+            if gate["blockers"]:
+                raise HTTPException(
+                    status_code=409,
+                    detail="BRSR Core assurance required before filing: "
+                    + ", ".join(b["kpi_code"] for b in gate["blockers"]),
+                )
 
     # Fetch user's BRSR entries for the financial year
     entries_result = supabase.table("brsr_entries").select("*").eq(

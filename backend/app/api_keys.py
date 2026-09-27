@@ -17,6 +17,7 @@ from typing import Optional
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from app.auth import resolve_user_id
 from app.config import get_settings
 
 logger = logging.getLogger("filebrsr.api_keys")
@@ -65,19 +66,11 @@ async def validate_api_key(
 ) -> dict:
     """
     FastAPI dependency to validate API key from X-API-Key header.
-    Returns the key metadata if valid.
-
-    For now, uses Supabase to store and look up keys.
-    Falls back to allowing requests without key for backward compatibility.
+    Parses the ``X-API-Key`` header, hashes it and looks it up in Supabase.
+    Rejects requests without a key; the public API is key-gated.
     """
     if not x_api_key:
-        # Allow keyless access for backward compatibility (rate limited)
-        return {
-            "tier": "free",
-            "user_id": None,
-            "key_id": None,
-            "limits": API_TIERS["free"],
-        }
+        raise HTTPException(status_code=401, detail="Missing API key")
 
     if not x_api_key.startswith("fbrsr_"):
         raise HTTPException(status_code=401, detail="Invalid API key format")
@@ -168,20 +161,10 @@ async def _require_user_id(authorization: Optional[str]) -> str:
     token = authorization[len("Bearer "):].strip()
     if not token or token in ("guest", "undefined", "null"):
         raise HTTPException(status_code=401, detail="Invalid auth token")
-    if token == get_settings().SUPABASE_SERVICE_KEY:
-        raise HTTPException(status_code=401, detail="Service key not permitted here")
-    try:
-        import jwt as pyjwt
-
-        payload = pyjwt.decode(token, options={"verify_signature": False})
-        uid = payload.get("sub")
-        if not uid or uid == "guest":
-            raise HTTPException(status_code=401, detail="Invalid JWT payload")
-        return uid
-    except HTTPException:
-        raise
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=401, detail=f"Could not decode JWT: {e}")
+    user_id = resolve_user_id(token, allow_anon=False)
+    if not user_id or user_id in ("guest", "undefined", "null"):
+        raise HTTPException(status_code=401, detail="Invalid JWT payload")
+    return user_id
 
 
 def _supabase():

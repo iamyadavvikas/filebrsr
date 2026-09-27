@@ -29,16 +29,13 @@ echo "→ Pulling images"
 export TAG ECR_REGISTRY
 docker compose -f docker-compose.prod.yml pull frontend backend worker
 
-# 3. Fetch secrets from AWS Secrets Manager onto .env
-echo "→ Fetching secrets"
-AWS_REGION="${AWS_REGION:-ap-south-1}"
-"$(dirname "$0")/fetch-secrets.sh" > .env.tmp 2>/dev/null
-grep -v '^TAG=' .env 2>/dev/null >> .env.tmp || true
+# 3. Persist TAG to .env so `docker compose` resolves variables on next restart
+#    (compose reads ./.env automatically)
+grep -v '^TAG=' .env 2>/dev/null > .env.tmp || true
 grep -v '^ECR_REGISTRY=' .env.tmp > .env.tmp2 || true
 mv .env.tmp2 .env.tmp
 echo "TAG=$TAG"                   >> .env.tmp
 echo "ECR_REGISTRY=$ECR_REGISTRY" >> .env.tmp
-echo "AWS_REGION=$AWS_REGION"     >> .env.tmp
 mv .env.tmp .env
 
 # 4. Recreate containers (zero-downtime for nginx: it only restarts if config changed)
@@ -88,7 +85,33 @@ if [[ "$ok" != "1" ]]; then
   exit 1
 fi
 
-# 6. Record the new live tag and prune old images
+# 6. TLS renewal — non-fatal: app is already healthy; a failed renewal logs here
+#    and retries on the next deploy (certbot sidecar also retries every 12h).
+echo "→ Checking disk (certbot renew needs room to write new certs)"
+DISK_PCT="$(df -h / | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
+echo "   Root disk usage: ${DISK_PCT}%"
+if [[ "${DISK_PCT:-0}" -ge 85 ]]; then
+  echo "⚠ Disk ≥85% full — pruning docker to free space"
+  docker system prune -f >/dev/null 2>&1 || true
+  docker image prune -af --filter "until=48h" >/dev/null 2>&1 || true
+fi
+
+echo "→ Renewing Let's Encrypt certificate"
+# Stop the certbot sidecar first: its entrypoint is a 12h loop, so a plain
+# `docker compose run certbot ...` would start a second infinite loop and
+# hang the deploy (and both instances fight over the letsencrypt lock).
+docker compose -f docker-compose.prod.yml stop certbot >/dev/null 2>&1 || true
+timeout 10m docker compose -f docker-compose.prod.yml run --rm \
+  --entrypoint certbot certbot renew --force-renewal -v \
+  && echo "   ✓ certificate renewed" \
+  || echo "⚠ certbot renew failed — cert unchanged; will retry next deploy (see CI log)"
+docker compose -f docker-compose.prod.yml start certbot >/dev/null 2>&1 || true
+docker compose -f docker-compose.prod.yml exec nginx nginx -s reload || true
+
+# 7. Record the new live tag and prune old images
+if [[ -n "$PREV_TAG" ]]; then
+  echo "$PREV_TAG" > .previous_tag
+fi
 echo "$TAG" > .current_tag
 docker image prune -af --filter "until=168h" >/dev/null 2>&1 || true
 

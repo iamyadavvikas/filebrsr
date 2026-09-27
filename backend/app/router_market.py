@@ -11,6 +11,7 @@ from datetime import datetime, date
 import io
 import json
 
+from app.auth import get_user_id_from_header as get_user_id
 from app.config import get_settings
 from app.email_service import (
     send_team_invite, send_filing_reminder, send_extraction_complete,
@@ -24,18 +25,6 @@ settings = get_settings()
 def get_supabase_admin():
     from supabase import create_client
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-
-
-async def get_user_id(authorization: str) -> str:
-    token = authorization.replace("Bearer ", "")
-    if not token:
-        raise HTTPException(status_code=401, detail="Missing auth token")
-    try:
-        import jwt as pyjwt
-        payload = pyjwt.decode(token, options={"verify_signature": False})
-        return payload.get("sub", token)
-    except Exception:
-        return token
 
 
 # ═══════════════════════════════════════════════════════════════

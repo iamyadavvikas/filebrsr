@@ -13,6 +13,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
 from fastapi.responses import JSONResponse
 
+from app.auth import get_user_id_from_header as get_user_id
 from app.config import get_settings
 from app.brsr_datapoints import BRSR_DATAPOINTS
 
@@ -46,18 +47,6 @@ XBRL_TYPE_MAP = {
 def get_supabase_admin():
     from supabase import create_client
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
-
-
-async def get_user_id(authorization: str) -> str:
-    token = authorization.replace("Bearer ", "")
-    if not token:
-        raise HTTPException(status_code=401, detail="Missing auth token")
-    try:
-        import jwt as pyjwt
-        payload = pyjwt.decode(token, options={"verify_signature": False})
-        return payload.get("sub", token)
-    except Exception:
-        return token
 
 
 def dp_to_xbrl_concept(dp_id: str) -> str:

@@ -34,6 +34,8 @@ services:
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -43,6 +45,10 @@ services:
       - ENVIRONMENT=production
       - SENTRY_DSN=${SENTRY_DSN}
       - RESEND_API_KEY=${RESEND_API_KEY}
+      - CSRD_GUEST_ENABLED=${CSRD_GUEST_ENABLED:-false}
+      - CSRD_GUEST_TTL_HOURS=${CSRD_GUEST_TTL_HOURS:-72}
+      - CSRD_GUEST_RATE_MINUTE=${CSRD_GUEST_RATE_MINUTE:-20}
+      - CSRD_GUEST_MAX_REPORTS=${CSRD_GUEST_MAX_REPORTS:-5}
       - PORT=8000
     ports:
       - "8000:8000"
@@ -64,6 +70,7 @@ services:
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -133,6 +140,7 @@ services:
       - ./nginx/certbot/conf:/etc/letsencrypt
       - ./nginx/certbot/www:/var/www/certbot
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    restart: always
 
 volumes:
   prometheus_data:

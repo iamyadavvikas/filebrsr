@@ -119,7 +119,7 @@ export default function FrameworksClient() {
 
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Multi-Framework Mapping</h1>
-        <p className="text-gray-500 text-sm mt-1">Cross-reference BRSR datapoints with GRI, CDP, TCFD, SASB, UNGC &amp; SDGs</p>
+        <p className="text-gray-500 text-sm mt-1">Cross-reference BRSR datapoints with GRI, CDP, TCFD, SASB, UNGC, SDGs, ESRS (CSRD) &amp; IFRS S1/S2</p>
       </div>
 
       {/* Framework Coverage */}

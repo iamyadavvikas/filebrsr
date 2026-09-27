@@ -1,10 +1,24 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download, AlertTriangle, FileText, Loader2, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { Download, AlertTriangle, FileText, Loader2, ShieldCheck, BadgeCheck } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://filebrsr.com";
+
+interface AssuranceBlock {
+  applicable: boolean;
+  tier: string | null;
+  ready: boolean;
+  coverage_pct: number;
+  assured_kpis: number;
+  total_kpis: number;
+  required_mode: string;
+  required_by_year: string | null;
+  blockers: { kpi_code: string; kpi_label: string }[];
+  blocker_count: number;
+}
 
 interface ValidationResult {
   ready_for_filing: boolean;
@@ -21,6 +35,7 @@ interface ValidationResult {
   missing_mandatory_count: number;
   missing_core_count: number;
   missing_by_section: Record<string, { id: string; label: string; core: boolean }[]>;
+  assurance: AssuranceBlock;
 }
 
 interface Props {
@@ -73,7 +88,7 @@ export default function XBRLClient({ financialYear }: Props) {
     try {
       const token = await getToken();
       const res = await fetch(
-        `${API_BASE}/api/v2/filing/xbrl-xml?financial_year=${fy}`,
+        `${API_BASE}/api/v2/filing/xbrl-xml?financial_year=${fy}&enforce_assurance=true`,
         { method: "POST", headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) {
@@ -100,7 +115,7 @@ export default function XBRLClient({ financialYear }: Props) {
     try {
       const token = await getToken();
       const res = await fetch(
-        `${API_BASE}/api/v2/filing/sebi-pdf?financial_year=${fy}`,
+        `${API_BASE}/api/v2/filing/sebi-pdf?financial_year=${fy}&enforce_assurance=true`,
         { method: "POST", headers: { Authorization: `Bearer ${token}` } }
       );
       if (!res.ok) {
@@ -190,6 +205,53 @@ export default function XBRLClient({ financialYear }: Props) {
               <p className="text-lg font-bold text-amber-600">{validation.missing_mandatory_count}</p>
             </div>
           </div>
+          {validation.assurance && (
+            <div
+              className={`mt-4 rounded-lg border p-3 ${
+                !validation.assurance.applicable
+                  ? "bg-gray-50 border-gray-200"
+                  : validation.assurance.ready
+                    ? "bg-teal-50 border-teal-200"
+                    : "bg-rose-50 border-rose-200"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <BadgeCheck className={`w-5 h-5 ${validation.assurance.ready ? "text-teal-600" : "text-rose-600"}`} />
+                  <p className="text-sm font-semibold">
+                    BRSR Core assurance: {validation.assurance.assured_kpis}/{validation.assurance.total_kpis} guarded
+                  </p>
+                </div>
+                <Link
+                  href="/platform/assurance-core"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                >
+                  Manage in Cockpit →
+                </Link>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                {!validation.assurance.applicable
+                  ? "No market-cap band declared — assurance gate is advisory for this org."
+                  : validation.assurance.ready
+                    ? `Meets ${validation.assurance.required_mode} requirement${validation.assurance.required_by_year ? ` (effective ${validation.assurance.required_by_year})` : ""}. Filing gate will pass.`
+                    : `${validation.assurance.blocker_count} KPI${validation.assurance.blocker_count === 1 ? "" : "s"} not yet assured — filing downloads are blocked (409) until resolved.`}
+              </p>
+              {!validation.assurance.ready && validation.assurance.applicable && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(validation.assurance.blockers ?? []).slice(0, 8).map((b) => (
+                    <span key={b.kpi_code} className="text-[11px] font-mono bg-white/70 border border-rose-200 rounded-full px-2 py-0.5 text-rose-700">
+                      {b.kpi_code}
+                    </span>
+                  ))}
+                  {validation.assurance.blocker_count > 8 && (
+                    <span className="text-[11px] text-rose-600 font-semibold self-center">
+                      +{validation.assurance.blocker_count - 8} more
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

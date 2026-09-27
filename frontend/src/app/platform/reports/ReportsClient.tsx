@@ -14,6 +14,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getAccessToken } from "@/lib/supabase/token";
 
 interface ExtractionReport {
   id: string;
@@ -81,7 +82,7 @@ export default function ReportsClient({ initialReports }: { initialReports: Extr
       const { data: { user } } = await supabase.auth.getUser();
       const res = await fetch(`/backend/api/platform/reports/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${user?.id || ""}` },
+        headers: { Authorization: `Bearer ${(await getAccessToken()) || user?.id || ""}` },
       });
       if (res.ok) {
         setReports((prev) => prev.filter((r) => r.id !== id));
@@ -100,7 +101,7 @@ export default function ReportsClient({ initialReports }: { initialReports: Extr
       for (const id of selected) {
         await fetch(`/backend/api/platform/reports/${id}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${user?.id || ""}` },
+          headers: { Authorization: `Bearer ${(await getAccessToken()) || user?.id || ""}` },
         });
       }
       setReports((prev) => prev.filter((r) => !selected.has(r.id)));

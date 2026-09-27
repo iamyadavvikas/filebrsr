@@ -6,7 +6,9 @@ Each data point follows the ESRS structure:
 - label: Short description of the disclosure
 - data_type: One of narrative, boolean, integer, monetary, percent, decimal, date, gyear, table, enumeration, mass, energy, volume, area, intensity
 - mandatory: True if required by SEBI BRSR
-- core: True if part of BRSR Core (subject to assurance)
+- core: True if part of BRSR Core (subject to assurance). Canonicalized at
+  import time from brsr_core.DATAPOINT_TO_BRSC — the literal flags below are
+  legacy hints; the runtime value derives from the nine-attribute registry.
 - indicator_type: essential or leadership
 - esrs_ref: Cross-reference to ESRS standard (where applicable)
 - conditional: True if only applicable in certain circumstances
@@ -17,6 +19,8 @@ Based on:
 - SEBI BRSR Core Annexure I
 - EFRAG IG 3 List of ESRS Data Points methodology
 """
+
+from app.brsr_core import DATAPOINT_TO_BRSC
 
 # Data types following EFRAG IG 3 / XBRL taxonomy
 DATA_TYPES = {
@@ -345,6 +349,7 @@ BRSR_DATAPOINTS = [
     {"id": "C.P1.E.21", "label": "Sales to related parties as % of Total Sales (RPT)", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
     {"id": "C.P1.E.22", "label": "Loans & advances to related parties as % of Total Loans & advances (RPT)", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
     {"id": "C.P1.E.23", "label": "Investments in related parties as % of Total Investments (RPT)", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
+    {"id": "C.P1.E.24", "label": "Purchases from top 10 trading houses as % of total purchases from trading houses", "data_type": "percent", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_1", "esrs_ref": None, "conditional": False, "paragraph_ref": "P1 Essential Q9"},
 
     # PRINCIPLE 3 — Additional essential & leadership
     {"id": "C.P3.E.26", "label": "% of plants/offices assessed for working conditions", "data_type": "percent", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_3", "esrs_ref": None, "conditional": False, "paragraph_ref": "P3 Essential Q14"},
@@ -353,6 +358,7 @@ BRSR_DATAPOINTS = [
     {"id": "C.P3.E.29", "label": "Whether workers can report work-related hazards and remove themselves from risks (Y/N)", "data_type": "boolean", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_3", "esrs_ref": "ESRS S1-14", "conditional": False, "paragraph_ref": "P3 Essential Q10c"},
     {"id": "C.P3.E.30", "label": "Whether employees/workers have access to non-occupational medical/healthcare services (Y/N)", "data_type": "boolean", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_c", "subsection": "principle_3", "esrs_ref": "ESRS S1-14", "conditional": False, "paragraph_ref": "P3 Essential Q10d"},
     {"id": "C.P3.E.31", "label": "Complaints on Working Conditions - Filed/Pending/Resolved (current + preceding FY)", "data_type": "table", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_3", "esrs_ref": "ESRS S1-17", "conditional": False, "paragraph_ref": "P3 Essential Q13"},
+    {"id": "C.P3.E.32", "label": "Number of permanent disabilities among employees and workers", "data_type": "integer", "mandatory": True, "core": True, "indicator_type": "essential", "section": "section_c", "subsection": "principle_3", "esrs_ref": "ESRS S1-17", "conditional": False, "paragraph_ref": "P3 Essential Q11"},
     {"id": "C.P3.L.5", "label": "Measures undertaken to ensure statutory dues deposited by value chain partners", "data_type": "narrative", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_3", "esrs_ref": None, "conditional": False, "paragraph_ref": "P3 Leadership Q2"},
     {"id": "C.P3.L.6", "label": "% of value chain partners assessed for health and safety practices", "data_type": "percent", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_3", "esrs_ref": None, "conditional": False, "paragraph_ref": "P3 Leadership Q5"},
     {"id": "C.P3.L.7", "label": "% of value chain partners assessed for working conditions", "data_type": "percent", "mandatory": False, "core": False, "indicator_type": "leadership", "section": "section_c", "subsection": "principle_3", "esrs_ref": None, "conditional": False, "paragraph_ref": "P3 Leadership Q5"},
@@ -470,6 +476,18 @@ BRSR_DATAPOINTS = [
     {"id": "B.17", "label": "Whether entity lacks financial/human/technical resources for certain principles (P1-P9)", "data_type": "table", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_b", "subsection": "policy_management", "esrs_ref": None, "conditional": True, "paragraph_ref": "Section B.12"},
     {"id": "B.18", "label": "Whether planned to be done in next FY for certain principles (P1-P9)", "data_type": "table", "mandatory": True, "core": False, "indicator_type": "essential", "section": "section_b", "subsection": "policy_management", "esrs_ref": None, "conditional": True, "paragraph_ref": "Section B.12"},
 ]
+
+# ═══════════════════════════════════════════════════════════
+# Canonical core flags — reconciled against the BRSR Core registry
+# ═══════════════════════════════════════════════════════════
+# The legacy literal `core` flags above over-flagged (~121 ids) because most
+# mandatory fields were treated as "Core". BRSR Core is exactly the nine
+# ESG attributes with 43 assurable parameters (see brsr_core.py). The runtime
+# `core` value is derived from DATAPOINT_TO_BRSC so the catalog can never
+# drift from the canonical registry — keeping an id's `core: True` here is no
+# longer sufficient to mark it as Core.
+for _dp in BRSR_DATAPOINTS:
+    _dp["core"] = _dp["id"] in DATAPOINT_TO_BRSC
 
 
 # ═══════════════════════════════════════════════════════════

@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAnalytics } from "@/lib/analytics";
+import { getAccessToken } from "@/lib/supabase/token";
 import {
   Loader2,
   FileText,
@@ -354,7 +355,7 @@ function PastExtractions({ userId, initialReports }: { userId: string; initialRe
     try {
       const res = await fetch(`/backend/api/platform/reports/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${userId}` },
+        headers: { Authorization: `Bearer ${(await getAccessToken()) || userId}` },
       });
       if (res.ok) {
         setReports((prev) => prev.filter((r) => r.id !== id));
@@ -372,7 +373,7 @@ function PastExtractions({ userId, initialReports }: { userId: string; initialRe
       for (const id of selected) {
         await fetch(`/backend/api/platform/reports/${id}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${userId}` },
+          headers: { Authorization: `Bearer ${(await getAccessToken()) || userId}` },
         });
       }
       setReports((prev) => prev.filter((r) => !selected.has(r.id)));

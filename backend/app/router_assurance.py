@@ -26,6 +26,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Header, HTTPException, Query
 
+from app.auth import resolve_user_id
 from app.assurance import crypto, store
 from app.assurance import provenance as prov_mod
 from app.assurance.factors import REGION_LABELS
@@ -94,12 +95,7 @@ async def _resolve_org_id(authorization: str) -> tuple[object, str]:
     token = (authorization or "").replace("Bearer ", "").strip()
     if not token:
         raise HTTPException(status_code=401, detail="Missing auth token")
-    try:
-        import jwt as pyjwt
-
-        user_id = pyjwt.decode(token, options={"verify_signature": False}).get("sub", token)
-    except Exception:  # noqa: BLE001
-        user_id = token
+    user_id = resolve_user_id(token)
 
     sb = get_supabase_admin()
     profile = (
