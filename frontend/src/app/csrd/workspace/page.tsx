@@ -28,6 +28,7 @@ import {
   FlaskConical,
   X,
   Upload,
+  Sprout,
 } from "lucide-react";
 import {
   detectMode,
@@ -89,6 +90,11 @@ import {
   extractPdf,
   confirmCandidate,
   sessionToken,
+  vsmeCatalog,
+  vsmeUpgrade,
+  applyVsmePrefill,
+  type VSMEMetric,
+  type VSMEPrefill,
   listEvidenceDocuments,
   fetchAuditTrail,
   downloadBoardPack,
@@ -106,8 +112,8 @@ import {
 import { AuthSessionError } from "@/lib/supabase/session";
 import { createClient } from "@/lib/supabase/client";
 
-type Tab = "overview" | "registry" | "materiality" | "reports";
-const TABS: Tab[] = ["overview", "registry", "materiality", "reports"];
+type Tab = "overview" | "registry" | "materiality" | "reports" | "vsme";
+const TABS: Tab[] = ["overview", "registry", "materiality", "reports", "vsme"];
 
 const FY_OPTIONS = ["FY2024", "FY2025", "FY2026", "FY2027", "FY2028"];
 
@@ -338,6 +344,7 @@ function CsrdWorkspace() {
             { key: "registry" as Tab, label: "Registry", icon: RegistryIcon },
             { key: "materiality" as Tab, label: "Materiality", icon: Scale },
             { key: "reports" as Tab, label: "Reports", icon: FileText },
+            { key: "vsme" as Tab, label: "VSME Start", icon: Sprout },
           ].map((t) => {
             const Icon = t.icon;
             const active = tab === t.key;
@@ -404,6 +411,7 @@ function CsrdWorkspace() {
             {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} initialQuery={searchParams.get("q") || ""} goToReports={() => changeTab("reports")} />}
             {tab === "materiality" && <MaterialityTab financialYear={financialYear} mode={mode} notify={notify} />}
             {tab === "reports" && <ReportsTab financialYear={financialYear} mode={mode} notify={notify} />}
+            {tab === "vsme" && <VsmeTab financialYear={financialYear} notify={notify} />}
           </>
         )}
       </div>
@@ -659,6 +667,160 @@ function Loader({ center }: { center?: boolean }) {
 // ───────────────────────────────────────────────────────────────────────────
 
 const STANDARD_OPTIONS = ["", "2", "E1", "E2", "E3", "E4", "E5", "S1", "S2", "S3", "S4", "G1"];
+
+// VSME on-ramp (guided SME questionnaire -> ESRS prefill)
+// ───────────────────────────────────────────────────────────────────────────
+
+const VSME_AREA_NAMES: Record<string, string> = {
+  B1: "Basis for preparation",
+  B2: "Practices, policies & future initiatives",
+  B3: "Energy & GHG emissions",
+  B4: "Pollution",
+  B5: "Biodiversity",
+  B6: "Water",
+  B7: "Resource use, circularity & waste",
+  B8: "Workforce — general",
+  B9: "Workforce — health & safety",
+  B10: "Governance & anti-corruption",
+  B11: "Business conduct anchors",
+};
+
+function VsmeTab({ financialYear, notify }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void }) {
+  const [metrics, setMetrics] = useState<VSMEMetric[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [preview, setPreview] = useState<VSMEPrefill[]>([]);
+  const [unmapped, setUnmapped] = useState<string[]>([]);
+  const [working, setWorking] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    vsmeCatalog()
+      .then((d) => setMetrics(d.metrics))
+      .catch((e) => notify(e as Error, false));
+  }, [notify]);
+
+  const set = (code: string, value: string) => {
+    setAnswers((prev) => ({ ...prev, [code]: value }));
+    setPreview([]);
+  };
+
+  const parseAnswer = (m: VSMEMetric, raw: string): unknown => {
+    const t = raw.trim();
+    if (!t) return null;
+    if (m.data_type === "integer") {
+      const n = Number(t.replace(/,/g, ""));
+      return Number.isFinite(n) ? Math.round(n) : t;
+    }
+    if (m.data_type === "number") {
+      const n = Number(t.replace(/,/g, ""));
+      return Number.isFinite(n) ? n : t;
+    }
+    if (m.data_type === "boolean") return t === "true" || t.toLowerCase() === "yes";
+    return t;
+  };
+
+  const runPreview = async () => {
+    setWorking(true);
+    try {
+      const parsed: Record<string, unknown> = {};
+      for (const m of metrics) {
+        const v = parseAnswer(m, answers[m.code] || "");
+        if (v !== null && v !== "") parsed[m.code] = v;
+      }
+      const out = await vsmeUpgrade(parsed);
+      setPreview(out.entries);
+      setUnmapped(out.unmapped);
+      notify(out.entries.length ? `${out.entries.length} ESRS datapoint(s) prefilled from your answers` : "No mappable answers yet — fill a few fields first");
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const saveAll = async () => {
+    setSaving(true);
+    try {
+      const n = await applyVsmePrefill(financialYear, preview);
+      notify(`${n} prefilled value(s) saved to the registry — verify before filing`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const groups = new Map<string, VSMEMetric[]>();
+  for (const m of metrics) {
+    if (!groups.has(m.area)) groups.set(m.area, []);
+    groups.get(m.area)!.push(m);
+  }
+  const answered = Object.values(answers).filter((v) => v.trim() !== "").length;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6">
+        <h2 className="font-bold text-slate-900">VSME on-ramp</h2>
+        <p className="text-sm text-slate-500 mt-1">Answer the SME-scale questionnaire once ({metrics.length} metrics across B1–B11) — we prefill the matching ESRS datapoints so the registry starts populated. {answered} answered.</p>
+      </div>
+      {[...groups.entries()].map(([area, list]) => (
+        <div key={area} className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h3 className="text-sm font-extrabold text-slate-800">{area} — {VSME_AREA_NAMES[area] || area}</h3>
+          <div className="mt-3 space-y-3">
+            {list.map((m) => (
+              <div key={m.code} className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="flex-1 text-sm text-slate-700" title={m.maps_to.join(", ") || m.narrative_feeds || ""}>
+                  <span className="font-mono text-[11px] text-blue-700 mr-2">{m.code}</span>
+                  {m.name}
+                  {m.unit && <span className="ml-1 text-[11px] text-slate-400">({m.unit})</span>}
+                  {!m.required && <span className="ml-1 text-[10px] text-slate-400">optional</span>}
+                </label>
+                {m.data_type === "boolean" ? (
+                  <select value={answers[m.code] || ""} onChange={(e) => set(m.code, e.target.value)} className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm w-40">
+                    <option value="">—</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                ) : m.data_type === "narrative" || m.data_type === "composite" ? (
+                  <input value={answers[m.code] || ""} onChange={(e) => set(m.code, e.target.value)} placeholder="Text…" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm flex-1 sm:max-w-xs" />
+                ) : (
+                  <input value={answers[m.code] || ""} onChange={(e) => set(m.code, e.target.value)} placeholder={m.unit || "Value"} inputMode="decimal" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm w-40" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        <button onClick={runPreview} disabled={working} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-bold px-5 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+          {working ? "Computing…" : "Preview ESRS prefill"}
+        </button>
+        {preview.length > 0 && (
+          <button onClick={saveAll} disabled={saving} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-bold px-5 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}>
+            {saving ? "Saving…" : `Save ${preview.length} to registry`}
+          </button>
+        )}
+      </div>
+      {unmapped.length > 0 && (
+        <p className="text-[11px] text-slate-400">Narrative-only answers ({unmapped.length}) feed policy text, not numbers: {unmapped.slice(0, 6).join(", ")}{unmapped.length > 6 ? "…" : ""}</p>
+      )}
+      {preview.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 text-sm font-semibold text-slate-700">Prefill preview ({preview.length})</div>
+          <ul className="divide-y divide-slate-50 max-h-80 overflow-y-auto">
+            {preview.map((e) => (
+              <li key={e.datapoint_id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
+                <span className="font-mono text-xs text-slate-500 w-32 shrink-0 truncate" title={e.datapoint_id}>{e.datapoint_id}</span>
+                <span className="flex-1 text-slate-700 truncate" title={String(e.value ?? "")}>{String(e.value ?? "—")}</span>
+                <span className="text-[10px] text-slate-400">vsme-feeder</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Upload & Extract (PDF annual report -> reviewable ESRS candidates)
 // ───────────────────────────────────────────────────────────────────────────
