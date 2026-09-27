@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -113,6 +113,7 @@ import {
   STAKEHOLDER_GROUPS,
   ENGAGEMENT_METHODS,
 } from "@/lib/csrd/workspace";
+import { nextAction, stepStates, focusQueue as buildFocusQueue } from "@/lib/csrd/journey";
 import { AuthSessionError } from "@/lib/supabase/session";
 import { createClient } from "@/lib/supabase/client";
 
@@ -221,7 +222,11 @@ function CsrdWorkspace() {
   );
 
   const changeTab = (t: Tab) => {
-    syncUrl({ tab: t, fy: financialYear });
+    syncUrl({ tab: t, fy: financialYear, focus: "" });
+  };
+
+  const goToFocus = (id: string) => {
+    syncUrl({ tab: "registry", fy: financialYear, q: "", focus: id });
   };
 
   const changeFy = (fy: string) => {
@@ -411,12 +416,77 @@ function CsrdWorkspace() {
           </div>
         ) : (
           <>
-            {tab === "overview" && <OverviewTab financialYear={financialYear} mode={mode} notify={notify} goToRegistry={() => changeTab("registry")} valueChainScope={valueChainScope} />}
-            {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} initialQuery={searchParams.get("q") || ""} goToReports={() => changeTab("reports")} />}
+            {tab === "overview" && <OverviewTab financialYear={financialYear} mode={mode} notify={notify} goToRegistry={() => changeTab("registry")} goToMateriality={() => changeTab("materiality")} goToReports={() => changeTab("reports")} goToVsme={() => changeTab("vsme")} goToFocus={goToFocus} valueChainScope={valueChainScope} />}
+            {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} initialQuery={searchParams.get("q") || ""} initialFocus={searchParams.get("focus") || ""} goToReports={() => changeTab("reports")} />}
             {tab === "materiality" && <MaterialityTab financialYear={financialYear} mode={mode} notify={notify} />}
             {tab === "reports" && <ReportsTab financialYear={financialYear} mode={mode} notify={notify} />}
             {tab === "vsme" && <VsmeTab financialYear={financialYear} notify={notify} />}
           </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Guided journey: stepper + next action (Overview)
+// ───────────────────────────────────────────────────────────────────────────
+
+function StepTracker({ state, go }: {
+  state: import("@/lib/csrd/journey").JourneyState;
+  go: (tab: "overview" | "registry" | "materiality" | "reports" | "vsme") => void;
+}) {
+  const steps = stepStates(state);
+  return (
+    <ol className="flex flex-wrap items-center gap-1.5 mt-3">
+      {steps.map((s, i) => (
+        <li key={s.id} className="flex items-center gap-1.5">
+          {i > 0 && <span className="text-slate-300 text-xs">→</span>}
+          <button
+            onClick={() => go(s.tab)}
+            title={s.state === "done" ? "Completed — review" : s.state === "current" ? "Do this next" : "Locked until prior steps progress"}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${
+              s.state === "done"
+                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                : s.state === "current"
+                  ? "bg-violet-600 text-white shadow hover:bg-violet-700"
+                  : "bg-white border border-slate-200 text-slate-400"
+            }`}
+          >
+            {s.state === "done" ? <Check className="w-3 h-3" /> : <span className="w-4 h-4 rounded-full border border-current flex items-center justify-center text-[9px]">{i + 1}</span>}
+            {s.label}
+          </button>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function NextActionHero({ state, coverage, go }: {
+  state: import("@/lib/csrd/journey").JourneyState;
+  coverage: DMACoverage | null;
+  go: (tab: "overview" | "registry" | "materiality" | "reports" | "vsme") => void;
+}) {
+  const action = nextAction(state);
+  return (
+    <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex-1">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600">Do this next</p>
+        <p className="text-base font-extrabold text-slate-900 mt-0.5">{action.title}</p>
+        <p className="text-xs text-slate-500 mt-1">{action.detail}</p>
+        {coverage && (
+          <p className={`mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${coverage.audit_ready ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+            {coverage.audit_ready ? "Audit-ready methodology" : `Methodology ${coverage.methodology_status} · ${coverage.orphan_iro_ids.length} orphan IRO(s) · ${coverage.stakeholder_records} engagement(s)`}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col gap-2 flex-shrink-0">
+        <button onClick={() => go(action.tab)} className="rounded-xl text-white text-sm font-bold px-5 py-2.5" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+          {action.cta} →
+        </button>
+        {action.step === "start" && (
+          <button onClick={() => go("vsme")} className="rounded-xl border border-blue-300 bg-white px-5 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50">
+            New to ESRS? Start with VSME
+          </button>
         )}
       </div>
     </div>
@@ -432,17 +502,28 @@ function OverviewTab({
   mode,
   notify,
   goToRegistry,
+  goToMateriality,
+  goToReports,
+  goToVsme,
+  goToFocus,
   valueChainScope,
 }: {
   financialYear: string;
   mode: CsrdMode;
   notify: (m: string | Error, ok?: boolean) => void;
   goToRegistry: () => void;
+  goToMateriality: () => void;
+  goToReports: () => void;
+  goToVsme: () => void;
+  goToFocus: (id: string) => void;
   valueChainScope: string[];
 }) {
   const [gap, setGap] = useState<GapSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [standards, setStandards] = useState<StandardMeta[]>([]);
+  const [iroList, setIroList] = useState<IRO[]>([]);
+  const [coverage, setCoverage] = useState<DMACoverage | null>(null);
+  const [reportCount, setReportCount] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -454,7 +535,10 @@ function OverviewTab({
         listIro(financialYear).catch(() => [] as IRO[]),
       ]);
       setStandards(standardsMeta);
+      setIroList(iro);
       setGap(computeGap(reg, entries.entries, standardsMeta, financialYear, { valueChainScope, iro }));
+      dmaCoverage(financialYear).then(setCoverage).catch(() => setCoverage(null));
+      listReports(financialYear).then((r) => setReportCount(r.length)).catch(() => setReportCount(0));
     } catch (e) {
       notify(e as Error);
     } finally {
@@ -501,11 +585,23 @@ function OverviewTab({
                   ? "A throwaway workspace — nothing you do here is filed with a regulator."
                   : "Everything is saved in this browser, ready to explore."}
               </p>
-              <ol className="text-xs text-slate-600 mt-2 space-y-1">
-                <li><span className="font-semibold text-violet-700">1.</span> Assess datapoints in the registry (or load sample data)</li>
-                <li><span className="font-semibold text-violet-700">2.</span> Record impacts, risks &amp; opportunities in Materiality</li>
-                <li><span className="font-semibold text-violet-700">3.</span> Generate your ESRS statement in Reports</li>
-              </ol>
+              <StepTracker
+                state={{
+                  entriesAssessed: gap.handled,
+                  entriesTotal: gap.total_datapoints,
+                  iroCount: iroList.length,
+                  orphanIroIds: coverage?.orphan_iro_ids || [],
+                  methodologyStatus: coverage?.methodology_status || "draft",
+                  stakeholderRecords: coverage?.stakeholder_records || 0,
+                  reportsGenerated: reportCount,
+                }}
+                go={(tab) =>
+                  tab === "registry" ? goToRegistry()
+                  : tab === "materiality" ? goToMateriality()
+                  : tab === "reports" ? goToReports()
+                  : goToVsme()
+                }
+              />
             </div>
           </div>
           <div className="flex gap-2 flex-shrink-0">
@@ -520,6 +616,25 @@ function OverviewTab({
       )}
 
       <RolloverCard financialYear={financialYear} mode={mode} notify={notify} />
+
+      <NextActionHero
+        state={{
+          entriesAssessed: gap.handled,
+          entriesTotal: gap.total_datapoints,
+          iroCount: iroList.length,
+          orphanIroIds: coverage?.orphan_iro_ids || [],
+          methodologyStatus: coverage?.methodology_status || "draft",
+          stakeholderRecords: coverage?.stakeholder_records || 0,
+          reportsGenerated: reportCount,
+        }}
+        coverage={coverage}
+        go={(tab) =>
+          tab === "registry" ? goToRegistry()
+          : tab === "materiality" ? goToMateriality()
+          : tab === "reports" ? goToReports()
+          : goToVsme()
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* readiness ring card */}
@@ -601,11 +716,11 @@ function OverviewTab({
         <p className="text-xs text-slate-400 mt-0.5 mb-4">These disclosures anchor the whole statement. Assess them first, then move to the topical standards.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {PRIORITY_DPS.map((id) => (
-            <div key={id} className="rounded-xl border border-slate-200 p-4">
+            <button key={id} onClick={() => goToFocus(id)} className="text-left rounded-xl border border-slate-200 p-4 hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
               <p className="text-xs font-bold text-blue-700">{id}</p>
               <p className="text-xs text-slate-500 mt-1">{STANDARD_META[id.split(".")[0]]?.split(" — ")[1] || id}</p>
-              <span className="mt-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">gating disclosure</span>
-            </div>
+              <span className="mt-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">gating disclosure → assess</span>
+            </button>
           ))}
         </div>
       </div>
@@ -1151,7 +1266,7 @@ function EvidenceHistory({ financialYear, datapointId, evidence, onAttach, notif
     </div>
   );
 }
-function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void; initialQuery?: string; goToReports: () => void }) {
+function RegistryTab({ financialYear, mode, notify, initialQuery, initialFocus, goToReports }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void; initialQuery?: string; initialFocus?: string; goToReports: () => void }) {
   const [items, setItems] = useState<RegistryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState(initialQuery || "");
@@ -1168,6 +1283,10 @@ function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }:
   const [draftNotes, setDraftNotes] = useState("");
   const [roster, setRoster] = useState<IRO[]>([]);
   const [draftMaterialityId, setDraftMaterialityId] = useState("");
+  const [focusQueue, setFocusQueue] = useState<string[]>([]);
+  const [focusIdx, setFocusIdx] = useState(0);
+  const [focusOn, setFocusOn] = useState(false);
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const LIMIT = 25;
 
@@ -1263,6 +1382,110 @@ function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }:
 
   const hasMaterialIro = roster.some((r) => r.material);
 
+  useEffect(() => {
+    if (!focusOn) return;
+    const id = focusQueue[focusIdx];
+    if (!id) return;
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    const existing = entriesByDp[id];
+    setSelected(item);
+    setDraftStatus(existing?.status || "not_assessed");
+    setDraftValue(existing?.value == null ? "" : typeof existing.value === "object" ? JSON.stringify(existing.value) : String(existing.value));
+    setDraftEvidence(existing?.evidence || "");
+    setDraftNotes(existing?.notes || "");
+    setDraftMaterialityId(existing?.materiality_id || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusOn, focusIdx]);
+
+  const startFocus = useCallback(async () => {
+    const unassessed = items.filter((i) => {
+      const s = entriesByDp[i.id]?.status || "not_assessed";
+      return !HANDLED.has(s);
+    });
+    if (unassessed.length === 0) {
+      notify("Nothing left to assess in this view — well done.");
+      return;
+    }
+    let order: string[] = ["2", "E1", "E2", "E3", "E4", "E5", "S1", "S2", "S3", "S4", "G1"];
+    try {
+      const meta = await fetchStandards();
+      order = [...meta].sort((a, b) => a.order - b.order).map((m) => m.standard);
+    } catch {
+      /* default order stands */
+    }
+    const assessed = new Set(Object.keys(entriesByDp).filter((id) => HANDLED.has(entriesByDp[id]?.status || "")));
+    setFocusQueue(buildFocusQueue(unassessed, assessed, order));
+    setFocusIdx(0);
+    setFocusOn(true);
+  }, [items, entriesByDp, notify]);
+
+  const exitFocus = useCallback(() => {
+    setFocusOn(false);
+    setFocusQueue([]);
+    setFocusIdx(0);
+  }, []);
+
+  const focusSaveNext = async () => {
+    const item = items.find((i) => i.id === focusQueue[focusIdx]);
+    if (!item) {
+      exitFocus();
+      return;
+    }
+    let value: unknown = null;
+    if (draftValue.trim() !== "") {
+      try {
+        value = JSON.parse(draftValue);
+      } catch {
+        value = draftValue;
+      }
+    }
+    await persist(item, draftStatus, value, draftEvidence, draftNotes, draftMaterialityId);
+    if (focusIdx + 1 >= focusQueue.length) {
+      notify("Focus queue complete — verify values before filing");
+      exitFocus();
+    } else {
+      setFocusIdx(focusIdx + 1);
+    }
+  };
+
+  const focusSkip = () => {
+    if (focusIdx + 1 >= focusQueue.length) exitFocus();
+    else setFocusIdx(focusIdx + 1);
+  };
+
+  useEffect(() => {
+    if (!focusOn) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        void focusSaveNext();
+      } else if (e.key === "Escape") {
+        exitFocus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  useEffect(() => {
+    if (!initialFocus || items.length === 0) return;
+    const load = async () => {
+      try {
+        const reg = await fullRegistry();
+        const item = reg.find((d) => d.id === initialFocus);
+        if (item) {
+          pick(item as RegistryItem);
+          requestAnimationFrame(() => rowRefs.current[initialFocus]?.scrollIntoView({ behavior: "smooth", block: "center" }));
+        }
+      } catch {
+        /* registry unavailable — ignore deep focus */
+      }
+    };
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length]);
+
   return (
     <div className="space-y-4">
       <ExtractImport financialYear={financialYear} notify={notify} onConfirmed={refreshEntries} />
@@ -1325,10 +1548,15 @@ function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }:
           <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
               <p className="text-sm font-semibold text-slate-700">{total} datapoints</p>
-              <div className="flex items-center gap-1 text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <button onClick={() => void startFocus()} className="text-[11px] font-bold text-white bg-slate-900 rounded-lg px-3 py-1.5 hover:bg-slate-700" title="Walk unassessed datapoints one by one (Ctrl+Enter saves, Esc exits)">
+                  Assess in focus
+                </button>
+                <div className="flex items-center gap-1 text-xs text-slate-400">
                 <button disabled={Boolean(statusF) || offset === 0} onClick={() => setOffset(Math.max(0, offset - LIMIT))} className="p-1 rounded hover:bg-slate-100 disabled:opacity-40">‹</button>
                 <span>{Math.floor(offset / LIMIT) + 1}</span>
                 <button disabled={Boolean(statusF) || offset + LIMIT >= total} onClick={() => setOffset(offset + LIMIT)} className="p-1 rounded hover:bg-slate-100 disabled:opacity-40">›</button>
+                </div>
               </div>
             </div>
             <div className="max-h-[600px] overflow-y-auto divide-y divide-slate-50">
@@ -1337,7 +1565,7 @@ function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }:
                 const sel = selected?.id === item.id;
                 const saving = savingId === item.id;
                 return (
-                  <div key={item.id} className={`px-5 py-3.5 transition-colors ${sel ? "bg-blue-50/70" : "hover:bg-slate-50"}`}>
+                  <div key={item.id} ref={(el) => { rowRefs.current[item.id] = el; }} className={`px-5 py-3.5 transition-colors ${sel ? "bg-blue-50/70" : "hover:bg-slate-50"}`}>
                     <div className="flex items-start justify-between gap-3">
                       <button className="text-left flex-1 min-w-0" onClick={() => pick(item)}>
                         <div className="flex items-center gap-2">
@@ -1469,6 +1697,42 @@ function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }:
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {focusOn && selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
+                Focus {Math.min(focusIdx + 1, focusQueue.length)} of {focusQueue.length}
+              </p>
+              <button onClick={exitFocus} className="text-slate-400 hover:text-slate-700 text-sm font-bold">Exit (Esc)</button>
+            </div>
+            <p className="text-xs font-bold text-blue-700 mt-2">{selected.id}</p>
+            <p className="font-semibold text-slate-900 mt-1 leading-6">{selected.name}</p>
+            <div className="mt-4 flex gap-2">
+              <select value={draftStatus} onChange={(e) => setDraftStatus(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+              </select>
+              <input
+                value={draftValue}
+                onChange={(e) => setDraftValue(e.target.value)}
+                placeholder="Value"
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono"
+              />
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button onClick={() => void focusSaveNext()} disabled={savingId === selected.id} className="flex-1 rounded-xl text-white text-sm font-bold py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+                Save &amp; next (Ctrl+Enter)
+              </button>
+              <button onClick={focusSkip} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                Skip
+              </button>
+            </div>
+            <div className="mt-3 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${focusQueue.length ? Math.round(((focusIdx + 1) / focusQueue.length) * 100) : 0}%` }} />
+            </div>
           </div>
         </div>
       )}
