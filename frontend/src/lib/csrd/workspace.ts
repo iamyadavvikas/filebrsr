@@ -1223,6 +1223,40 @@ export async function rolloverVariance(fromFy: string, toFy: string, threshold =
   return cloudJSON(`/rollover/variance?from_fy=${encodeURIComponent(fromFy)}&to_fy=${encodeURIComponent(toFy)}&threshold_pct=${threshold}`);
 }
 
+// ──────────────────────────────────────────────────── gap analysis ───
+
+export interface GapAnalysisReport {
+  rule_set_version: string | null;
+  rule_set_unset: boolean;
+  reporting_period?: string | null;
+  summary: string;
+  readiness_pct: number;
+  days_to_deadline?: number | null;
+  filing_deadline?: string | null;
+  standards: { standard: string; code?: string; name?: string; applicable_dps: number; assessed: number; gaps: number; computed_status: string }[];
+  gating: { id: string; name: string; status: string; owner: string; due_date?: string | null; risk: string }[];
+  gating_complete: number;
+  gating_total: number;
+  orphan_iros: string[];
+  value_chain_scope: Record<string, boolean>;
+  framework_mapping_coverage: Record<string, unknown>;
+  workflow: { key: string; title: string; work: string; exit: string; state: string }[];
+  qc: { key: string; label: string; met: boolean | null }[];
+  critical_findings: string[];
+}
+
+export async function gapAnalysisReport(
+  financialYear: string,
+  opts?: { ruleSet?: string; deadline?: string; daysToDeadline?: number }
+): Promise<GapAnalysisReport | null> {
+  if (!isServerMode(await detectMode())) return null;
+  const qs = new URLSearchParams({ financial_year: financialYear });
+  if (opts?.ruleSet) qs.set("rule_set_version", opts.ruleSet);
+  if (opts?.deadline) qs.set("filing_deadline", opts.deadline);
+  if (opts?.daysToDeadline != null) qs.set("days_to_deadline", String(opts.daysToDeadline));
+  return cloudJSON<GapAnalysisReport>(`/gap-report?${qs.toString()}`);
+}
+
 // ──────────────────────────────────────────────────────────── sample seed ─
 
 export async function seedDemo(financialYear: string): Promise<void> {

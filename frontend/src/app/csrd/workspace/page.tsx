@@ -90,6 +90,8 @@ import {
   extractPdf,
   confirmCandidate,
   sessionToken,
+  gapAnalysisReport,
+  type GapAnalysisReport,
   runRollover,
   rolloverVariance,
   type RolloverResult,
@@ -2344,6 +2346,137 @@ function ValidationFindings({ summary, validatedAt, passed }: {
   );
 }
 
+// Compliance-lead gap analysis (spec: readiness, gaps, workflow, QC)
+// ───────────────────────────────────────────────────────────────────────────
+
+function GapReportPanel({ financialYear, notify }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void }) {
+  const [report, setReport] = useState<GapAnalysisReport | null>(null);
+  const [ruleSet, setRuleSet] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const [days, setDays] = useState("");
+  const [working, setWorking] = useState(false);
+
+  const run = async () => {
+    setWorking(true);
+    try {
+      const r = await gapAnalysisReport(financialYear, {
+        ruleSet: ruleSet || undefined,
+        deadline: deadline || undefined,
+        daysToDeadline: days.trim() === "" ? undefined : Number(days),
+      });
+      setReport(r);
+      if (!r) notify("Gap analysis needs the sandbox or sign-in.", false);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <h2 className="font-bold text-slate-900">Gap analysis — compliance-lead view</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Readiness, blockers, sequential workflow and QC checklist from live workspace state.</p>
+        </div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <select value={ruleSet} onChange={(e) => setRuleSet(e.target.value)} title="Rule set (leave unset to surface the ambiguity explicitly)" className="rounded-lg border border-slate-300 px-2 py-2 text-xs">
+            <option value="">Rule set: unset</option>
+            <option value="ESRS Set 1 (2023)">ESRS Set 1 (2023)</option>
+            <option value="VSME (voluntary)">VSME (voluntary)</option>
+          </select>
+          <input value={deadline} onChange={(e) => setDeadline(e.target.value)} placeholder="Filing deadline" type="date" className="rounded-lg border border-slate-300 px-2 py-2 text-xs" />
+          <input value={days} onChange={(e) => setDays(e.target.value)} placeholder="Days left" inputMode="numeric" className="w-24 rounded-lg border border-slate-300 px-2 py-2 text-xs" />
+          <button onClick={() => void run()} disabled={working} className="rounded-xl text-white text-xs font-bold px-4 py-2 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+            {working ? "Analyzing…" : "Run analysis"}
+          </button>
+        </div>
+      </div>
+
+      {report && (
+        <div className="mt-4 space-y-4">
+          <p className="text-sm text-slate-700 leading-6">{report.summary}</p>
+          {report.critical_findings.length > 0 && (
+            <ul className="space-y-1.5">
+              {report.critical_findings.map((f, i) => (
+                <li key={i} className="text-xs text-red-700 rounded-lg bg-red-50 border border-red-100 px-3 py-2">{f}</li>
+              ))}
+            </ul>
+          )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-400">
+                  <th className="py-1.5 pr-3 font-semibold">Standard</th>
+                  <th className="py-1.5 pr-3 font-semibold">Applicable</th>
+                  <th className="py-1.5 pr-3 font-semibold">Assessed</th>
+                  <th className="py-1.5 pr-3 font-semibold">Gaps</th>
+                  <th className="py-1.5 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {report.standards.map((s) => (
+                  <tr key={s.standard}>
+                    <td className="py-1.5 pr-3 font-bold text-slate-700">{s.code || s.standard}</td>
+                    <td className="py-1.5 pr-3 text-slate-500">{s.applicable_dps}</td>
+                    <td className="py-1.5 pr-3 text-slate-500">{s.assessed}</td>
+                    <td className="py-1.5 pr-3 font-bold text-slate-700">{s.gaps}</td>
+                    <td className={`py-1.5 font-bold ${s.computed_status === "On Track" ? "text-emerald-600" : s.computed_status === "Blocked" ? "text-red-600" : "text-amber-600"}`}>{s.computed_status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {report.gating.length > 0 && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-1.5">Gating disclosures ({report.gating_complete}/{report.gating_total})</p>
+              <ul className="space-y-1">
+                {report.gating.map((g) => (
+                  <li key={g.id} className="flex flex-wrap items-center gap-2 text-xs text-slate-600 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1.5">
+                    <b className="text-slate-800">{g.id}</b>
+                    <span className="flex-1 min-w-[120px]">{g.name}</span>
+                    <span>{g.status.replace(/_/g, " ")}</span>
+                    <span className="text-slate-400">· {g.owner}</span>
+                    <span>{g.risk}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {report.orphan_iros.length > 0 && (
+            <p className="text-xs text-amber-700 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+              Orphan IROs (material, no linked disclosure): <b>{report.orphan_iros.join(", ")}</b>
+            </p>
+          )}
+          <ol className="space-y-1.5">
+            {report.workflow.map((w, i) => (
+              <li key={w.key} className="flex gap-2.5 text-xs rounded-xl border border-slate-200 px-3 py-2">
+                <span className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold ${w.state === "done" ? "bg-emerald-100 text-emerald-700" : w.state === "current" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}>{i + 1}</span>
+                <div>
+                  <b className="text-slate-800">{w.title}</b> <span className="text-slate-400">· {w.state}</span>
+                  <p className="text-slate-500 mt-0.5">{w.work}</p>
+                  <p className="text-slate-500"><b>Done when:</b> {w.exit}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <ul className="space-y-1">
+            {report.qc.map((q) => (
+              <li key={q.key} className="flex items-start gap-2 text-xs text-slate-600">
+                <span className={`mt-0.5 w-4 h-4 shrink-0 rounded border flex items-center justify-center text-[10px] font-bold ${q.met === true ? "bg-emerald-500 border-emerald-500 text-white" : q.met === false ? "border-red-300 text-red-400" : "border-slate-300 text-slate-300"}`}>
+                  {q.met === true ? "✓" : q.met === false ? "!" : "?"}
+                </span>
+                <span>{q.label}{q.met === null && <span className="text-slate-400"> — needs a check run to evaluate</span>}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void }) {
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
@@ -2556,6 +2689,8 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
           </button>
         </div>
       </div>
+
+      <GapReportPanel financialYear={financialYear} notify={notify} />
 
       {reports.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-400">

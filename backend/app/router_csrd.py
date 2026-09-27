@@ -1510,6 +1510,90 @@ async def board_pack(
     )
 
 
+@router.get("/gap-report")
+async def gap_report(
+    financial_year: str,
+    rule_set_version: Optional[str] = None,
+    filing_deadline: Optional[str] = None,
+    days_to_deadline: Optional[int] = None,
+    authorization: str = Header(...),
+):
+    """Compliance-lead gap analysis populated from live workspace state.
+
+    Owners/due dates are not tracked by the platform — gating rows report
+    ``unassigned``/``unscheduled`` honestly rather than inventing them.
+    """
+    from app.cross_framework_mapping import get_all_mappings
+    from app.esrs_datapoints import by_standard
+    from app.esrs_gap_report import GATING_SETS, build_report
+
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    in_scope_ids, entries_map, scope, has_material_iro = _scoped_state(sb, org_id, financial_year, None)
+    gap = _gap_report(sb, org_id, financial_year, in_scope_ids, entries_map, scope, has_material_iro)
+    cov = await dma_coverage(financial_year, org_id, authorization)
+
+    gating_known = set()
+    for rows in GATING_SETS.values():
+        gating_known.update(g["id"] for g in rows)
+    gating_status = []
+    for dr in sorted(gating_known):
+        dps = [d for d in ESRS_DATAPOINTS if d.get("dr") == dr and d["id"] in in_scope_ids]
+        handled = sum(
+            1 for d in dps
+            if _status_handled((entries_map.get(d["id"], {}) or {}).get("status", "not_assessed"),
+                               (entries_map.get(d["id"], {}) or {}).get("materiality_id"), has_material_iro)
+        )
+        gating_status.append({
+            "id": dr, "name": dr,
+            "status": "complete" if dps and handled >= len(dps) else ("in_progress" if handled else "not_started"),
+        })
+
+    iros = sb.table("esrs_materiality").select("id,title").eq("org_id", org_id).eq(
+        "financial_year", financial_year).eq("material", True).execute()
+    titles = {r["id"]: r.get("title", r["id"]) for r in ((iros.data or []) if iros is not None else [])}
+    orphans = cov.get("orphan_iro_ids", [])
+    orphan_names = [titles.get(i, i) for i in orphans]
+
+    fw_counts: dict[str, int] = {}
+    for m in get_all_mappings():
+        for fw in ("gri_ref", "issb_ref", "tcfd_ref", "sdg_ref"):
+            if m.get(fw):
+                fw_counts[fw.split("_")[0]] = fw_counts.get(fw.split("_")[0], 0) + 1
+
+    std_rows = [
+        {"standard": s.get("standard"), "code": s.get("code"), "name": s.get("name"),
+         "applicable_dps": s.get("datapoints", 0),
+         "assessed": s.get("handled", 0), "gaps": s.get("remaining", 0), "status": ""}
+        for s in gap.get("standards", [])
+    ]
+    return build_report({
+        "rule_set_version": rule_set_version or "",
+        "reporting_period": financial_year,
+        "entity_scope": [],
+        "value_chain_scope": {seg: (seg in (gap.get("value_chain_scope") or [])) for seg in ("own_operations", "upstream", "downstream")},
+        "datapoint_summary": {
+            "total_datapoints": gap.get("total_datapoints", 0),
+            "assessed_datapoints": gap.get("handled", 0),
+            "handled_disclosures": gap.get("handled", 0),
+            "effective_gaps": gap.get("effective_gap", 0),
+        },
+        "standard_status": std_rows,
+        "gating_disclosures_status": gating_status,
+        "dma_status": {
+            "iros_identified": cov.get("material_iros", 0),
+            "iros_assessed": cov.get("material_iros", 0),
+            "iros_material": cov.get("material_iros", 0),
+            "orphan_iro_ids": orphan_names,
+            "scope_locked": cov.get("methodology_status") == "approved",
+        },
+        "framework_mapping_coverage": {**fw_counts, "reviewed": False},
+        "filing_deadline": filing_deadline,
+        "days_to_deadline": days_to_deadline,
+    })
+
+
 # ═══════════════════════════════════════════════════════════════════
 # AUDIT TRAIL + EVIDENCE + FRAMEWORK LINKS
 # ═══════════════════════════════════════════════════════════════════
