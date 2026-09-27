@@ -74,6 +74,23 @@ import {
   submitEsefReport,
   validateEsefReport,
   REPORT_EXT,
+  listStakeholders,
+  addStakeholder,
+  deleteStakeholder,
+  getDMAConfig,
+  putDMAConfig,
+  approveDMAConfig,
+  listIroDrs,
+  linkIroDr,
+  unlinkIroDr,
+  dmaCoverage,
+  dmaMethodology,
+  type Stakeholder,
+  type DMAConfig,
+  type DMACoverage,
+  type IRODRLink,
+  STAKEHOLDER_GROUPS,
+  ENGAGEMENT_METHODS,
 } from "@/lib/csrd/workspace";
 import { AuthSessionError } from "@/lib/supabase/session";
 import { createClient } from "@/lib/supabase/client";
@@ -900,6 +917,213 @@ function RegistryTab({ financialYear, mode, notify }: { financialYear: string; m
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// Methodology pack (DMA audit trail)
+// ───────────────────────────────────────────────────────────────────────────
+
+function MethodologyPanel({ financialYear, notify, refreshKey }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void; refreshKey: number }) {
+  const [cfg, setCfg] = useState<DMAConfig | null>(null);
+  const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
+  const [coverage, setCoverage] = useState<DMACoverage | null>(null);
+  const [paragraph, setParagraph] = useState<string>("");
+  const [impactT, setImpactT] = useState("3");
+  const [financialT, setFinancialT] = useState("3");
+  const [approver, setApprover] = useState("");
+  const [sgroup, setSgroup] = useState(STAKEHOLDER_GROUPS[5]);
+  const [smethod, setSmethod] = useState(ENGAGEMENT_METHODS[1]);
+  const [ssummary, setSsummary] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const [c, s] = await Promise.all([getDMAConfig(financialYear), listStakeholders(financialYear)]);
+      setCfg(c);
+      setImpactT(String(c.impact_threshold));
+      setFinancialT(String(c.financial_threshold));
+      setStakeholders(s);
+      const cov = await dmaCoverage(financialYear);
+      setCoverage(cov);
+      if (cov) {
+        const m = await dmaMethodology(financialYear);
+        setParagraph(m?.paragraph || "");
+      } else {
+        setParagraph("");
+      }
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  }, [financialYear, notify]);
+
+  useEffect(() => {
+    load();
+  }, [load, refreshKey]);
+
+  const saveThresholds = async () => {
+    try {
+      const c = await putDMAConfig(financialYear, { impact_threshold: Number(impactT) || 3, financial_threshold: Number(financialT) || 3 });
+      setCfg(c);
+      notify("Threshold methodology saved (draft)");
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  const approve = async () => {
+    if (!approver.trim()) {
+      notify("Name the approver to lock the scope.", false);
+      return;
+    }
+    try {
+      const c = await approveDMAConfig(financialYear, approver.trim());
+      setCfg(c);
+      await load();
+      notify("Methodology approved — assessment scope locked");
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  const addS = async () => {
+    try {
+      await addStakeholder(financialYear, { stakeholder_group: sgroup, method: smethod, summary: ssummary || null });
+      setSsummary("");
+      await load();
+      notify("Engagement logged");
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  const removeS = async (id: string) => {
+    try {
+      await deleteStakeholder(financialYear, id);
+      await load();
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  const approved = cfg?.status === "approved";
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-bold text-slate-900">DMA methodology</h2>
+        {cfg && (
+          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${approved ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+            {approved ? `Approved${cfg.approved_by ? ` · ${cfg.approved_by}` : ""}` : "Draft"}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-slate-400 mt-0.5 mb-4">Thresholds, stakeholder record and DR traceability — the auditor&apos;s methodology pack.</p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 mb-1">Impact threshold (0–5)</label>
+          <input type="number" min={0} max={5} step={0.1} value={impactT} disabled={approved} onChange={(e) => setImpactT(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 mb-1">Financial threshold (0–5)</label>
+          <input type="number" min={0} max={5} step={0.1} value={financialT} disabled={approved} onChange={(e) => setFinancialT(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50" />
+        </div>
+      </div>
+      {!approved && (
+        <div className="flex gap-2 mt-3">
+          <button onClick={saveThresholds} className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">Save draft</button>
+          <input value={approver} onChange={(e) => setApprover(e.target.value)} placeholder="Approver (e.g. Audit Committee)" className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs" />
+          <button onClick={approve} className="rounded-xl text-white px-4 py-2 text-xs font-bold" style={{ background: "linear-gradient(120deg, #059669, #10B981)" }}>Approve &amp; lock</button>
+        </div>
+      )}
+
+      {coverage && (
+        <div className={`mt-4 rounded-xl border px-3 py-2.5 text-xs font-semibold ${coverage.audit_ready ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+          {coverage.audit_ready
+            ? `Audit-ready: ${coverage.covered_iros}/${coverage.material_iros} material IROs traced, methodology approved, ${coverage.stakeholder_records} engagement record(s).`
+            : `Not audit-ready: ${coverage.orphan_iro_ids.length} material IRO(s) lack DR linkage${coverage.methodology_status !== "approved" ? ", methodology unapproved" : ""}${coverage.stakeholder_records === 0 ? ", no stakeholder record" : ""}.`}
+        </div>
+      )}
+      {paragraph && <p className="mt-3 text-[11px] leading-5 text-slate-500 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">{paragraph}</p>}
+
+      <h3 className="mt-5 mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Stakeholder engagements ({stakeholders.length})</h3>
+      <div className="flex flex-wrap gap-2">
+        <select value={sgroup} onChange={(e) => setSgroup(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs">
+          {STAKEHOLDER_GROUPS.map((g) => <option key={g} value={g}>{g.replace(/_/g, " ")}</option>)}
+        </select>
+        <select value={smethod} onChange={(e) => setSmethod(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs">
+          {ENGAGEMENT_METHODS.map((m) => <option key={m} value={m}>{m.replace(/_/g, " ")}</option>)}
+        </select>
+        <input value={ssummary} onChange={(e) => setSsummary(e.target.value)} placeholder="What they said / influence (optional)" className="flex-1 min-w-[140px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs" />
+        <button onClick={addS} className="rounded-lg bg-slate-900 text-white px-3 py-1.5 text-xs font-bold">Log</button>
+      </div>
+      {stakeholders.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {stakeholders.map((s) => (
+            <li key={s.id} className="flex items-center justify-between gap-2 text-xs text-slate-600 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1.5">
+              <span><b>{s.stakeholder_group.replace(/_/g, " ")}</b> · {s.method.replace(/_/g, " ")}{s.summary ? ` — ${s.summary}` : ""}</span>
+              <button onClick={() => removeS(s.id)} className="text-slate-300 hover:text-red-500" aria-label="remove"><X className="w-3.5 h-3.5" /></button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function IroDrChips({ iroId, notify }: { iroId: string; notify: (m: string | Error, ok?: boolean) => void }) {
+  const [links, setLinks] = useState<IRODRLink[]>([]);
+  const [dr, setDr] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      setLinks(await listIroDrs(iroId));
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  }, [iroId, notify]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const add = async () => {
+    const code = dr.trim();
+    if (!code) return;
+    try {
+      await linkIroDr(iroId, code);
+      setDr("");
+      await load();
+      notify(`Linked ${code}`);
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  const remove = async (code: string) => {
+    try {
+      await unlinkIroDr(iroId, code);
+      await load();
+    } catch (e) {
+      notify(e as Error, false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
+      <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Triggered disclosure requirements</div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {links.length === 0 && <span className="text-[11px] text-amber-600 font-semibold">Untraced — link at least one DR (e.g. E1, E1-6).</span>}
+        {links.map((l) => (
+          <span key={l.dr} className="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-[11px] font-bold">
+            {l.dr}
+            <button onClick={() => remove(l.dr)} className="hover:text-red-500" aria-label="unlink"><X className="w-3 h-3" /></button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-1.5">
+        <input value={dr} onChange={(e) => setDr(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder="DR code, e.g. E1-6" className="flex-1 rounded-lg border border-slate-300 px-2 py-1 text-xs" />
+        <button onClick={add} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold">Link</button>
+      </div>
+    </div>
+  );
+}
+
 // Materiality (double materiality)
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -1017,6 +1241,7 @@ function MaterialityTab({ financialYear, mode, notify }: { financialYear: string
 
       {/* list + matrix */}
       <div className="lg:col-span-2 space-y-4">
+        <MethodologyPanel financialYear={financialYear} notify={notify} refreshKey={iro.length} />
         <MaterialityMatrix iro={iro} material={material} onSelect={(r) => notify(`${r.title} — ${material(r) ? "material" : "not material"}`)} />
 
         {iro.length === 0 && (
@@ -1050,6 +1275,7 @@ function MaterialityTab({ financialYear, mode, notify }: { financialYear: string
                 <ScoreEditor label="Severity" value={r.severity ?? 0} onChange={(v) => patchAll(r.id, { severity: v })} />
                 <ScoreEditor label="Likelihood" value={r.likelihood ?? 0} onChange={(v) => patchAll(r.id, { likelihood: v })} />
               </div>
+              {m && <IroDrChips iroId={r.id} notify={notify} />}
             </div>
           );
         })}

@@ -866,6 +866,334 @@ async def delete_iro(iro_id: str, authorization: str = Header(...)):
 
 
 # ═══════════════════════════════════════════════════════════════════
+# DMA METHODOLOGY PACK (stakeholders, thresholds, IRO-DR traceability)
+# ═══════════════════════════════════════════════════════════════════
+
+
+STAKEHOLDER_GROUPS = {
+    "own_workforce", "value_chain_workers", "affected_communities",
+    "consumers_end_users", "investors_lenders", "regulators",
+    "civil_society_ngos", "suppliers_partners", "customers", "other",
+}
+
+ENGAGEMENT_METHODS = {
+    "survey", "interview", "workshop", "site_visit",
+    "grievance_review", "desktop_research", "other",
+}
+
+
+class StakeholderIn(BaseModel):
+    financial_year: str
+    stakeholder_group: str
+    method: str
+    org_id: Optional[str] = None
+    consulted_on: Optional[str] = None
+    participants: Optional[int] = Field(None, ge=0)
+    summary: Optional[str] = None
+    influence: Optional[str] = None
+
+
+class DMAConfigIn(BaseModel):
+    financial_year: str
+    org_id: Optional[str] = None
+    impact_threshold: Optional[float] = Field(None, ge=0, le=5)
+    financial_threshold: Optional[float] = Field(None, ge=0, le=5)
+    methodology: Optional[str] = None
+    sensitivity_note: Optional[str] = None
+
+
+class DMAApprovalIn(BaseModel):
+    financial_year: str
+    org_id: Optional[str] = None
+    approved_by: str
+    methodology: Optional[str] = None
+
+
+class IRODRLinkIn(BaseModel):
+    dr: str
+    rationale: Optional[str] = None
+
+
+def _valid_dr(dr: str) -> bool:
+    """A DR code is valid if it names a known standard or registry DR."""
+    from app.esrs_datapoints import by_dr as _by_dr
+
+    if dr in ESRS_STANDARDS:
+        return True
+    return bool(_by_dr(dr))
+
+
+@router.post("/stakeholders")
+async def add_stakeholder(req: StakeholderIn, authorization: str = Header(...)):
+    """Log a stakeholder engagement for the DMA methodology record."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, req.org_id)
+    if req.stakeholder_group not in STAKEHOLDER_GROUPS:
+        raise HTTPException(status_code=400, detail=f"Unknown stakeholder group {req.stakeholder_group!r}")
+    if req.method not in ENGAGEMENT_METHODS:
+        raise HTTPException(status_code=400, detail=f"Unknown engagement method {req.method!r}")
+    row = {
+        "org_id": org_id,
+        "financial_year": req.financial_year,
+        "stakeholder_group": req.stakeholder_group,
+        "method": req.method,
+        "consulted_on": req.consulted_on,
+        "participants": req.participants,
+        "summary": req.summary,
+        "influence": req.influence,
+        "created_by": _subject_id(user_id),
+    }
+    result = sb.table("esrs_stakeholders").insert(row).execute()
+    return {"stakeholder": (result.data or [{}])[0]}
+
+
+@router.get("/stakeholders")
+async def list_stakeholders(
+    org_id: Optional[str] = None,
+    financial_year: Optional[str] = None,
+    authorization: str = Header(...),
+):
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, org_id)
+    query = sb.table("esrs_stakeholders").select("*").eq("org_id", org_id)
+    if financial_year:
+        query = query.eq("financial_year", financial_year)
+    result = query.order("consulted_on", desc=False).execute()
+    return {"org_id": org_id, "count": len(result.data or []), "stakeholders": result.data or []}
+
+
+@router.delete("/stakeholders/{stakeholder_id}")
+async def delete_stakeholder(stakeholder_id: str, authorization: str = Header(...)):
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    existing = sb.table("esrs_stakeholders").select("id").eq("id", stakeholder_id).eq("org_id", org_id).maybe_single().execute()
+    if not _row(existing):
+        raise HTTPException(status_code=404, detail="Stakeholder record not found")
+    sb.table("esrs_stakeholders").delete().eq("id", stakeholder_id).execute()
+    return {"deleted": stakeholder_id}
+
+
+@router.get("/dma-config")
+async def get_dma_config(
+    financial_year: str,
+    org_id: Optional[str] = None,
+    authorization: str = Header(...),
+):
+    """Threshold methodology for the FY (defaults when never configured)."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, org_id)
+    res = sb.table("esrs_dma_config").select("*").eq("org_id", org_id).eq("financial_year", financial_year).maybe_single().execute()
+    row = _row(res)
+    if not row:
+        return {
+            "org_id": org_id,
+            "financial_year": financial_year,
+            "impact_threshold": DEFAULT_MATERIALITY_THRESHOLD,
+            "financial_threshold": DEFAULT_MATERIALITY_THRESHOLD,
+            "methodology": None,
+            "sensitivity_note": None,
+            "status": "draft",
+            "approved_by": None,
+            "approved_at": None,
+            "configured": False,
+        }
+    return {**row, "configured": True}
+
+
+@router.put("/dma-config")
+async def put_dma_config(req: DMAConfigIn, authorization: str = Header(...)):
+    """Create or update the threshold methodology (stays draft until approved)."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, req.org_id)
+    patch = {k: v for k, v in req.model_dump().items() if v is not None and k not in ("financial_year", "org_id")}
+    patch.update({"org_id": org_id, "financial_year": req.financial_year, "status": "draft", "approved_by": None, "approved_at": None})
+    existing = sb.table("esrs_dma_config").select("id").eq("org_id", org_id).eq("financial_year", req.financial_year).maybe_single().execute()
+    if _row(existing):
+        result = sb.table("esrs_dma_config").update(patch).eq("org_id", org_id).eq("financial_year", req.financial_year).execute()
+    else:
+        result = sb.table("esrs_dma_config").insert(patch).execute()
+    return {"config": (result.data or [{}])[0]}
+
+
+@router.post("/dma-config/approve")
+async def approve_dma_config(req: DMAApprovalIn, authorization: str = Header(...)):
+    """Lock the assessment scope: approve the threshold methodology."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, req.org_id)
+    if not req.approved_by.strip():
+        raise HTTPException(status_code=400, detail="approved_by is required")
+    patch: dict[str, Any] = {
+        "status": "approved",
+        "approved_by": req.approved_by.strip(),
+        "approved_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if req.methodology is not None:
+        patch["methodology"] = req.methodology
+    existing = sb.table("esrs_dma_config").select("id").eq("org_id", org_id).eq("financial_year", req.financial_year).maybe_single().execute()
+    if _row(existing):
+        result = sb.table("esrs_dma_config").update(patch).eq("org_id", org_id).eq("financial_year", req.financial_year).execute()
+    else:
+        result = sb.table("esrs_dma_config").insert({"org_id": org_id, "financial_year": req.financial_year, **patch}).execute()
+    return {"config": (result.data or [{}])[0]}
+
+
+@router.post("/materiality/{iro_id}/drs")
+async def link_iro_dr(iro_id: str, req: IRODRLinkIn, authorization: str = Header(...)):
+    """Trace a material IRO to a Disclosure Requirement it triggers."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    iro = sb.table("esrs_materiality").select("id, financial_year").eq("id", iro_id).eq("org_id", org_id).maybe_single().execute()
+    iro_row = _row(iro)
+    if not iro_row:
+        raise HTTPException(status_code=404, detail="IRO not found")
+    dr = (req.dr or "").strip()
+    if not dr or not _valid_dr(dr):
+        raise HTTPException(status_code=400, detail=f"Unknown disclosure requirement {req.dr!r}")
+    row = {
+        "org_id": org_id,
+        "financial_year": iro_row["financial_year"],
+        "iro_id": iro_id,
+        "dr": dr,
+        "rationale": req.rationale,
+    }
+    result = sb.table("iro_dr_links").upsert(row, on_conflict="iro_id,dr").execute()
+    return {"link": (result.data or [{}])[0]}
+
+
+@router.get("/materiality/{iro_id}/drs")
+async def list_iro_drs(iro_id: str, authorization: str = Header(...)):
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    iro = sb.table("esrs_materiality").select("id").eq("id", iro_id).eq("org_id", org_id).maybe_single().execute()
+    if not _row(iro):
+        raise HTTPException(status_code=404, detail="IRO not found")
+    result = sb.table("iro_dr_links").select("*").eq("iro_id", iro_id).execute()
+    return {"iro_id": iro_id, "count": len(result.data or []), "drs": result.data or []}
+
+
+@router.delete("/materiality/{iro_id}/drs/{dr}")
+async def unlink_iro_dr(iro_id: str, dr: str, authorization: str = Header(...)):
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, None)
+    sb.table("iro_dr_links").delete().eq("iro_id", iro_id).eq("dr", dr).eq("org_id", org_id).execute()
+    return {"deleted": {"iro_id": iro_id, "dr": dr}}
+
+
+@router.get("/dma-coverage")
+async def dma_coverage(
+    financial_year: str,
+    org_id: Optional[str] = None,
+    authorization: str = Header(...),
+):
+    """Traceability matrix: material IROs, their DRs, and orphans without DRs."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, org_id)
+    iros = sb.table("esrs_materiality").select("id, title, iro_type, standard, material").eq("org_id", org_id).eq("financial_year", financial_year).eq("material", True).execute()
+    links = sb.table("iro_dr_links").select("iro_id, dr, rationale").eq("org_id", org_id).eq("financial_year", financial_year).execute()
+    by_iro: dict[str, list[dict[str, Any]]] = {}
+    for ln in links.data or []:
+        by_iro.setdefault(ln["iro_id"], []).append({"dr": ln["dr"], "rationale": ln.get("rationale")})
+    rows = []
+    orphans = []
+    for iro in iros.data or []:
+        drs = by_iro.get(iro["id"], [])
+        rows.append({**iro, "drs": drs, "covered": bool(drs)})
+        if not drs:
+            orphans.append(iro["id"])
+    cfg = sb.table("esrs_dma_config").select("status, approved_by, approved_at").eq("org_id", org_id).eq("financial_year", financial_year).maybe_single().execute()
+    cfg_row = _row(cfg) or {}
+    stakeholders = sb.table("esrs_stakeholders").select("id").eq("org_id", org_id).eq("financial_year", financial_year).execute()
+    return {
+        "org_id": org_id,
+        "financial_year": financial_year,
+        "material_iros": len(rows),
+        "covered_iros": sum(1 for r in rows if r["covered"]),
+        "orphan_iro_ids": orphans,
+        "methodology_status": cfg_row.get("status", "draft"),
+        "methodology_approved_by": cfg_row.get("approved_by"),
+        "stakeholder_records": len(stakeholders.data or []),
+        "audit_ready": not orphans and cfg_row.get("status") == "approved" and bool(stakeholders.data),
+        "matrix": rows,
+    }
+
+
+@router.get("/dma-methodology")
+async def dma_methodology(
+    financial_year: str,
+    org_id: Optional[str] = None,
+    authorization: str = Header(...),
+):
+    """Generated IRO-1 methodology paragraph from the stored record."""
+    user_id = await get_user_id(authorization)
+    sb = get_supabase_admin()
+    org_id = _resolve_org(sb, user_id, org_id)
+    cfg = sb.table("esrs_dma_config").select("*").eq("org_id", org_id).eq("financial_year", financial_year).maybe_single().execute()
+    cfg_row = _row(cfg) or {}
+    stakeholders = sb.table("esrs_stakeholders").select("stakeholder_group, method, consulted_on, participants").eq("org_id", org_id).eq("financial_year", financial_year).execute()
+    cov = await dma_coverage(financial_year, org_id, authorization)
+    it = cfg_row.get("impact_threshold", DEFAULT_MATERIALITY_THRESHOLD)
+    ft = cfg_row.get("financial_threshold", DEFAULT_MATERIALITY_THRESHOLD)
+    groups = sorted({s["stakeholder_group"] for s in stakeholders.data or []})
+    methods = sorted({s["method"] for s in stakeholders.data or []})
+    lines = [
+        f"Double materiality was assessed for {financial_year} using impact and financial materiality thresholds of {it} and {ft} respectively (scale 0-5).",
+        f"{len(stakeholders.data or [])} stakeholder engagement record(s) inform the assessment"
+        + (f" across {', '.join(groups)} via {', '.join(methods)}." if groups else "."),
+        f"{cov['material_iros']} material IRO(s) were identified, of which {cov['covered_iros']} are traced to disclosure requirements.",
+    ]
+    if cov["orphan_iro_ids"]:
+        lines.append(f"{len(cov['orphan_iro_ids'])} material IRO(s) still lack DR linkage and must be traced before the scope locks.")
+    if cfg_row.get("methodology"):
+        lines.append(str(cfg_row["methodology"]))
+    if cfg_row.get("status") == "approved":
+        lines.append(f"Methodology approved by {cfg_row.get('approved_by')} on {cfg_row.get('approved_at')}.")
+    else:
+        lines.append("Methodology is in draft and has not been approved.")
+    return {
+        "org_id": org_id,
+        "financial_year": financial_year,
+        "paragraph": " ".join(lines),
+        "audit_ready": cov["audit_ready"],
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# VSME FEEDER (voluntary-SME on-ramp into full ESRS)
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/vsme-basic")
+async def vsme_basic_catalog():
+    """VSME Basic Module feeder catalog (public — the on-ramp needs no login)."""
+    from app.vsme import VSME_BASIC, VSME_VERSION
+
+    return {"version": VSME_VERSION, "count": len(VSME_BASIC), "metrics": VSME_BASIC}
+
+
+class VSMEUpgradeIn(BaseModel):
+    answers: dict[str, Any] = {}
+
+
+@router.post("/vsme-upgrade")
+async def vsme_upgrade(req: VSMEUpgradeIn):
+    """Convert VSME feeder answers into ESRS prefill entries (public compute)."""
+    from app.vsme import upgrade_prefill
+
+    out = upgrade_prefill(req.answers or {})
+    return {**out, "count": len(out["entries"])}
+
+
+# ═══════════════════════════════════════════════════════════════════
 # ORG SCOPE (value-chain boundary for phase/scoped gap analysis)
 # ═══════════════════════════════════════════════════════════════════
 

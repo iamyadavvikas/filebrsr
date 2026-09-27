@@ -567,6 +567,214 @@ export async function deleteIro(financialYear: string, id: string): Promise<void
   );
 }
 
+// ──────────────────────────────────────────────────── dma methodology ────
+
+export interface Stakeholder {
+  id: string;
+  financial_year: string;
+  stakeholder_group: string;
+  method: string;
+  consulted_on?: string | null;
+  participants?: number | null;
+  summary?: string | null;
+  influence?: string | null;
+}
+
+export const STAKEHOLDER_GROUPS = [
+  "own_workforce", "value_chain_workers", "affected_communities",
+  "consumers_end_users", "investors_lenders", "regulators",
+  "civil_society_ngos", "suppliers_partners", "customers", "other",
+];
+
+export const ENGAGEMENT_METHODS = [
+  "survey", "interview", "workshop", "site_visit",
+  "grievance_review", "desktop_research", "other",
+];
+
+export interface DMAConfig {
+  financial_year: string;
+  impact_threshold: number;
+  financial_threshold: number;
+  methodology?: string | null;
+  sensitivity_note?: string | null;
+  status: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  configured: boolean;
+}
+
+export interface IRODRLink {
+  dr: string;
+  rationale?: string | null;
+}
+
+export interface DMACoverage {
+  material_iros: number;
+  covered_iros: number;
+  orphan_iro_ids: string[];
+  methodology_status: string;
+  methodology_approved_by?: string | null;
+  stakeholder_records: number;
+  audit_ready: boolean;
+}
+
+export async function listStakeholders(financialYear: string): Promise<Stakeholder[]> {
+  if (isServerMode(await detectMode())) {
+    const data = await cloudJSON<{ stakeholders: Stakeholder[] }>(
+      `/stakeholders?financial_year=${encodeURIComponent(financialYear)}`
+    );
+    return data.stakeholders || [];
+  }
+  return readJson<Stakeholder[]>(demoKey(financialYear, "stakeholders"), []);
+}
+
+export async function addStakeholder(
+  financialYear: string,
+  item: Partial<Stakeholder> & { stakeholder_group: string; method: string }
+): Promise<Stakeholder> {
+  if (isServerMode(await detectMode())) {
+    const data = await cloudJSON<{ stakeholder: Stakeholder }>("/stakeholders", {
+      method: "POST",
+      body: JSON.stringify({ financial_year: financialYear, ...item }),
+    });
+    return data.stakeholder;
+  }
+  const rows = readJson<Stakeholder[]>(demoKey(financialYear, "stakeholders"), []);
+  const row: Stakeholder = {
+    id: `demo-${Math.random().toString(36).slice(2, 10)}`,
+    financial_year: financialYear,
+    stakeholder_group: item.stakeholder_group,
+    method: item.method,
+    consulted_on: item.consulted_on ?? null,
+    participants: item.participants ?? null,
+    summary: item.summary ?? null,
+    influence: item.influence ?? null,
+  };
+  rows.push(row);
+  writeJson(demoKey(financialYear, "stakeholders"), rows);
+  return row;
+}
+
+export async function deleteStakeholder(financialYear: string, id: string): Promise<void> {
+  if (isServerMode(await detectMode())) {
+    await cloudJSON(`/stakeholders/${id}`, { method: "DELETE" });
+    return;
+  }
+  const rows = readJson<Stakeholder[]>(demoKey(financialYear, "stakeholders"), []);
+  writeJson(demoKey(financialYear, "stakeholders"), rows.filter((r) => r.id !== id));
+}
+
+const DEFAULT_THRESHOLD = 3;
+
+export async function getDMAConfig(financialYear: string): Promise<DMAConfig> {
+  if (isServerMode(await detectMode())) {
+    return cloudJSON<DMAConfig>(`/dma-config?financial_year=${encodeURIComponent(financialYear)}`);
+  }
+  const saved = readJson<Partial<DMAConfig> | null>(demoKey(financialYear, "dma_config"), null);
+  return {
+    financial_year: financialYear,
+    impact_threshold: saved?.impact_threshold ?? DEFAULT_THRESHOLD,
+    financial_threshold: saved?.financial_threshold ?? DEFAULT_THRESHOLD,
+    methodology: saved?.methodology ?? null,
+    sensitivity_note: saved?.sensitivity_note ?? null,
+    status: saved?.status ?? "draft",
+    approved_by: saved?.approved_by ?? null,
+    approved_at: saved?.approved_at ?? null,
+    configured: !!saved,
+  };
+}
+
+export async function putDMAConfig(
+  financialYear: string,
+  patch: Partial<Pick<DMAConfig, "impact_threshold" | "financial_threshold" | "methodology" | "sensitivity_note">>
+): Promise<DMAConfig> {
+  if (isServerMode(await detectMode())) {
+    const data = await cloudJSON<{ config: DMAConfig }>("/dma-config", {
+      method: "PUT",
+      body: JSON.stringify({ financial_year: financialYear, ...patch }),
+    });
+    return data.config;
+  }
+  const prev = await getDMAConfig(financialYear);
+  const next: DMAConfig = {
+    ...prev,
+    ...patch,
+    status: "draft",
+    approved_by: null,
+    approved_at: null,
+    configured: true,
+  };
+  writeJson(demoKey(financialYear, "dma_config"), next);
+  return next;
+}
+
+export async function approveDMAConfig(financialYear: string, approvedBy: string, methodology?: string): Promise<DMAConfig> {
+  if (isServerMode(await detectMode())) {
+    const data = await cloudJSON<{ config: DMAConfig }>("/dma-config/approve", {
+      method: "POST",
+      body: JSON.stringify({ financial_year: financialYear, approved_by: approvedBy, methodology }),
+    });
+    return data.config;
+  }
+  const prev = await getDMAConfig(financialYear);
+  const next: DMAConfig = {
+    ...prev,
+    ...(methodology !== undefined ? { methodology } : {}),
+    status: "approved",
+    approved_by: approvedBy,
+    approved_at: new Date().toISOString(),
+    configured: true,
+  };
+  writeJson(demoKey(financialYear, "dma_config"), next);
+  return next;
+}
+
+export async function listIroDrs(iroId: string): Promise<IRODRLink[]> {
+  if (isServerMode(await detectMode())) {
+    const data = await cloudJSON<{ drs: IRODRLink[] }>(`/materiality/${iroId}/drs`);
+    return data.drs || [];
+  }
+  const links = readJson<Record<string, IRODRLink[]>>("csrd.demo.iro_drs", {});
+  return links[iroId] || [];
+}
+
+export async function linkIroDr(iroId: string, dr: string, rationale?: string): Promise<void> {
+  if (isServerMode(await detectMode())) {
+    await cloudJSON(`/materiality/${iroId}/drs`, {
+      method: "POST",
+      body: JSON.stringify({ dr, rationale: rationale ?? null }),
+    });
+    return;
+  }
+  const links = readJson<Record<string, IRODRLink[]>>("csrd.demo.iro_drs", {});
+  const rows = links[iroId] || [];
+  if (!rows.some((r) => r.dr === dr)) rows.push({ dr, rationale: rationale ?? null });
+  links[iroId] = rows;
+  writeJson("csrd.demo.iro_drs", links);
+}
+
+export async function unlinkIroDr(iroId: string, dr: string): Promise<void> {
+  if (isServerMode(await detectMode())) {
+    await cloudJSON(`/materiality/${iroId}/drs/${encodeURIComponent(dr)}`, { method: "DELETE" });
+    return;
+  }
+  const links = readJson<Record<string, IRODRLink[]>>("csrd.demo.iro_drs", {});
+  links[iroId] = (links[iroId] || []).filter((r) => r.dr !== dr);
+  writeJson("csrd.demo.iro_drs", links);
+}
+
+export async function dmaCoverage(financialYear: string): Promise<DMACoverage | null> {
+  if (!isServerMode(await detectMode())) return null;
+  return cloudJSON<DMACoverage>(`/dma-coverage?financial_year=${encodeURIComponent(financialYear)}`);
+}
+
+export async function dmaMethodology(financialYear: string): Promise<{ paragraph: string; audit_ready: boolean } | null> {
+  if (!isServerMode(await detectMode())) return null;
+  return cloudJSON<{ paragraph: string; audit_ready: boolean }>(
+    `/dma-methodology?financial_year=${encodeURIComponent(financialYear)}`
+  );
+}
+
 // ────────────────────────────────────────────────────────────── scope ─────
 
 const SCOPE_KEY = "csrd.demo.scope";
@@ -781,6 +989,63 @@ export async function generateDemoArtifacts(financialYear: string): Promise<{ ht
     html: buildStatementHtml(financialYear, registry, entries.entries, standards, { valueChainScope: scope, iro }),
     csv: buildCsv(financialYear, registry, entries.entries),
   };
+}
+
+// ───────────────────────────────────────────────────────── vsme feeder ───
+
+export interface VSMEMetric {
+  code: string;
+  module: string;
+  area: string;
+  name: string;
+  data_type: string;
+  unit?: string | null;
+  maps_to: string[];
+  narrative_feeds?: string | null;
+  required: boolean;
+}
+
+export interface VSMEPrefill {
+  datapoint_id: string;
+  status: string;
+  value: unknown;
+  source: string;
+  note: string;
+}
+
+export async function vsmeCatalog(): Promise<{ version: string; metrics: VSMEMetric[] }> {
+  const res = await fetch("/backend/api/platform/csrd/vsme-basic");
+  if (!res.ok) throw new Error(`VSME catalog failed (${res.status})`);
+  const data = await res.json();
+  return { version: data.version, metrics: data.metrics || [] };
+}
+
+export async function vsmeUpgrade(answers: Record<string, unknown>): Promise<{ entries: VSMEPrefill[]; unmapped: string[] }> {
+  const res = await fetch("/backend/api/platform/csrd/vsme-upgrade", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answers }),
+  });
+  if (!res.ok) throw new Error(`VSME upgrade failed (${res.status})`);
+  const data = await res.json();
+  return { entries: data.entries || [], unmapped: data.unmapped || [] };
+}
+
+/** Save VSME-prefilled entries into the workspace (server modes persist, demo writes localStorage). */
+export async function applyVsmePrefill(financialYear: string, entries: VSMEPrefill[]): Promise<number> {
+  let saved = 0;
+  for (const e of entries) {
+    await saveEntry(financialYear, {
+      datapoint_id: e.datapoint_id,
+      status: e.status,
+      value: e.value,
+      evidence: null,
+      notes: e.note,
+      source: e.source,
+    });
+    saved += 1;
+  }
+  return saved;
 }
 
 // ──────────────────────────────────────────────────────────── sample seed ─
