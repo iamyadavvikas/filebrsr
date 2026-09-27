@@ -668,11 +668,15 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
   const [working, setWorking] = useState(false);
   const [confirming, setConfirming] = useState<string>("");
   const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [lowFirst, setLowFirst] = useState(true);
+  const [hideDone, setHideDone] = useState(false);
 
   const upload = async (file: File | undefined) => {
     if (!file) return;
     setWorking(true);
     setConfirmed(new Set());
+    setCollapsed(new Set());
     try {
       const out = await extractPdf(file);
       setCandidates(out.candidates);
@@ -700,8 +704,8 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
     }
   };
 
-  const confirmAll = async () => {
-    for (const c of candidates) {
+  const confirmMany = async (list: ExtractCandidate[]) => {
+    for (const c of list) {
       if (confirmed.has(c.datapoint_id)) continue;
       try {
         await confirmCandidate(financialYear, c, "reported");
@@ -712,8 +716,32 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
       }
     }
     onConfirmed();
-    notify("All visible candidates confirmed — verify values before filing");
+    notify("Section confirmed — verify values before filing");
   };
+
+  const toggleSection = (key: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const confOf = (c: ExtractCandidate) => (c.confidence == null ? Number.POSITIVE_INFINITY : c.confidence);
+  const visible = hideDone ? candidates.filter((c) => !confirmed.has(c.datapoint_id)) : candidates;
+  const groups = new Map<string, ExtractCandidate[]>();
+  for (const c of visible) {
+    const key = c.standard || "other";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(c);
+  }
+  const ordered = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  for (const [, list] of ordered) {
+    list.sort((x, y) => (lowFirst ? confOf(x) - confOf(y) : confOf(y) - confOf(x)));
+  }
+  const doneCount = confirmed.size;
+  const pct = candidates.length ? Math.round((doneCount / candidates.length) * 100) : 0;
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -724,23 +752,64 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
         </label>
         <p className="text-xs text-slate-400">AI reads the annual report and proposes ESRS datapoint values — you review each one before it lands in the registry.</p>
         {candidates.length > 0 && (
-          <button onClick={confirmAll} className="ml-auto rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Confirm all ({candidates.length - confirmed.size} left)</button>
+          <button onClick={() => confirmMany(visible)} className="ml-auto rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Confirm all ({visible.length - visible.filter((c) => confirmed.has(c.datapoint_id)).length} left)</button>
         )}
       </div>
       {company && <p className="mt-2 text-xs text-slate-500">Detected company: <b>{company}</b></p>}
       {candidates.length > 0 && (
-        <ul className="mt-3 divide-y divide-slate-100 max-h-72 overflow-y-auto">
-          {candidates.map((c) => (
-            <li key={c.datapoint_id} className="flex items-center gap-3 py-2 text-sm">
-              <span className="font-mono text-xs text-slate-500 w-32 shrink-0">{c.datapoint_id}</span>
-              <span className="flex-1 text-slate-700 truncate" title={String(c.value ?? "")}>{String(c.value ?? "—")}</span>
-              {c.confidence != null && <span className="text-[11px] text-slate-400">{Math.round(c.confidence * 100)}%</span>}
-              {confirmed.has(c.datapoint_id)
-                ? <span className="text-[11px] font-bold text-emerald-600">Confirmed</span>
-                : <button onClick={() => confirmOne(c)} disabled={confirming === c.datapoint_id} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold disabled:opacity-50">Confirm</button>}
-            </li>
-          ))}
-        </ul>
+        <div className="mt-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-[160px] h-2 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #2563EB, #059669)" }} />
+            </div>
+            <span className="text-[11px] font-bold text-slate-500">{doneCount}/{candidates.length} confirmed</span>
+            <button onClick={() => setLowFirst(!lowFirst)} className="text-[11px] font-bold text-blue-700 hover:underline">
+              {lowFirst ? "Lowest confidence first" : "Highest confidence first"}
+            </button>
+            <label className="text-[11px] text-slate-500 inline-flex items-center gap-1 cursor-pointer">
+              <input type="checkbox" checked={hideDone} onChange={(e) => setHideDone(e.target.checked)} /> Hide confirmed
+            </label>
+          </div>
+          <div className="mt-2 space-y-2 max-h-96 overflow-y-auto pr-1">
+            {ordered.map(([std, list]) => {
+              const left = list.filter((c) => !confirmed.has(c.datapoint_id));
+              const shut = collapsed.has(std);
+              return (
+                <div key={std} className="rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-slate-50">
+                    <button onClick={() => toggleSection(std)} className="text-slate-500 font-bold text-sm w-5">{shut ? "+" : "–"}</button>
+                    <span className="text-xs font-extrabold text-slate-800">ESRS {std}</span>
+                    <span className="text-[11px] text-slate-400">{left.length}/{list.length} left</span>
+                    {left.length > 0 && (
+                      <button onClick={() => confirmMany(list)} className="ml-auto text-[11px] font-bold text-blue-700 hover:underline">Confirm section</button>
+                    )}
+                  </div>
+                  {!shut && (
+                    <ul className="divide-y divide-slate-100">
+                      {list.map((c) => (
+                        <li key={c.datapoint_id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                          <span className="font-mono text-xs text-slate-500 w-32 shrink-0 truncate" title={c.datapoint_id}>{c.datapoint_id}</span>
+                          <span className="flex-1 text-slate-700 truncate" title={String(c.value ?? "")}>{String(c.value ?? "—")}</span>
+                          {c.confidence != null && (
+                            <span className={`text-[11px] font-bold ${c.confidence < 0.5 ? "text-amber-600" : "text-slate-400"}`}>
+                              {Math.round(c.confidence * 100)}%
+                            </span>
+                          )}
+                          {confirmed.has(c.datapoint_id)
+                            ? <span className="text-[11px] font-bold text-emerald-600">Confirmed</span>
+                            : <button onClick={() => confirmOne(c)} disabled={confirming === c.datapoint_id} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold disabled:opacity-50">Confirm</button>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+            {ordered.length === 0 && (
+              <p className="text-xs text-slate-400 py-4 text-center">All candidates confirmed — verify values in the registry before filing.</p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
