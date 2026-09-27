@@ -401,7 +401,7 @@ function CsrdWorkspace() {
         ) : (
           <>
             {tab === "overview" && <OverviewTab financialYear={financialYear} mode={mode} notify={notify} goToRegistry={() => changeTab("registry")} valueChainScope={valueChainScope} />}
-            {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} initialQuery={searchParams.get("q") || ""} />}
+            {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} initialQuery={searchParams.get("q") || ""} goToReports={() => changeTab("reports")} />}
             {tab === "materiality" && <MaterialityTab financialYear={financialYear} mode={mode} notify={notify} />}
             {tab === "reports" && <ReportsTab financialYear={financialYear} mode={mode} notify={notify} />}
           </>
@@ -915,7 +915,7 @@ function EvidenceHistory({ financialYear, datapointId, evidence, onAttach, notif
     </div>
   );
 }
-function RegistryTab({ financialYear, mode, notify, initialQuery }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void; initialQuery?: string }) {
+function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void; initialQuery?: string; goToReports: () => void }) {
   const [items, setItems] = useState<RegistryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState(initialQuery || "");
@@ -1030,6 +1030,17 @@ function RegistryTab({ financialYear, mode, notify, initialQuery }: { financialY
   return (
     <div className="space-y-4">
       <ExtractImport financialYear={financialYear} notify={notify} onConfirmed={refreshEntries} />
+      {(() => {
+        const done = Object.values(entriesByDp).filter((e) => e.status === "reported" || e.status === "assessed").length;
+        return done > 0 ? (
+          <button onClick={goToReports} className="w-full flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3.5 hover:bg-emerald-100/70 transition-colors text-left">
+            <span className="text-sm text-emerald-800"><b>{done} confirmed</b> — ready when you are. Generate your ESEF statement, validate, assure and file.</span>
+            <span className="shrink-0 inline-flex items-center gap-1.5 rounded-xl text-white text-xs font-bold px-4 py-2" style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}>
+              Go to Reports →
+            </span>
+          </button>
+        ) : null;
+      })()}
       {/* filter bar */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex flex-col lg:flex-row gap-3">
