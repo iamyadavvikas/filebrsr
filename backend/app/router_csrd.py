@@ -1411,7 +1411,8 @@ async def framework_links(standard: Optional[str] = None):
     return {"standard": standard, "groups": out, "count": sum(len(v) for v in out.values())}
 
 
-@router.get("/extract/mining")
+@router.get("/extract/miss-patterns", include_in_schema=True)
+@router.get("/extract/mining", include_in_schema=False)
 async def extract_mining(
     financial_year: Optional[str] = None,
     authorization: str = Header(...),

@@ -88,6 +88,7 @@ import {
   dmaMethodology,
   extractPdf,
   confirmCandidate,
+  sessionToken,
   listEvidenceDocuments,
   fetchAuditTrail,
   downloadBoardPack,
@@ -671,6 +672,22 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [lowFirst, setLowFirst] = useState(true);
   const [hideDone, setHideDone] = useState(false);
+  const [drift, setDrift] = useState<{ ai_confirmed: number; drifted: number } | null>(null);
+
+  const refreshDrift = useCallback(async () => {
+    try {
+      const token = await sessionToken().catch(() => "");
+      const res = await fetch(`/backend/api/platform/csrd/extract/miss-patterns?financial_year=${encodeURIComponent(financialYear)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setDrift({ ai_confirmed: d.ai_confirmed || 0, drifted: d.drifted || 0 });
+      }
+    } catch {
+      /* miss-pattern stats are advisory; never block review */
+    }
+  }, [financialYear]);
 
   const upload = async (file: File | undefined) => {
     if (!file) return;
@@ -683,6 +700,7 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
       setCompany(out.company_name || "");
       notify(out.candidates.length ? `${out.candidates.length} candidate(s) from ${file.name} — review and confirm` : `No mappable figures found in ${file.name}`);
       onConfirmed();
+      refreshDrift();
     } catch (e) {
       notify(e as Error, false);
     } finally {
@@ -696,6 +714,7 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
       await confirmCandidate(financialYear, c, "reported");
       setConfirmed((prev) => new Set(prev).add(c.datapoint_id));
       onConfirmed();
+      refreshDrift();
       notify(`Confirmed ${c.datapoint_id}`);
     } catch (e) {
       notify(e as Error, false);
@@ -756,6 +775,11 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
         )}
       </div>
       {company && <p className="mt-2 text-xs text-slate-500">Detected company: <b>{company}</b></p>}
+      {drift && drift.ai_confirmed > 0 && (
+        <p className="mt-1.5 text-[11px] text-slate-400">
+          Miss-pattern report for {financialYear}: reviewers adjusted {drift.drifted} of {drift.ai_confirmed} AI-proposed values.
+        </p>
+      )}
       {candidates.length > 0 && (
         <div className="mt-3">
           <div className="flex flex-wrap items-center gap-3">

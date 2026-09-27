@@ -199,7 +199,7 @@ async def test_mining_reports_drift_and_calibration(client, db):
     )
     assert resp.status_code == 200
     resp = await client.get(
-        "/api/platform/csrd/extract/mining", params={"financial_year": FY}, headers=_auth()
+        "/api/platform/csrd/extract/miss-patterns", params={"financial_year": FY}, headers=_auth()
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
