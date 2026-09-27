@@ -47,12 +47,24 @@ FIELD_TO_BRSR: dict[str, str] = {
     "employees_perm_male": "A.IV.1",
     "employees_perm_female": "A.IV.2",
     "employees_perm_total": "A.IV.3",
+    "wf_perm_emp_m": "A.IV.1",
+    "wf_perm_emp_f": "A.IV.2",
+    "wf_perm_emp_t": "A.IV.3",
     "employees_other_male": "A.IV.4",
     "employees_other_female": "A.IV.5",
     "employees_other_total": "A.IV.6",
+    "wf_other_emp_m": "A.IV.4",
+    "wf_other_emp_f": "A.IV.5",
+    "wf_other_emp_t": "A.IV.6",
     "workers_perm_male": "A.IV.7",
     "workers_perm_female": "A.IV.8",
     "workers_perm_total": "A.IV.9",
+    "wf_perm_work_m": "A.IV.7",
+    "wf_perm_work_f": "A.IV.8",
+    "wf_perm_work_t": "A.IV.9",
+    "wf_other_work_m": "A.IV.10",
+    "wf_other_work_f": "A.IV.11",
+    "wf_other_work_t": "A.IV.12",
     "policy_translated_to_procedures": "B.4",
     "policy_extends_value_chain": "B.5",
     "sustainability_in_board_committees": "B.11",
@@ -192,7 +204,15 @@ def brsr_fields_to_esrs_candidates(
         cite = (citations.get(section) or {}).get(field) or {}
         norm = (normalised.get(section) or {}).get(field) or {}
         unit = norm.get("unit") or ""
-        display_value = norm.get("value", value) if isinstance(norm.get("value"), (int, float)) else value
+        if isinstance(norm.get("value"), (int, float)):
+            from app.normalise import canonicalise
+
+            display_value, unit, converted = canonicalise(float(norm["value"]), unit)
+            if not unit:
+                converted = False
+        else:
+            display_value = value
+            converted = False
         for dp in dps:
             candidates.append({
                 "datapoint_id": dp["id"],
@@ -202,7 +222,7 @@ def brsr_fields_to_esrs_candidates(
                 "value": display_value,
                 "raw_value": value if display_value != value else None,
                 "unit": unit or None,
-                "unit_converted": bool(unit),
+                "unit_converted": converted,
                 "confidence": conf_f,
                 "source_page": cite.get("source_page"),
                 "snippet": cite.get("snippet"),

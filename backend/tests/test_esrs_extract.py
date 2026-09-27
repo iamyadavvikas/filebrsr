@@ -50,6 +50,84 @@ def _auth(token=GUEST_A) -> dict:
     return {"authorization": f"Bearer {token}"}
 
 
+def test_headcount_grids_parse_without_cross_contamination():
+    from app.extraction_enhanced import extract_tables
+
+    out = extract_tables(
+        "Particulars Male Female Total\n"
+        "Permanent Employees 800 320 1120\n"
+        "Other than Permanent Employees 100 50 150\n"
+        "Permanent Workers 150 30 180\n"
+        "Other than Permanent Workers 60 20 80\n"
+    )["section_a"]
+    assert out["wf_perm_emp_m"] == "800"
+    assert out["wf_perm_emp_f"] == "320"
+    assert out["wf_perm_emp_t"] == "1120"
+    assert out["wf_other_emp_m"] == "100"
+    assert out["wf_perm_work_t"] == "180"
+    assert out["wf_other_work_t"] == "80"
+
+
+def test_headcount_grids_require_header():
+    from app.extraction_enhanced import extract_tables
+
+    out = extract_tables("Permanent Employees went up this year.")["section_a"]
+    assert not any(k.startswith("wf_") for k in out)
+
+
+def test_headcount_grid_fields_bridge_to_esrs():
+    from app.esrs_extract import FIELD_TO_BRSR, _resolve_esrs
+    from app.esrs_datapoints import ESRS_DATAPOINTS
+
+    by_std_dr = {(d.get("standard"), d.get("dr")) for d in ESRS_DATAPOINTS}
+    for key in ["wf_perm_emp_m", "wf_perm_emp_f", "wf_other_emp_t",
+                "wf_perm_work_m", "wf_other_work_f"]:
+        assert key in FIELD_TO_BRSR, key
+        parsed = _resolve_esrs(FIELD_TO_BRSR[key])
+        assert parsed and parsed in by_std_dr, (key, parsed)
+
+
+def test_canonicalise_energy_water_mass():
+    from app.normalise import canonicalise
+
+    assert canonicalise(5.4, "GWh") == (5400.0, "MWh", True)
+    assert canonicalise(19440, "GJ") == (5400.0, "MWh", True)
+    assert canonicalise(5400, "MWh") == (5400.0, "MWh", False)
+    assert canonicalise(95, "ML") == (95000.0, "m3", True)
+    assert canonicalise(300, "MT") == (300.0, "tonnes", False)
+    assert canonicalise(7, "furlongs") == (7, "furlongs", False)
+
+
+def test_bridge_applies_canonical_scale():
+    out = brsr_fields_to_esrs_candidates(
+        {
+            "section_c": {"energy_consumption_total": "5.4 GWh"},
+            "normalised": {"section_c": {"energy_consumption_total": {
+                "raw": "5.4 GWh", "value": 5.4, "unit": "GWh", "value_inr": None}}},
+        },
+        {},
+    )
+    e = [c for c in out["candidates"] if c["source_field"] == "energy_consumption_total"]
+    assert e, "energy field should map"
+    assert e[0]["value"] == 5400.0
+    assert e[0]["unit"] == "MWh"
+    assert e[0]["unit_converted"] is True
+    assert e[0]["raw_value"] == "5.4 GWh"
+
+
+def test_sector_phrase_variants():
+    from app.extraction import extract_with_regex
+
+    r = extract_with_regex(
+        "Revenue: Rs 4,850\nPermanent headcount: 1150\n"
+        "Learning hours per employee: 30\nTRIFR: 0.4"
+    )
+    assert r["section_a"].get("turnover") == "4,850"
+    assert r["section_a"].get("employees_permanent") == "1150"
+    assert r["section_c"].get("training_hours_per_employee") == "30"
+    assert r["section_c"].get("safety_incidents") == "0.4"
+
+
 def test_parse_esrs_ref():
     assert parse_esrs_ref("ESRS S1-6.50(a)") == ("S1", "S1-6")
     assert parse_esrs_ref("ESRS 2 BP-1") == ("2", "BP-1")
@@ -94,8 +172,8 @@ def test_bridge_passes_citations_and_normalised_units():
     assert c["source_page"] == 47
     assert "Scope 1" in (c["snippet"] or "")
     assert c["match_kind"] == "numeric"
-    assert c["unit"] == "tCO2e"
-    assert c["unit_converted"] is True
+    assert c["unit"] == "tonnes"  # tCO2e canonicalised, same scale
+    assert c["unit_converted"] is False
     assert c["raw_value"] is None  # display == raw here
 
 
@@ -113,7 +191,7 @@ def test_bridge_inr_magnitude_uses_normalised_value():
     assert csr[0]["value"] == 15000000.0
     assert csr[0]["raw_value"] == "Rs 1.5 Cr"
     assert csr[0]["unit"] == "INR"
-    assert csr[0]["unit_converted"] is True
+    assert csr[0]["unit_converted"] is False  # magnitude applied upstream, no rescale here
 
 
 def test_field_map_every_id_has_esrs_ref():

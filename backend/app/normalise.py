@@ -119,6 +119,40 @@ def convert_to_inr(value: float, currency: str) -> float | None:
     return value * rate
 
 
+# Canonical physical units: reports mix TJ/GJ/MWh/kWh, ML/KL/m3 and
+# MT/tonnes/kg for the same quantity. canonicalise() folds them so
+# cross-report comparison (and the ESRS bridge) sees one scale.
+ENERGY_TO_MWH: dict[str, float] = {
+    "KWH": 0.001, "MWH": 1.0, "GWH": 1000.0,
+    "J": 1 / 3.6e9, "KJ": 1 / 3.6e6, "MJ": 1 / 3600.0,
+    "GJ": 1 / 3.6, "TJ": 1000.0 / 3.6,
+}
+VOLUME_TO_M3: dict[str, float] = {
+    "L": 0.001, "LITRE": 0.001, "LITRES": 0.001,
+    "ML": 1000.0, "KL": 1.0, "M3": 1.0, "CUBIC": 1.0,
+}
+MASS_TO_TONNES: dict[str, float] = {
+    "KG": 0.001, "MT": 1.0, "T": 1.0, "TONNE": 1.0, "TONNES": 1.0,
+    "TCO2E": 1.0, "TCO2": 1.0,
+}
+
+
+def canonicalise(value: float, unit: str) -> tuple[float, str, bool]:
+    """Fold a value+unit to canonical scale.
+
+    Returns (canonical_value, canonical_unit, converted). Unknown units
+    pass through unchanged with converted=False.
+    """
+    u = (unit or "").upper().replace("²", "2").replace("³", "3")
+    for table, canonical in (
+        (ENERGY_TO_MWH, "MWh"), (VOLUME_TO_M3, "m3"), (MASS_TO_TONNES, "tonnes"),
+    ):
+        if u in table:
+            factor = table[u]
+            return (value * factor, canonical, factor != 1.0)
+    return (value, unit, False)
+
+
 @dataclass
 class Normalised:
     """Canonical numeric form of a raw extracted value."""
