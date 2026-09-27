@@ -66,6 +66,30 @@ jobs:
           SUPABASE_SERVICE_KEY: test-service-key
           ALLOWED_ORIGINS: http://localhost:3000
 
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Apply all migrations in order on a fresh database
+        run: ./scripts/migrate-check.sh --no-docker
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: filebrsr_migrate_check
+
   # PR dry-run: prove both Docker images build before merge. No push, no
   # deploy — this is the "plan" equivalent for our build-and-deploy pipeline.
   # Runs only on pull_request; actual deploy is manual via workflow_dispatch.

@@ -30,6 +30,16 @@ create table if not exists public.audit_trail (
   created_at timestamptz not null default now()
 );
 
+-- v3_platform created an earlier audit_trail without these columns and
+-- CREATE TABLE IF NOT EXISTS is a no-op on fresh databases, so add them
+-- idempotently here (gate-caught: the datapoint index below failed).
+alter table public.audit_trail add column if not exists datapoint_id text;
+alter table public.audit_trail add column if not exists financial_year text;
+alter table public.audit_trail add column if not exists user_email text;
+alter table public.audit_trail add column if not exists change_reason text;
+alter table public.audit_trail add column if not exists metadata jsonb;
+alter table public.audit_trail add column if not exists checksum text;
+
 -- Make audit trail truly append-only (no updates or deletes via RLS)
 alter table public.audit_trail enable row level security;
 

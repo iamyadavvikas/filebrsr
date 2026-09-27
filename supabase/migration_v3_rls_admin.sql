@@ -89,16 +89,9 @@ DROP POLICY IF EXISTS "Service role full access payments" ON payments;
 CREATE POLICY "Service role full access payments" ON payments
   FOR ALL USING (auth.role() = 'service_role');
 
--- ANALYTICS_EVENTS table (only service role can read all)
-ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Users insert own events" ON analytics_events;
-CREATE POLICY "Users insert own events" ON analytics_events
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "Service role full access analytics" ON analytics_events;
-CREATE POLICY "Service role full access analytics" ON analytics_events
-  FOR ALL USING (auth.role() = 'service_role');
+-- ANALYTICS_EVENTS policies live with the table owner
+-- (migration_v7_teams_analytics.sql). This file must not reference the table:
+-- it does not exist yet at v3 in a fresh database (gate-caught ordering bug).
 
 -- SUPPLIERS table (if exists)
 DO $$
