@@ -112,8 +112,45 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Stage-labelled fetch: turns undici's bare "fetch failed" into the
+  // failing hop (precheck vs upload vs poll) so prod issues are diagnosable
+  // from the UI alone.
+  async function backendFetch(stage: string, url: string, init: RequestInit) {
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`[${stage}] ${msg}`);
+    }
+    return res;
+  }
+
+  async function backendReachable(backendUrl: string): Promise<string | null> {
+    try {
+      const res = await fetch(`${backendUrl}/health`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return `backend health returned ${res.status}`;
+      return null;
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
+  }
+
   try {
     const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+
+    // Fast precheck: connection-level failure here means the backend
+    // container is down/unreachable (vs dying mid-extraction).
+    const healthErr = await backendReachable(backendUrl);
+    if (healthErr) {
+      console.error("Backend unreachable at precheck:", healthErr);
+      return NextResponse.json(
+        { error: "Internal server error", detail: `[precheck] backend unreachable: ${healthErr}` },
+        { status: 500 }
+      );
+    }
 
     // Guest: send directly to backend, return inline results
     if (!user) {
@@ -122,7 +159,7 @@ export async function POST(request: NextRequest) {
       backendForm.append("report_id", "guest");
       backendForm.append("user_id", "guest");
 
-      const backendRes = await fetch(`${backendUrl}/api/extract`, {
+      const backendRes = await backendFetch("guest-extract", `${backendUrl}/api/extract`, {
         method: "POST",
         body: backendForm,
         headers: {
@@ -192,7 +229,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Call backend to queue extraction (returns immediately)
-    const backendRes = await fetch(`${backendUrl}/api/extract-queue`, {
+    const backendRes = await backendFetch("queue", `${backendUrl}/api/extract-queue`, {
       method: "POST",
       body: JSON.stringify({
         report_id: report.id,
@@ -208,7 +245,7 @@ export async function POST(request: NextRequest) {
 
     if (!backendRes.ok) {
       // Fallback: try synchronous extract-async if queue fails
-      const fallbackRes = await fetch(`${backendUrl}/api/extract-async`, {
+      const fallbackRes = await backendFetch("fallback-extract", `${backendUrl}/api/extract-async`, {
         method: "POST",
         body: JSON.stringify({
           report_id: report.id,
@@ -237,7 +274,8 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(resolve => setTimeout(resolve, 3000));
       try {
-        const statusRes = await fetch(
+        const statusRes = await backendFetch(
+          "poll",
           `${backendUrl}/api/extract-status/${report.id}`,
           {
             headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
