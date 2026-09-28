@@ -329,6 +329,8 @@ export default function SupplyChainClient() {
         </div>
       )}
 
+      <CascadeSection />
+
       {/* Add Supplier Modal */}
       {showAddModal && <AddSupplierModal onClose={() => setShowAddModal(false)} onAdded={(s) => { setSuppliers((prev) => [s, ...prev]); setShowAddModal(false); }} />}
 
@@ -618,6 +620,161 @@ function CsvUploadModal({ onClose, onUploaded }: { onClose: () => void; onUpload
           </div>
         )}
       </div>
+    </div>
+  );
+}
+export function CascadeSection() {
+  interface CascadeSupplier { id: string; name: string }
+  interface CascadeResponse {
+    id: string; supplier_id: string; questionnaire: string; status: string;
+    supplier?: { name?: string };
+  }
+  interface PrefillRow { datapoint_id: string; value: unknown; note?: string }
+  const [suppliers, setSuppliers] = useState<CascadeSupplier[]>([]);
+  const [responses, setResponses] = useState<CascadeResponse[]>([]);
+  const [fy, setFy] = useState("FY2025-26");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [preview, setPreview] = useState<PrefillRow[]>([]);
+  const [previewFor, setPreviewFor] = useState("");
+  const [message, setMessage] = useState("");
+
+  const token = async () => {
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? "";
+  };
+
+  const authed = async (path: string, init?: RequestInit) => {
+    const t = await token();
+    const res = await fetch(`/backend${path}`, {
+      ...init,
+      headers: { ...(init?.headers ?? {}), "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+    });
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    return res.json();
+  };
+
+  const load = async () => {
+    try {
+      const [s, r] = await Promise.all([
+        authed("/api/suppliers"),
+        authed(`/api/suppliers/responses?financial_year=${encodeURIComponent(fy)}`).catch(() => ({ responses: [] })),
+      ]);
+      setSuppliers(s.suppliers || []);
+      setResponses(r.responses || []);
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
+  useEffect(() => {
+    load().catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fy]);
+
+  const invite = async () => {
+    if (!name.trim()) {
+      setMessage("Enter the supplier name.");
+      return;
+    }
+    try {
+      const d = await authed("/api/suppliers/invite", {
+        method: "POST",
+        body: JSON.stringify({ name: name.trim(), email: email.trim() || null }),
+      });
+      setInviteUrl(d.invite_url);
+      setName("");
+      setEmail("");
+      await load();
+      setMessage("");
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
+  const showPrefill = async (id: string) => {
+    try {
+      const d = await authed(`/api/suppliers/responses/${id}/prefill`, { method: "POST" });
+      setPreview(d.entries || []);
+      setPreviewFor(id);
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
+  const saveToRegistry = async () => {
+    if (!preview.length) return;
+    try {
+      // CSRD FY format (FY2025) differs from platform FY (FY2025-26).
+      const csrdFy = "FY" + fy.slice(2, 6);
+      await authed("/api/platform/csrd/entries", {
+        method: "POST",
+        body: JSON.stringify({
+          financial_year: csrdFy,
+          entries: preview.map((e: PrefillRow) => ({
+            datapoint_id: e.datapoint_id, status: "reported", value: e.value,
+            notes: e.note, source: "supplier",
+          })),
+        }),
+      });
+      setMessage(`${preview.length} value(s) saved to the CSRD registry (${csrdFy}) — verify before filing.`);
+      setPreview([]);
+      setPreviewFor("");
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
+  return (
+    <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6">
+      <h2 className="font-bold text-gray-900">Supplier cascade</h2>
+      <p className="text-xs text-gray-500 mt-1">Invite vendors by magic link — their answers prefill Scope 3 + S2 with your review. FY format here is platform-style; CSRD saves use the mapped year.</p>
+      <div className="mt-3 flex flex-wrap gap-2 items-center">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Supplier name" className="rounded-lg border px-3 py-2 text-sm" />
+        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (optional)" className="rounded-lg border px-3 py-2 text-sm" />
+        <select value={fy} onChange={(e) => setFy(e.target.value)} className="rounded-lg border px-2 py-2 text-sm">
+          {["FY2024-25", "FY2025-26", "FY2026-27"].map((f) => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <button onClick={invite} className="rounded-lg bg-slate-900 text-white px-4 py-2 text-xs font-bold">Invite vendor</button>
+      </div>
+      {inviteUrl && (
+        <p className="mt-2 text-xs text-emerald-700 break-all">Invite ready — send this link: <b>{inviteUrl}</b></p>
+      )}
+      {message && <p className="mt-2 text-xs text-amber-700">{message}</p>}
+      <div className="mt-4 space-y-2">
+        {responses.length === 0 && <p className="text-xs text-gray-400">No questionnaire responses yet for {fy}.</p>}
+        {responses.map((r: CascadeResponse) => (
+          <div key={r.id} className="rounded-xl border border-gray-100 p-3">
+            <div className="flex items-center gap-2 text-sm">
+              <b>{r.supplier?.name || r.supplier_id}</b>
+              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${r.status === "submitted" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{r.status}</span>
+              <span className="text-xs text-gray-400">{r.questionnaire}</span>
+              <button onClick={() => showPrefill(r.id)} className="ml-auto text-xs font-bold text-blue-700 hover:underline">Preview prefill</button>
+            </div>
+            {previewFor === r.id && (
+              <div className="mt-2">
+                <ul className="space-y-1 max-h-40 overflow-y-auto">
+                  {preview.map((e: PrefillRow) => (
+                    <li key={e.datapoint_id} className="flex gap-2 text-xs text-gray-600">
+                      <span className="font-mono text-slate-500">{e.datapoint_id}</span>
+                      <span className="truncate">{String(e.value ?? "—")}</span>
+                    </li>
+                  ))}
+                </ul>
+                {preview.length > 0 && (
+                  <button onClick={saveToRegistry} className="mt-2 rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-xs font-bold">Save {preview.length} to CSRD registry</button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {suppliers.length > 0 && (
+        <p className="mt-3 text-[11px] text-gray-400">{suppliers.length} invited vendor(s): {suppliers.map((s) => s.name).join(", ")}</p>
+      )}
     </div>
   );
 }

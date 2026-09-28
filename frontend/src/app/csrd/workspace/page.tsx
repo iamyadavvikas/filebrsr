@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -90,6 +91,12 @@ import {
   extractPdf,
   confirmCandidate,
   sessionToken,
+  gapAnalysisReport,
+  type GapAnalysisReport,
+  runRollover,
+  rolloverVariance,
+  type RolloverResult,
+  type VarianceFlag,
   vsmeCatalog,
   vsmeUpgrade,
   applyVsmePrefill,
@@ -109,6 +116,7 @@ import {
   STAKEHOLDER_GROUPS,
   ENGAGEMENT_METHODS,
 } from "@/lib/csrd/workspace";
+import { nextAction, stepStates, focusQueue as buildFocusQueue } from "@/lib/csrd/journey";
 import { AuthSessionError } from "@/lib/supabase/session";
 import { createClient } from "@/lib/supabase/client";
 
@@ -217,7 +225,11 @@ function CsrdWorkspace() {
   );
 
   const changeTab = (t: Tab) => {
-    syncUrl({ tab: t, fy: financialYear });
+    syncUrl({ tab: t, fy: financialYear, focus: "" });
+  };
+
+  const goToFocus = (id: string) => {
+    syncUrl({ tab: "registry", fy: financialYear, q: "", focus: id });
   };
 
   const changeFy = (fy: string) => {
@@ -407,12 +419,103 @@ function CsrdWorkspace() {
           </div>
         ) : (
           <>
-            {tab === "overview" && <OverviewTab financialYear={financialYear} mode={mode} notify={notify} goToRegistry={() => changeTab("registry")} valueChainScope={valueChainScope} />}
-            {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} initialQuery={searchParams.get("q") || ""} goToReports={() => changeTab("reports")} />}
+            {tab === "overview" && <OverviewTab financialYear={financialYear} mode={mode} notify={notify} goToRegistry={() => changeTab("registry")} goToMateriality={() => changeTab("materiality")} goToReports={() => changeTab("reports")} goToVsme={() => changeTab("vsme")} goToFocus={goToFocus} valueChainScope={valueChainScope} />}
+            {tab === "registry" && <RegistryTab financialYear={financialYear} mode={mode} notify={notify} initialQuery={searchParams.get("q") || ""} initialFocus={searchParams.get("focus") || ""} goToReports={() => changeTab("reports")} />}
             {tab === "materiality" && <MaterialityTab financialYear={financialYear} mode={mode} notify={notify} />}
             {tab === "reports" && <ReportsTab financialYear={financialYear} mode={mode} notify={notify} />}
             {tab === "vsme" && <VsmeTab financialYear={financialYear} notify={notify} />}
           </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Guided journey: stepper + next action (Overview)
+// ───────────────────────────────────────────────────────────────────────────
+
+const GLOSSARY: Record<string, string> = {
+  datapoint: "One question the EU requires an answer to. There are 664 in total; only the ones in your scope count.",
+  readiness: "Share of in-scope questions you have answered (reported, assessed, not-material or not-applicable).",
+  handled: "Questions already answered or ruled out — they no longer block you.",
+  "effective gap": "In-scope questions still waiting for an answer. This number going down is progress.",
+  IRO: "Impact, Risk or Opportunity — the sustainability topics you declare material. They decide which questions count.",
+  DR: "Disclosure Requirement — a themed group of questions (e.g. E1 covers climate).",
+  "phase-in": "EU relief: smaller companies may skip some questions for the first years. Skipped ones don't count against you.",
+  "in-scope": "Applies to you this year, given your size, phase-in reliefs and value-chain boundary.",
+  material: "Important enough to disclose — either by impact on people/environment or by financial effect on you.",
+  assurance: "Independent check of your statement by an auditor: limited (lighter touch) or reasonable (deep testing).",
+  attestation: "A named person signing that the statement is approved — required before filing.",
+  sandbox: "A throwaway workspace: full features, nothing filed, auto-deleted. Safe to experiment.",
+};
+
+function HelpTerm({ term, children }: { term: keyof typeof GLOSSARY | string; children?: ReactNode }) {
+  const key = String(term).toLowerCase();
+  const tip = (GLOSSARY as Record<string, string>)[key];
+  if (!tip) return <>{children || term}</>;
+  return (
+    <span title={tip} className="underline decoration-dotted decoration-slate-300 underline-offset-2 cursor-help">
+      {children || term}
+    </span>
+  );
+}
+
+function StepTracker({ state, go }: {
+  state: import("@/lib/csrd/journey").JourneyState;
+  go: (tab: "overview" | "registry" | "materiality" | "reports" | "vsme") => void;
+}) {
+  const steps = stepStates(state);
+  return (
+    <ol className="flex flex-wrap items-center gap-1.5 mt-3">
+      {steps.map((s, i) => (
+        <li key={s.id} className="flex items-center gap-1.5">
+          {i > 0 && <span className="text-slate-300 text-xs">→</span>}
+          <button
+            onClick={() => go(s.tab)}
+            title={s.state === "done" ? "Completed — review" : s.state === "current" ? "Do this next" : "Locked until prior steps progress"}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${
+              s.state === "done"
+                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                : s.state === "current"
+                  ? "bg-violet-600 text-white shadow hover:bg-violet-700"
+                  : "bg-white border border-slate-200 text-slate-400"
+            }`}
+          >
+            {s.state === "done" ? <Check className="w-3 h-3" /> : <span className="w-4 h-4 rounded-full border border-current flex items-center justify-center text-[9px]">{i + 1}</span>}
+            {s.label}
+          </button>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function NextActionHero({ state, coverage, go }: {
+  state: import("@/lib/csrd/journey").JourneyState;
+  coverage: DMACoverage | null;
+  go: (tab: "overview" | "registry" | "materiality" | "reports" | "vsme") => void;
+}) {
+  const action = nextAction(state);
+  return (
+    <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex-1">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600">Do this next</p>
+        <p className="text-base font-extrabold text-slate-900 mt-0.5">{action.title}</p>
+        <p className="text-xs text-slate-500 mt-1">{action.detail}</p>
+        {coverage && (
+          <p className={`mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${coverage.audit_ready ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+            {coverage.audit_ready ? "Audit-ready methodology" : `Methodology ${coverage.methodology_status} · ${coverage.orphan_iro_ids.length} orphan IRO(s) · ${coverage.stakeholder_records} engagement(s)`}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col gap-2 flex-shrink-0">
+        <button onClick={() => go(action.tab)} className="rounded-xl text-white text-sm font-bold px-5 py-2.5" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+          {action.cta} →
+        </button>
+        {action.step === "start" && (
+          <button onClick={() => go("vsme")} className="rounded-xl border border-blue-300 bg-white px-5 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50">
+            New to ESRS? Start with VSME
+          </button>
         )}
       </div>
     </div>
@@ -428,17 +531,28 @@ function OverviewTab({
   mode,
   notify,
   goToRegistry,
+  goToMateriality,
+  goToReports,
+  goToVsme,
+  goToFocus,
   valueChainScope,
 }: {
   financialYear: string;
   mode: CsrdMode;
   notify: (m: string | Error, ok?: boolean) => void;
   goToRegistry: () => void;
+  goToMateriality: () => void;
+  goToReports: () => void;
+  goToVsme: () => void;
+  goToFocus: (id: string) => void;
   valueChainScope: string[];
 }) {
   const [gap, setGap] = useState<GapSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [standards, setStandards] = useState<StandardMeta[]>([]);
+  const [iroList, setIroList] = useState<IRO[]>([]);
+  const [coverage, setCoverage] = useState<DMACoverage | null>(null);
+  const [reportCount, setReportCount] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -450,7 +564,10 @@ function OverviewTab({
         listIro(financialYear).catch(() => [] as IRO[]),
       ]);
       setStandards(standardsMeta);
+      setIroList(iro);
       setGap(computeGap(reg, entries.entries, standardsMeta, financialYear, { valueChainScope, iro }));
+      dmaCoverage(financialYear).then(setCoverage).catch(() => setCoverage(null));
+      listReports(financialYear).then((r) => setReportCount(r.length)).catch(() => setReportCount(0));
     } catch (e) {
       notify(e as Error);
     } finally {
@@ -484,6 +601,25 @@ function OverviewTab({
 
   return (
     <div className="space-y-6">
+      <NextActionHero
+        state={{
+          entriesAssessed: gap.handled,
+          entriesTotal: gap.total_datapoints,
+          iroCount: iroList.length,
+          orphanIroIds: coverage?.orphan_iro_ids || [],
+          methodologyStatus: coverage?.methodology_status || "draft",
+          stakeholderRecords: coverage?.stakeholder_records || 0,
+          reportsGenerated: reportCount,
+        }}
+        coverage={coverage}
+        go={(tab) =>
+          tab === "registry" ? goToRegistry()
+          : tab === "materiality" ? goToMateriality()
+          : tab === "reports" ? goToReports()
+          : goToVsme()
+        }
+      />
+
       {mode !== "cloud" && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-5">
           <div className="flex items-start gap-3">
@@ -497,11 +633,23 @@ function OverviewTab({
                   ? "A throwaway workspace — nothing you do here is filed with a regulator."
                   : "Everything is saved in this browser, ready to explore."}
               </p>
-              <ol className="text-xs text-slate-600 mt-2 space-y-1">
-                <li><span className="font-semibold text-violet-700">1.</span> Assess datapoints in the registry (or load sample data)</li>
-                <li><span className="font-semibold text-violet-700">2.</span> Record impacts, risks &amp; opportunities in Materiality</li>
-                <li><span className="font-semibold text-violet-700">3.</span> Generate your ESRS statement in Reports</li>
-              </ol>
+              <StepTracker
+                state={{
+                  entriesAssessed: gap.handled,
+                  entriesTotal: gap.total_datapoints,
+                  iroCount: iroList.length,
+                  orphanIroIds: coverage?.orphan_iro_ids || [],
+                  methodologyStatus: coverage?.methodology_status || "draft",
+                  stakeholderRecords: coverage?.stakeholder_records || 0,
+                  reportsGenerated: reportCount,
+                }}
+                go={(tab) =>
+                  tab === "registry" ? goToRegistry()
+                  : tab === "materiality" ? goToMateriality()
+                  : tab === "reports" ? goToReports()
+                  : goToVsme()
+                }
+              />
             </div>
           </div>
           <div className="flex gap-2 flex-shrink-0">
@@ -510,6 +658,31 @@ function OverviewTab({
             </button>
             <button onClick={clear} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-50">
               <Trash2 className="w-4 h-4" /> Reset
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(gap.handled > 0 || reportCount > 0) && (
+        <RolloverCard financialYear={financialYear} mode={mode} notify={notify} />
+      )}
+
+      {gap.handled === 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6">
+          <p className="text-sm font-bold text-slate-800">Three ways to start — pick one</p>
+          <p className="text-xs text-slate-500 mt-1">Any path lands answers in the same registry. Nothing is filed until you generate a statement in Reports.</p>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button onClick={goToRegistry} className="rounded-xl border border-slate-200 p-4 text-left hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
+              <p className="text-sm font-bold text-slate-800">Import your report</p>
+              <p className="text-xs text-slate-500 mt-1">Upload the annual report — AI proposes values, you confirm each one.</p>
+            </button>
+            <button onClick={seed} className="rounded-xl border border-slate-200 p-4 text-left hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
+              <p className="text-sm font-bold text-slate-800">Explore sample data</p>
+              <p className="text-xs text-slate-500 mt-1">A realistic 20% workspace to click through in 2 minutes.</p>
+            </button>
+            <button onClick={goToVsme} className="rounded-xl border border-slate-200 p-4 text-left hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
+              <p className="text-sm font-bold text-slate-800">Answer 30 SME questions</p>
+              <p className="text-xs text-slate-500 mt-1">The VSME on-ramp prefills matching ESRS answers for you.</p>
             </button>
           </div>
         </div>
@@ -539,9 +712,9 @@ function OverviewTab({
             </div>
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-800">Overall readiness</p>
+            <p className="text-sm font-bold text-slate-800">Overall <HelpTerm term="readiness">readiness</HelpTerm></p>
             <p className="text-xs text-slate-500 mt-1 leading-5">
-              {gap.handled} of {gap.total_datapoints} datapoints assessed for {financialYear}.
+              {gap.handled} of {gap.total_datapoints} <HelpTerm term="datapoint">datapoints</HelpTerm> assessed for {financialYear}.
             </p>
             <button onClick={goToRegistry} className="mt-3 text-xs font-semibold text-blue-700 hover:underline">
               Start with ESRS 2 → BP-1 / BP-2 &raquo;
@@ -549,9 +722,9 @@ function OverviewTab({
           </div>
         </div>
 
-        <StatCard label="Handled" value={gap.handled} hint="reported · assessed · not applicable" color="#059669" />
+        <StatCard label={<HelpTerm term="handled">Handled</HelpTerm>} value={gap.handled} hint="reported · assessed · not applicable" color="#059669" />
         <StatCard
-          label="Effective gap"
+          label={<HelpTerm term="effective gap">Effective gap</HelpTerm>}
           value={gap.effective_gap}
           hint="still to assess for your FY"
           color={gap.effective_gap > 0 ? "#D97706" : "#059669"}
@@ -591,15 +764,15 @@ function OverviewTab({
 
       {/* priority shortlist */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6">
-        <h2 className="font-bold text-slate-900">Start here — ESRS 2 cornerstone datapoints</h2>
-        <p className="text-xs text-slate-400 mt-0.5 mb-4">These disclosures anchor the whole statement. Assess them first, then move to the topical standards.</p>
+        <h2 className="font-bold text-slate-900">Start here — ESRS 2 cornerstone <HelpTerm term="datapoint">datapoints</HelpTerm></h2>
+        <p className="text-xs text-slate-400 mt-0.5 mb-4">These company-profile disclosures anchor the whole statement — everything else references them. Click one to assess it directly, then move to the topical standards.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {PRIORITY_DPS.map((id) => (
-            <div key={id} className="rounded-xl border border-slate-200 p-4">
+            <button key={id} onClick={() => goToFocus(id)} className="text-left rounded-xl border border-slate-200 p-4 hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
               <p className="text-xs font-bold text-blue-700">{id}</p>
               <p className="text-xs text-slate-500 mt-1">{STANDARD_META[id.split(".")[0]]?.split(" — ")[1] || id}</p>
-              <span className="mt-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">gating disclosure</span>
-            </div>
+              <span className="mt-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">gating disclosure → assess</span>
+            </button>
           ))}
         </div>
       </div>
@@ -644,8 +817,57 @@ function FrameworkLinksPanel() {
   );
 }
 
-function StatCard({ label, value, hint, color }: { label: string; value: string | number; hint: string; color: string }) {
+function RolloverCard({ financialYear, mode, notify }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void }) {
+  const [toFy, setToFy] = useState("FY2026");
+  const [result, setResult] = useState<RolloverResult | null>(null);
+  const [flags, setFlags] = useState<VarianceFlag[]>([]);
+  const [working, setWorking] = useState(false);
+
+  const run = async () => {
+    setWorking(true);
+    try {
+      const r = await runRollover(financialYear, toFy);
+      setResult(r);
+      const v = await rolloverVariance(financialYear, toFy).catch(() => null);
+      setFlags((v?.flags || []).filter((f) => f.flagged).slice(0, 8));
+      notify(`Carried ${r.entries_copied} entries + ${r.iros_copied} IROs into ${toFy}`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  if (mode === "demo") return null;
   return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex-1">
+        <p className="text-sm font-bold text-slate-800">Start {toFy} from {financialYear}</p>
+        <p className="text-xs text-slate-500 mt-0.5">Carries values forward as in-progress (nothing overwritten), IROs as draft, methodology unlocked. Reruns only fill gaps.</p>
+        {result && (
+          <p className="text-xs text-emerald-700 font-semibold mt-1.5">
+            {result.entries_copied} copied · {result.entries_skipped} already present · {result.iros_copied} IROs
+          </p>
+        )}
+        {flags.length > 0 && (
+          <p className="text-[11px] text-amber-600 mt-1">
+            Variance ≥10%: {flags.map((f) => `${f.datapoint_id} (${f.pct_change}%)`).join(", ")}
+          </p>
+        )}
+      </div>
+      <div className="flex gap-2 flex-shrink-0">
+        <select value={toFy} onChange={(e) => setToFy(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm">
+          {FY_OPTIONS.filter((f) => f !== financialYear).map((f) => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <button onClick={run} disabled={working} className="rounded-xl text-white text-sm font-bold px-4 py-2 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+          {working ? "Carrying…" : `Rollover → ${toFy}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, hint, color }: { label: ReactNode; value: string | number; hint: ReactNode; color: string }) {  return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 flex flex-col justify-between">
       <p className="text-xs font-bold uppercase tracking-wider text-slate-400">{label}</p>
       <p className="text-3xl font-extrabold mt-2" style={{ color }}>{value}</p>
@@ -686,8 +908,24 @@ const VSME_AREA_NAMES: Record<string, string> = {
 };
 
 function VsmeTab({ financialYear, notify }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void }) {
+  const draftKey = `csrd.vsme.draft.${financialYear}`;
   const [metrics, setMetrics] = useState<VSMEMetric[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>(() => {
+    try {
+      if (typeof window === "undefined") return {};
+      return JSON.parse(window.localStorage.getItem(draftKey) || "{}");
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(draftKey, JSON.stringify(answers));
+    } catch {
+      /* quota exceeded — draft stays in memory */
+    }
+  }, [answers, draftKey]);
   const [preview, setPreview] = useState<VSMEPrefill[]>([]);
   const [unmapped, setUnmapped] = useState<string[]>([]);
   const [working, setWorking] = useState(false);
@@ -791,13 +1029,18 @@ function VsmeTab({ financialYear, notify }: { financialYear: string; notify: (m:
           </div>
         </div>
       ))}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         <button onClick={runPreview} disabled={working} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-bold px-5 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
           {working ? "Computing…" : "Preview ESRS prefill"}
         </button>
         {preview.length > 0 && (
           <button onClick={saveAll} disabled={saving} className="inline-flex items-center gap-2 rounded-xl text-white text-sm font-bold px-5 py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #059669, #0D9488)" }}>
             {saving ? "Saving…" : `Save ${preview.length} to registry`}
+          </button>
+        )}
+        {answered > 0 && (
+          <button onClick={() => { setAnswers({}); setPreview([]); setUnmapped([]); }} className="text-[11px] font-bold text-slate-400 hover:text-red-500 ml-auto">
+            Clear draft
           </button>
         )}
       </div>
@@ -822,12 +1065,53 @@ function VsmeTab({ financialYear, notify }: { financialYear: string; notify: (m:
   );
 }
 
+// Bulk-assess the loaded page (skips already-handled rows)
+// ───────────────────────────────────────────────────────────────────────────
+
+function BulkAssess({ items, entriesByDp, persist, notify }: {
+  items: RegistryItem[];
+  entriesByDp: Record<string, EntryRow>;
+  persist: (item: RegistryItem, status: string, value?: unknown, evidence?: string, notes?: string, materialityId?: string) => Promise<void>;
+  notify: (m: string | Error, ok?: boolean) => void;
+}) {
+  const [working, setWorking] = useState(false);
+  const pending = items.filter((i) => !HANDLED.has(entriesByDp[i.id]?.status || ""));
+  if (pending.length === 0) return null;
+
+  const run = async (status: "assessed" | "reported") => {
+    if (!window.confirm(`Mark ${pending.length} visible datapoint(s) as ${STATUS_LABELS[status]}? Values stay empty — add them per row after.`)) return;
+    setWorking(true);
+    let done = 0;
+    try {
+      for (const item of pending) {
+        const e = entriesByDp[item.id];
+        await persist(item, status, e?.value ?? null, e?.evidence || "", e?.notes || "", e?.materiality_id || "");
+        done += 1;
+      }
+      notify(`${done} datapoint(s) marked ${STATUS_LABELS[status]}`);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1 text-[11px]">
+      <span className="text-slate-400 font-semibold">{pending.length} open</span>
+      <button onClick={() => void run("assessed")} disabled={working} className="font-bold text-blue-700 hover:underline disabled:opacity-50">Mark assessed</button>
+      <button onClick={() => void run("reported")} disabled={working} className="font-bold text-blue-700 hover:underline disabled:opacity-50">Mark reported</button>
+    </div>
+  );
+}
+
 // Upload & Extract (PDF annual report -> reviewable ESRS candidates)
 // ───────────────────────────────────────────────────────────────────────────
 
 function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void; onConfirmed: () => void }) {
   const [candidates, setCandidates] = useState<ExtractCandidate[]>([]);
   const [company, setCompany] = useState<string>("");
+  const [fileMeta, setFileMeta] = useState<{ name: string; kb: number; seconds: number; capped: boolean } | null>(null);
   const [working, setWorking] = useState(false);
   const [confirming, setConfirming] = useState<string>("");
   const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
@@ -857,10 +1141,18 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
     setWorking(true);
     setConfirmed(new Set());
     setCollapsed(new Set());
+    setFileMeta(null);
+    const started = Date.now();
     try {
       const out = await extractPdf(file);
       setCandidates(out.candidates);
       setCompany(out.company_name || "");
+      setFileMeta({
+        name: file.name,
+        kb: Math.round(file.size / 1024),
+        seconds: Math.round((Date.now() - started) / 100) / 10,
+        capped: out.stats?.capped ?? out.candidates.length >= 200,
+      });
       notify(out.candidates.length ? `${out.candidates.length} candidate(s) from ${file.name} — review and confirm` : `No mappable figures found in ${file.name}`);
       onConfirmed();
       refreshDrift();
@@ -874,7 +1166,7 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
   const confirmOne = async (c: ExtractCandidate) => {
     setConfirming(c.datapoint_id);
     try {
-      await confirmCandidate(financialYear, c, "reported");
+      await confirmCandidate(financialYear, c);
       setConfirmed((prev) => new Set(prev).add(c.datapoint_id));
       onConfirmed();
       refreshDrift();
@@ -890,7 +1182,7 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
     for (const c of list) {
       if (confirmed.has(c.datapoint_id)) continue;
       try {
-        await confirmCandidate(financialYear, c, "reported");
+        await confirmCandidate(financialYear, c);
         setConfirmed((prev) => new Set(prev).add(c.datapoint_id));
       } catch (e) {
         notify(e as Error, false);
@@ -938,6 +1230,12 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
         )}
       </div>
       {company && <p className="mt-2 text-xs text-slate-500">Detected company: <b>{company}</b></p>}
+      {fileMeta && (
+        <p className="mt-1 text-[11px] text-slate-400">
+          {fileMeta.name} · {fileMeta.kb} KB · extracted in {fileMeta.seconds}s
+          {fileMeta.capped && <span className="ml-1 font-bold text-amber-600">Showing first 200 — refine by standard or re-upload a narrower report for full coverage.</span>}
+        </p>
+      )}
       {drift && drift.ai_confirmed > 0 && (
         <div className="mt-1.5">
           <p className="text-[11px] text-slate-400">
@@ -995,10 +1293,13 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
                         <li key={c.datapoint_id} className="px-3 py-2 text-sm">
                           <div className="flex items-center gap-3">
                             <span className="font-mono text-xs text-slate-500 w-32 shrink-0 truncate" title={c.datapoint_id}>{c.datapoint_id}</span>
-                            <span className="flex-1 text-slate-700 truncate" title={String(c.value ?? "")}>
-                              {String(c.value ?? "—")}
+                            <span className="flex-1 text-slate-700 truncate" title={String(c.value ?? c.snippet ?? "")}>
+                              {c.needs_writing ? <span className="text-slate-400 italic">write from snippet ↓</span> : String(c.value ?? "—")}
                               {c.unit && <span className="ml-1 text-[10px] text-slate-400">{c.unit}{c.unit_converted ? " · converted" : ""}</span>}
                             </span>
+                            {(c.weak_reasons || []).length > 0 && (
+                              <span className="shrink-0 text-[10px] font-bold text-amber-600" title={`Check: ${c.weak_reasons!.join(", ")}`}>verify</span>
+                            )}
                             {c.source_page != null && (
                               <span className="shrink-0 text-[10px] font-bold text-slate-400" title={c.snippet || ""}>p.{c.source_page}</span>
                             )}
@@ -1009,7 +1310,7 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
                             )}
                             {confirmed.has(c.datapoint_id)
                               ? <span className="text-[11px] font-bold text-emerald-600">Confirmed</span>
-                              : <button onClick={() => confirmOne(c)} disabled={confirming === c.datapoint_id} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold disabled:opacity-50">Confirm</button>}
+                              : <button onClick={() => confirmOne(c)} disabled={confirming === c.datapoint_id} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold disabled:opacity-50">{c.needs_writing ? "Attach" : "Confirm"}</button>}
                           </div>
                           {c.snippet && (
                             <p className="mt-1 pl-0 text-[11px] text-slate-400 truncate" title={c.snippet}>“{c.snippet}”</p>
@@ -1096,7 +1397,7 @@ function EvidenceHistory({ financialYear, datapointId, evidence, onAttach, notif
     </div>
   );
 }
-function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void; initialQuery?: string; goToReports: () => void }) {
+function RegistryTab({ financialYear, mode, notify, initialQuery, initialFocus, goToReports }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void; initialQuery?: string; initialFocus?: string; goToReports: () => void }) {
   const [items, setItems] = useState<RegistryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState(initialQuery || "");
@@ -1113,6 +1414,10 @@ function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }:
   const [draftNotes, setDraftNotes] = useState("");
   const [roster, setRoster] = useState<IRO[]>([]);
   const [draftMaterialityId, setDraftMaterialityId] = useState("");
+  const [focusQueue, setFocusQueue] = useState<string[]>([]);
+  const [focusIdx, setFocusIdx] = useState(0);
+  const [focusOn, setFocusOn] = useState(false);
+  const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const LIMIT = 25;
 
@@ -1208,6 +1513,110 @@ function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }:
 
   const hasMaterialIro = roster.some((r) => r.material);
 
+  useEffect(() => {
+    if (!focusOn) return;
+    const id = focusQueue[focusIdx];
+    if (!id) return;
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+    const existing = entriesByDp[id];
+    setSelected(item);
+    setDraftStatus(existing?.status || "not_assessed");
+    setDraftValue(existing?.value == null ? "" : typeof existing.value === "object" ? JSON.stringify(existing.value) : String(existing.value));
+    setDraftEvidence(existing?.evidence || "");
+    setDraftNotes(existing?.notes || "");
+    setDraftMaterialityId(existing?.materiality_id || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusOn, focusIdx]);
+
+  const startFocus = useCallback(async () => {
+    const unassessed = items.filter((i) => {
+      const s = entriesByDp[i.id]?.status || "not_assessed";
+      return !HANDLED.has(s);
+    });
+    if (unassessed.length === 0) {
+      notify("Nothing left to assess in this view — well done.");
+      return;
+    }
+    let order: string[] = ["2", "E1", "E2", "E3", "E4", "E5", "S1", "S2", "S3", "S4", "G1"];
+    try {
+      const meta = await fetchStandards();
+      order = [...meta].sort((a, b) => a.order - b.order).map((m) => m.standard);
+    } catch {
+      /* default order stands */
+    }
+    const assessed = new Set(Object.keys(entriesByDp).filter((id) => HANDLED.has(entriesByDp[id]?.status || "")));
+    setFocusQueue(buildFocusQueue(unassessed, assessed, order));
+    setFocusIdx(0);
+    setFocusOn(true);
+  }, [items, entriesByDp, notify]);
+
+  const exitFocus = useCallback(() => {
+    setFocusOn(false);
+    setFocusQueue([]);
+    setFocusIdx(0);
+  }, []);
+
+  const focusSaveNext = async () => {
+    const item = items.find((i) => i.id === focusQueue[focusIdx]);
+    if (!item) {
+      exitFocus();
+      return;
+    }
+    let value: unknown = null;
+    if (draftValue.trim() !== "") {
+      try {
+        value = JSON.parse(draftValue);
+      } catch {
+        value = draftValue;
+      }
+    }
+    await persist(item, draftStatus, value, draftEvidence, draftNotes, draftMaterialityId);
+    if (focusIdx + 1 >= focusQueue.length) {
+      notify("Focus queue complete — verify values before filing");
+      exitFocus();
+    } else {
+      setFocusIdx(focusIdx + 1);
+    }
+  };
+
+  const focusSkip = () => {
+    if (focusIdx + 1 >= focusQueue.length) exitFocus();
+    else setFocusIdx(focusIdx + 1);
+  };
+
+  useEffect(() => {
+    if (!focusOn) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        void focusSaveNext();
+      } else if (e.key === "Escape") {
+        exitFocus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  useEffect(() => {
+    if (!initialFocus || items.length === 0) return;
+    const load = async () => {
+      try {
+        const reg = await fullRegistry();
+        const item = reg.find((d) => d.id === initialFocus);
+        if (item) {
+          pick(item as RegistryItem);
+          requestAnimationFrame(() => rowRefs.current[initialFocus]?.scrollIntoView({ behavior: "smooth", block: "center" }));
+        }
+      } catch {
+        /* registry unavailable — ignore deep focus */
+      }
+    };
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length]);
+
   return (
     <div className="space-y-4">
       <ExtractImport financialYear={financialYear} notify={notify} onConfirmed={refreshEntries} />
@@ -1270,10 +1679,16 @@ function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }:
           <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
               <p className="text-sm font-semibold text-slate-700">{total} datapoints</p>
-              <div className="flex items-center gap-1 text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <BulkAssess items={items} entriesByDp={entriesByDp} persist={persist} notify={notify} />
+                <button onClick={() => void startFocus()} className="text-[11px] font-bold text-white bg-slate-900 rounded-lg px-3 py-1.5 hover:bg-slate-700" title="Walk unassessed datapoints one by one (Ctrl+Enter saves, Esc exits)">
+                  Assess in focus
+                </button>
+                <div className="flex items-center gap-1 text-xs text-slate-400">
                 <button disabled={Boolean(statusF) || offset === 0} onClick={() => setOffset(Math.max(0, offset - LIMIT))} className="p-1 rounded hover:bg-slate-100 disabled:opacity-40">‹</button>
                 <span>{Math.floor(offset / LIMIT) + 1}</span>
                 <button disabled={Boolean(statusF) || offset + LIMIT >= total} onClick={() => setOffset(offset + LIMIT)} className="p-1 rounded hover:bg-slate-100 disabled:opacity-40">›</button>
+                </div>
               </div>
             </div>
             <div className="max-h-[600px] overflow-y-auto divide-y divide-slate-50">
@@ -1282,7 +1697,7 @@ function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }:
                 const sel = selected?.id === item.id;
                 const saving = savingId === item.id;
                 return (
-                  <div key={item.id} className={`px-5 py-3.5 transition-colors ${sel ? "bg-blue-50/70" : "hover:bg-slate-50"}`}>
+                  <div key={item.id} ref={(el) => { rowRefs.current[item.id] = el; }} className={`px-5 py-3.5 transition-colors ${sel ? "bg-blue-50/70" : "hover:bg-slate-50"}`}>
                     <div className="flex items-start justify-between gap-3">
                       <button className="text-left flex-1 min-w-0" onClick={() => pick(item)}>
                         <div className="flex items-center gap-2">
@@ -1417,6 +1832,42 @@ function RegistryTab({ financialYear, mode, notify, initialQuery, goToReports }:
           </div>
         </div>
       )}
+      {focusOn && selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
+                Focus {Math.min(focusIdx + 1, focusQueue.length)} of {focusQueue.length}
+              </p>
+              <button onClick={exitFocus} className="text-slate-400 hover:text-slate-700 text-sm font-bold">Exit (Esc)</button>
+            </div>
+            <p className="text-xs font-bold text-blue-700 mt-2">{selected.id}</p>
+            <p className="font-semibold text-slate-900 mt-1 leading-6">{selected.name}</p>
+            <div className="mt-4 flex gap-2">
+              <select value={draftStatus} onChange={(e) => setDraftStatus(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+              </select>
+              <input
+                value={draftValue}
+                onChange={(e) => setDraftValue(e.target.value)}
+                placeholder="Value"
+                className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono"
+              />
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button onClick={() => void focusSaveNext()} disabled={savingId === selected.id} className="flex-1 rounded-xl text-white text-sm font-bold py-2.5 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+                Save &amp; next (Ctrl+Enter)
+              </button>
+              <button onClick={focusSkip} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                Skip
+              </button>
+            </div>
+            <div className="mt-3 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${focusQueue.length ? Math.round(((focusIdx + 1) / focusQueue.length) * 100) : 0}%` }} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1510,7 +1961,7 @@ function MethodologyPanel({ financialYear, notify, refreshKey }: { financialYear
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-bold text-slate-900">DMA methodology</h2>
+        <h2 className="font-bold text-slate-900">DMA <HelpTerm term="material">methodology</HelpTerm></h2>
         {cfg && (
           <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${approved ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
             {approved ? `Approved${cfg.approved_by ? ` · ${cfg.approved_by}` : ""}` : "Draft"}
@@ -1881,6 +2332,204 @@ function MaterialityMatrix({ iro, material, onSelect }: { iro: IRO[]; material: 
 // Reports
 // ───────────────────────────────────────────────────────────────────────────
 
+// Validation findings with remediation hints
+// ───────────────────────────────────────────────────────────────────────────
+
+const REMEDIATION_HINTS: { match: RegExp; hint: string }[] = [
+  { match: /no_facts|no tagged facts/i, hint: "Add reported values to at least one mapped datapoint (e.g. E1 Scope 1+2) and regenerate." },
+  { match: /assurance_missing|assurance/i, hint: "Record a limited or reasonable assurance opinion on the report before submitting." },
+  { match: /mapped_untagged/i, hint: "These datapoints map to ESRS concepts but have no values — assess them in the Registry or mark not-material with an IRO link." },
+  { match: /^message:ea_/i, hint: "ESRS completeness advisory from the taxonomy (informational — filing still proceeds)." },
+  { match: /ix11|header/i, hint: "Inline-XBRL packaging note — regenerate the statement to clear it." },
+];
+
+function remediationFor(code: string, message: string): string | null {
+  const hay = `${code} ${message}`;
+  for (const r of REMEDIATION_HINTS) {
+    if (r.match.test(hay)) return r.hint;
+  }
+  return null;
+}
+
+function ValidationFindings({ summary, validatedAt, passed }: {
+  summary: ReportRow["validation_summary"];
+  validatedAt?: string | null;
+  passed: boolean;
+}) {
+  if (!summary) return null;
+  const errors = summary.errors || [];
+  const warnings = summary.warnings || [];
+  return (
+    <div className="w-full">
+      <span
+        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-full`}
+        style={{ background: passed ? "#D1FAE5" : "#FEE2E2", color: passed ? "#065F46" : "#991B1B" }}
+      >
+        {passed ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+        {passed ? "ESEF valid" : "ESEF needs fixes"} · {summary.summary ?? ""}
+        {validatedAt ? ` · ${new Date(validatedAt).toLocaleString()}` : ""}
+      </span>
+      {errors.length > 0 && (
+        <ul className="mt-2 space-y-1.5">
+          {errors.slice(0, 6).map((e, i) => (
+            <li key={i} className="text-xs text-red-700 rounded-lg bg-red-50 border border-red-100 px-2.5 py-1.5">
+              <span className="font-mono text-[10px] text-red-400 mr-1.5">{e.code}</span>{e.message}
+              {remediationFor(e.code, e.message) && (
+                <span className="block mt-0.5 text-red-600/80">→ {remediationFor(e.code, e.message)}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {warnings.length > 0 && (
+        <details className="mt-2">
+          <summary className="text-[11px] font-bold text-amber-600 cursor-pointer">
+            {warnings.length} advisor{warnings.length > 1 ? "ies" : "y"} (non-blocking)
+          </summary>
+          <ul className="mt-1.5 space-y-1">
+            {warnings.slice(0, 8).map((w, i) => (
+              <li key={i} className="text-[11px] text-amber-700 rounded-lg bg-amber-50 border border-amber-100 px-2.5 py-1.5">
+                <span className="font-mono text-[10px] text-amber-400 mr-1.5">{w.code}</span>{w.message}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+// Compliance-lead gap analysis (spec: readiness, gaps, workflow, QC)
+// ───────────────────────────────────────────────────────────────────────────
+
+function GapReportPanel({ financialYear, notify }: { financialYear: string; notify: (m: string | Error, ok?: boolean) => void }) {
+  const [report, setReport] = useState<GapAnalysisReport | null>(null);
+  const [ruleSet, setRuleSet] = useState("");
+  const [deadline, setDeadline] = useState("");
+  const [days, setDays] = useState("");
+  const [working, setWorking] = useState(false);
+
+  const run = async () => {
+    setWorking(true);
+    try {
+      const r = await gapAnalysisReport(financialYear, {
+        ruleSet: ruleSet || undefined,
+        deadline: deadline || undefined,
+        daysToDeadline: days.trim() === "" ? undefined : Number(days),
+      });
+      setReport(r);
+      if (!r) notify("Gap analysis needs the sandbox or sign-in.", false);
+    } catch (e) {
+      notify(e as Error, false);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <h2 className="font-bold text-slate-900">Gap analysis — compliance-lead view</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Readiness, blockers, sequential workflow and QC checklist from live workspace state.</p>
+        </div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <select value={ruleSet} onChange={(e) => setRuleSet(e.target.value)} title="Rule set (leave unset to surface the ambiguity explicitly)" className="rounded-lg border border-slate-300 px-2 py-2 text-xs">
+            <option value="">Rule set: unset</option>
+            <option value="ESRS Set 1 (2023)">ESRS Set 1 (2023)</option>
+            <option value="VSME (voluntary)">VSME (voluntary)</option>
+          </select>
+          <input value={deadline} onChange={(e) => setDeadline(e.target.value)} placeholder="Filing deadline" type="date" className="rounded-lg border border-slate-300 px-2 py-2 text-xs" />
+          <input value={days} onChange={(e) => setDays(e.target.value)} placeholder="Days left" inputMode="numeric" className="w-24 rounded-lg border border-slate-300 px-2 py-2 text-xs" />
+          <button onClick={() => void run()} disabled={working} className="rounded-xl text-white text-xs font-bold px-4 py-2 disabled:opacity-60" style={{ background: "linear-gradient(120deg, #2563EB, #4F46E5)" }}>
+            {working ? "Analyzing…" : "Run analysis"}
+          </button>
+        </div>
+      </div>
+
+      {report && (
+        <div className="mt-4 space-y-4">
+          <p className="text-sm text-slate-700 leading-6">{report.summary}</p>
+          {report.critical_findings.length > 0 && (
+            <ul className="space-y-1.5">
+              {report.critical_findings.map((f, i) => (
+                <li key={i} className="text-xs text-red-700 rounded-lg bg-red-50 border border-red-100 px-3 py-2">{f}</li>
+              ))}
+            </ul>
+          )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-400">
+                  <th className="py-1.5 pr-3 font-semibold">Standard</th>
+                  <th className="py-1.5 pr-3 font-semibold">Applicable</th>
+                  <th className="py-1.5 pr-3 font-semibold">Assessed</th>
+                  <th className="py-1.5 pr-3 font-semibold">Gaps</th>
+                  <th className="py-1.5 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {report.standards.map((s) => (
+                  <tr key={s.standard}>
+                    <td className="py-1.5 pr-3 font-bold text-slate-700">{s.code || s.standard}</td>
+                    <td className="py-1.5 pr-3 text-slate-500">{s.applicable_dps}</td>
+                    <td className="py-1.5 pr-3 text-slate-500">{s.assessed}</td>
+                    <td className="py-1.5 pr-3 font-bold text-slate-700">{s.gaps}</td>
+                    <td className={`py-1.5 font-bold ${s.computed_status === "On Track" ? "text-emerald-600" : s.computed_status === "Blocked" ? "text-red-600" : "text-amber-600"}`}>{s.computed_status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {report.gating.length > 0 && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-1.5">Gating disclosures ({report.gating_complete}/{report.gating_total})</p>
+              <ul className="space-y-1">
+                {report.gating.map((g) => (
+                  <li key={g.id} className="flex flex-wrap items-center gap-2 text-xs text-slate-600 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1.5">
+                    <b className="text-slate-800">{g.id}</b>
+                    <span className="flex-1 min-w-[120px]">{g.name}</span>
+                    <span>{g.status.replace(/_/g, " ")}</span>
+                    <span className="text-slate-400">· {g.owner}</span>
+                    <span>{g.risk}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {report.orphan_iros.length > 0 && (
+            <p className="text-xs text-amber-700 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+              Orphan IROs (material, no linked disclosure): <b>{report.orphan_iros.join(", ")}</b>
+            </p>
+          )}
+          <ol className="space-y-1.5">
+            {report.workflow.map((w, i) => (
+              <li key={w.key} className="flex gap-2.5 text-xs rounded-xl border border-slate-200 px-3 py-2">
+                <span className={`w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-[10px] font-bold ${w.state === "done" ? "bg-emerald-100 text-emerald-700" : w.state === "current" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-400"}`}>{i + 1}</span>
+                <div>
+                  <b className="text-slate-800">{w.title}</b> <span className="text-slate-400">· {w.state}</span>
+                  <p className="text-slate-500 mt-0.5">{w.work}</p>
+                  <p className="text-slate-500"><b>Done when:</b> {w.exit}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <ul className="space-y-1">
+            {report.qc.map((q) => (
+              <li key={q.key} className="flex items-start gap-2 text-xs text-slate-600">
+                <span className={`mt-0.5 w-4 h-4 shrink-0 rounded border flex items-center justify-center text-[10px] font-bold ${q.met === true ? "bg-emerald-500 border-emerald-500 text-white" : q.met === false ? "border-red-300 text-red-400" : "border-slate-300 text-slate-300"}`}>
+                  {q.met === true ? "✓" : q.met === false ? "!" : "?"}
+                </span>
+                <span>{q.label}{q.met === null && <span className="text-slate-400"> — needs a check run to evaluate</span>}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mode: CsrdMode; notify: (m: string | Error, ok?: boolean) => void }) {
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
@@ -2094,6 +2743,8 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
         </div>
       </div>
 
+      <GapReportPanel financialYear={financialYear} notify={notify} />
+
       {reports.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-400">
           No reports generated yet for {financialYear}.
@@ -2166,23 +2817,7 @@ function ReportsTab({ financialYear, mode, notify }: { financialYear: string; mo
               </div>
             )}
             {(r.validation_status === "pass" || r.validation_status === "fail") && r.report_type === "esef" && (
-              <div className="w-full">
-                <span
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-full"
-                  style={{ background: r.validation_status === "pass" ? "#D1FAE5" : "#FEE2E2", color: r.validation_status === "pass" ? "#065F46" : "#991B1B" }}
-                >
-                  {r.validation_status === "pass" ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
-                  {r.validation_status === "pass" ? "ESEF valid" : "ESEF needs fixes"} · {r.validation_summary?.summary ?? ""}
-                  {r.validated_at ? ` · ${new Date(r.validated_at).toLocaleString()}` : ""}
-                </span>
-                {r.validation_status === "fail" && r.validation_summary?.errors.length ? (
-                  <ul className="mt-2 space-y-1 text-xs text-red-700 list-disc list-inside">
-                    {r.validation_summary.errors.slice(0, 4).map((e, i) => (
-                      <li key={i}>{e.message}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
+              <ValidationFindings summary={r.validation_summary} validatedAt={r.validated_at} passed={r.validation_status === "pass"} />
             )}
             {assuring === r.id && r.report_type === "esef" && (
               <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4">

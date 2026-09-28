@@ -50,6 +50,84 @@ def _auth(token=GUEST_A) -> dict:
     return {"authorization": f"Bearer {token}"}
 
 
+def test_headcount_grids_parse_without_cross_contamination():
+    from app.extraction_enhanced import extract_tables
+
+    out = extract_tables(
+        "Particulars Male Female Total\n"
+        "Permanent Employees 800 320 1120\n"
+        "Other than Permanent Employees 100 50 150\n"
+        "Permanent Workers 150 30 180\n"
+        "Other than Permanent Workers 60 20 80\n"
+    )["section_a"]
+    assert out["wf_perm_emp_m"] == "800"
+    assert out["wf_perm_emp_f"] == "320"
+    assert out["wf_perm_emp_t"] == "1120"
+    assert out["wf_other_emp_m"] == "100"
+    assert out["wf_perm_work_t"] == "180"
+    assert out["wf_other_work_t"] == "80"
+
+
+def test_headcount_grids_require_header():
+    from app.extraction_enhanced import extract_tables
+
+    out = extract_tables("Permanent Employees went up this year.")["section_a"]
+    assert not any(k.startswith("wf_") for k in out)
+
+
+def test_headcount_grid_fields_bridge_to_esrs():
+    from app.esrs_extract import FIELD_TO_BRSR, _resolve_esrs
+    from app.esrs_datapoints import ESRS_DATAPOINTS
+
+    by_std_dr = {(d.get("standard"), d.get("dr")) for d in ESRS_DATAPOINTS}
+    for key in ["wf_perm_emp_m", "wf_perm_emp_f", "wf_other_emp_t",
+                "wf_perm_work_m", "wf_other_work_f"]:
+        assert key in FIELD_TO_BRSR, key
+        parsed = _resolve_esrs(FIELD_TO_BRSR[key])
+        assert parsed and parsed in by_std_dr, (key, parsed)
+
+
+def test_canonicalise_energy_water_mass():
+    from app.normalise import canonicalise
+
+    assert canonicalise(5.4, "GWh") == (5400.0, "MWh", True)
+    assert canonicalise(19440, "GJ") == (5400.0, "MWh", True)
+    assert canonicalise(5400, "MWh") == (5400.0, "MWh", False)
+    assert canonicalise(95, "ML") == (95000.0, "m3", True)
+    assert canonicalise(300, "MT") == (300.0, "tonnes", False)
+    assert canonicalise(7, "furlongs") == (7, "furlongs", False)
+
+
+def test_bridge_applies_canonical_scale():
+    out = brsr_fields_to_esrs_candidates(
+        {
+            "section_c": {"energy_consumption_total": "5.4 GWh"},
+            "normalised": {"section_c": {"energy_consumption_total": {
+                "raw": "5.4 GWh", "value": 5.4, "unit": "GWh", "value_inr": None}}},
+        },
+        {},
+    )
+    e = [c for c in out["candidates"] if c["source_field"] == "energy_consumption_total"]
+    assert e, "energy field should map"
+    assert e[0]["value"] == 5400.0
+    assert e[0]["unit"] == "MWh"
+    assert e[0]["unit_converted"] is True
+    assert e[0]["raw_value"] == "5.4 GWh"
+
+
+def test_sector_phrase_variants():
+    from app.extraction import extract_with_regex
+
+    r = extract_with_regex(
+        "Revenue: Rs 4,850\nPermanent headcount: 1150\n"
+        "Learning hours per employee: 30\nTRIFR: 0.4"
+    )
+    assert r["section_a"].get("turnover") == "4850"
+    assert r["section_a"].get("employees_permanent") == "1150"
+    assert r["section_c"].get("training_hours_per_employee") == "30"
+    assert r["section_c"].get("safety_incidents") == "0.4"
+
+
 def test_parse_esrs_ref():
     assert parse_esrs_ref("ESRS S1-6.50(a)") == ("S1", "S1-6")
     assert parse_esrs_ref("ESRS 2 BP-1") == ("2", "BP-1")
@@ -71,11 +149,99 @@ def test_bridge_maps_fields_to_real_datapoints():
 
     for c in out["candidates"]:
         assert by_id(c["datapoint_id"]) is not None
-        assert c["status"] == "reported"
+        assert c["status"] in ("reported", "in_progress")
     ghg = [c for c in out["candidates"] if c["source_field"] == "ghg_scope1"]
     assert ghg and ghg[0]["value"] == 1200.5
+    # No unit context on a measure field -> weak-flagged and capped.
+    assert ghg[0]["confidence"] == 0.3
+    assert ghg[0]["weak_reasons"] == ["no_unit"]
+
+
+def test_unit_context_preserves_confidence():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"ghg_scope1": 1200.5},
+         "normalised": {"section_c": {"ghg_scope1": {
+             "raw": 1200.5, "value": 1200.5, "unit": "tCO2e", "value_inr": None}}}},
+        {"ghg_scope1": 0.9},
+    )
+    ghg = [c for c in out["candidates"] if c["source_field"] == "ghg_scope1"]
+    assert ghg and ghg[0]["confidence"] == 0.9
+    assert ghg[0]["weak_reasons"] == []
+
+
+def test_snippet_recovers_dropped_unit():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"ghg_scope1": 1200.5},
+         "citations": {"section_c": {"ghg_scope1": {
+             "source_page": 12, "snippet": "Scope 1 emissions: 1200 tCO2e", "match_kind": "numeric"}}}},
+        {"ghg_scope1": 0.9},
+    )
+    ghg = [c for c in out["candidates"] if c["source_field"] == "ghg_scope1"]
+    assert ghg
+    assert ghg[0]["unit"] == "tCO2e"
+    assert ghg[0]["weak_reasons"] == []
     assert ghg[0]["confidence"] == 0.9
-    assert ghg[0]["source_brsr_id"] == "C.P6.E.3"
+
+
+def test_junk_values_dropped():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"ghg_scope1": "n", "ghg_scope2": " ", "waste_generated": 5}},
+        {},
+    )
+    fields = {c["source_field"] for c in out["candidates"]}
+    assert "ghg_scope1" not in fields
+    assert "ghg_scope2" not in fields
+    assert out["stats"]["dropped_junk"] == 2
+    assert "waste_generated" in fields
+
+
+def test_narrative_datapoints_get_snippets_not_numbers():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"anti_corruption_policy": "Yes, zero-tolerance policy"},
+         "citations": {"section_c": {"anti_corruption_policy": {
+             "source_page": 25, "snippet": "zero-tolerance policy", "match_kind": "text"}}}},
+        {},
+    )
+    nar = [c for c in out["candidates"]
+           if c["source_field"] == "anti_corruption_policy" and c.get("needs_writing")]
+    assert nar, "narrative datapoints should get snippet candidates"
+    assert all(c["status"] == "in_progress" and c.get("needs_writing") for c in nar)
+    assert all(c["source_page"] == 25 for c in nar)
+    # Figure is kept alongside the snippet so nothing is lost.
+    assert all(c["value"] is not None for c in nar)
+
+
+def test_semi_narrative_bare_numbers_route_to_snippets():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"ghg_scope1": 67.6},
+         "citations": {"section_c": {}}},
+        {},
+    )
+    # E1-3.23 is semi-narrative: bare number without snippet context stays
+    # visible but weak-flagged (recall preserved, trust withheld).
+    e13 = [c for c in out["candidates"] if c["datapoint_id"] == "E1.E1-3.23"]
+    assert not e13  # ghg maps to E1-6, not E1-3 — use the right field below
+    out2 = brsr_fields_to_esrs_candidates(
+        {"section_c": {"r_and_d_spend": 96000000},
+         "citations": {"section_c": {"r_and_d_spend": {
+             "source_page": 9, "snippet": "R&D spend Rs 9.6 Cr on clean tech", "match_kind": "numeric"}}}},
+        {},
+    )
+    e13b = [c for c in out2["candidates"] if c["datapoint_id"] == "E1.E1-3.23"]
+    assert e13b, "E1-3 narrative family should surface with snippet"
+    assert e13b[0]["status"] == "in_progress"
+    assert e13b[0].get("needs_writing") is True
+
+
+def test_policy_field_numerics_flagged_unexpected():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"anti_corruption_policy": 25}},
+        {},
+    )
+    flagged = [c for c in out["candidates"] if c["source_field"] == "anti_corruption_policy"]
+    assert flagged
+    assert all("unexpected_number" in (c.get("weak_reasons") or []) for c in flagged)
+    assert all((c.get("confidence") or 0) <= 0.35 for c in flagged)
 
 
 def test_bridge_passes_citations_and_normalised_units():
@@ -94,8 +260,8 @@ def test_bridge_passes_citations_and_normalised_units():
     assert c["source_page"] == 47
     assert "Scope 1" in (c["snippet"] or "")
     assert c["match_kind"] == "numeric"
-    assert c["unit"] == "tCO2e"
-    assert c["unit_converted"] is True
+    assert c["unit"] == "tonnes"  # tCO2e canonicalised, same scale
+    assert c["unit_converted"] is False
     assert c["raw_value"] is None  # display == raw here
 
 
@@ -113,20 +279,18 @@ def test_bridge_inr_magnitude_uses_normalised_value():
     assert csr[0]["value"] == 15000000.0
     assert csr[0]["raw_value"] == "Rs 1.5 Cr"
     assert csr[0]["unit"] == "INR"
-    assert csr[0]["unit_converted"] is True
+    assert csr[0]["unit_converted"] is False  # magnitude applied upstream, no rescale here
 
 
 def test_field_map_every_id_has_esrs_ref():
     """CI gate: no dead-end bridge fields (each maps to a real ESRS ref)."""
-    from app.cross_framework_mapping import get_mapping_for_brsr_id
-    from app.esrs_extract import FIELD_TO_BRSR, parse_esrs_ref
+    from app.esrs_extract import FIELD_TO_BRSR, _resolve_esrs
     from app.esrs_datapoints import ESRS_DATAPOINTS
 
     by_std_dr = {(d.get("standard"), d.get("dr")) for d in ESRS_DATAPOINTS}
     dead = []
     for field, brsr_id in FIELD_TO_BRSR.items():
-        m = get_mapping_for_brsr_id(brsr_id)
-        parsed = parse_esrs_ref((m or {}).get("esrs_ref") or "")
+        parsed = _resolve_esrs(brsr_id)
         if not parsed or parsed not in by_std_dr:
             dead.append((field, brsr_id))
     assert dead == [], f"bridge fields with no ESRS target: {dead}"

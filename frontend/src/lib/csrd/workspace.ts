@@ -1068,6 +1068,8 @@ export interface ExtractCandidate {
   source_brsr_id?: string | null;
   source_field?: string | null;
   status: string;
+  needs_writing?: boolean;
+  weak_reasons?: string[];
 }
 
 export interface ExtractResult {
@@ -1110,11 +1112,12 @@ export async function extractPdf(file: File): Promise<ExtractResult> {
 export async function confirmCandidate(
   financialYear: string,
   c: ExtractCandidate,
-  status: string
+  status?: string
 ): Promise<void> {
+  const finalStatus = status || c.status || "reported";
   await saveEntry(financialYear, {
     datapoint_id: c.datapoint_id,
-    status,
+    status: finalStatus,
     value: c.value,
     evidence: null,
     notes: `AI-extracted from annual report${c.confidence != null ? ` (confidence ${c.confidence})` : ""} — verify before filing.`,
@@ -1185,6 +1188,76 @@ export async function frameworkLinks(standard?: string): Promise<{ groups: Recor
   if (!res.ok) throw new Error(`Framework links failed (${res.status})`);
   const data = await res.json();
   return { groups: data.groups || {}, count: data.count || 0 };
+}
+
+// ─────────────────────────────────────────────────────── year rollover ───
+
+export interface RolloverResult {
+  from_fy: string;
+  to_fy: string;
+  entries_copied: number;
+  entries_skipped: number;
+  iros_copied: number;
+}
+
+export async function runRollover(fromFy: string, toFy: string): Promise<RolloverResult> {
+  if (!isServerMode(await detectMode())) {
+    throw new Error("Rollover needs the sandbox or sign-in — demo mode is browser-only.");
+  }
+  return cloudJSON<RolloverResult>("/rollover", {
+    method: "POST",
+    body: JSON.stringify({ from_fy: fromFy, to_fy: toFy }),
+  });
+}
+
+export interface VarianceFlag {
+  datapoint_id: string;
+  from_value: unknown;
+  to_value: unknown;
+  pct_change?: number | null;
+  changed: boolean;
+  flagged: boolean;
+}
+
+export async function rolloverVariance(fromFy: string, toFy: string, threshold = 10): Promise<{ compared: number; flagged: number; flags: VarianceFlag[] }> {
+  if (!isServerMode(await detectMode())) {
+    throw new Error("Variance needs the sandbox or sign-in.");
+  }
+  return cloudJSON(`/rollover/variance?from_fy=${encodeURIComponent(fromFy)}&to_fy=${encodeURIComponent(toFy)}&threshold_pct=${threshold}`);
+}
+
+// ──────────────────────────────────────────────────── gap analysis ───
+
+export interface GapAnalysisReport {
+  rule_set_version: string | null;
+  rule_set_unset: boolean;
+  reporting_period?: string | null;
+  summary: string;
+  readiness_pct: number;
+  days_to_deadline?: number | null;
+  filing_deadline?: string | null;
+  standards: { standard: string; code?: string; name?: string; applicable_dps: number; assessed: number; gaps: number; computed_status: string }[];
+  gating: { id: string; name: string; status: string; owner: string; due_date?: string | null; risk: string }[];
+  gating_complete: number;
+  gating_total: number;
+  orphan_iros: string[];
+  value_chain_scope: Record<string, boolean>;
+  framework_mapping_coverage: Record<string, unknown>;
+  workflow: { key: string; title: string; work: string; exit: string; state: string }[];
+  qc: { key: string; label: string; met: boolean | null }[];
+  critical_findings: string[];
+}
+
+export async function gapAnalysisReport(
+  financialYear: string,
+  opts?: { ruleSet?: string; deadline?: string; daysToDeadline?: number }
+): Promise<GapAnalysisReport | null> {
+  if (!isServerMode(await detectMode())) return null;
+  const qs = new URLSearchParams({ financial_year: financialYear });
+  if (opts?.ruleSet) qs.set("rule_set_version", opts.ruleSet);
+  if (opts?.deadline) qs.set("filing_deadline", opts.deadline);
+  if (opts?.daysToDeadline != null) qs.set("days_to_deadline", String(opts.daysToDeadline));
+  return cloudJSON<GapAnalysisReport>(`/gap-report?${qs.toString()}`);
 }
 
 // ──────────────────────────────────────────────────────────── sample seed ─

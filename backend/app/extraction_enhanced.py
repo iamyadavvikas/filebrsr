@@ -13,26 +13,26 @@ def extract_enhanced(text: str) -> dict[str, Any]:
     """
     # Step 1: Identify section boundaries
     sections_text = split_into_sections(text)
-    
+
     results = {"section_a": {}, "section_b": {}, "section_c": {}}
-    
+
     # Step 2: Extract from each section with section-specific patterns
     results["section_a"] = extract_section_a(sections_text.get("section_a", text))
     results["section_b"] = extract_section_b(sections_text.get("section_b", text))
     results["section_c"] = extract_section_c(sections_text.get("section_c", text))
-    
+
     # Step 3: Extract tables (common in BRSR)
     table_data = extract_tables(text)
     for section in results:
         results[section].update(table_data.get(section, {}))
-    
+
     return results
 
 
 def split_into_sections(text: str) -> dict[str, str]:
     """Split BRSR text into Section A, B, C using standard markers."""
     sections = {}
-    
+
     # Find section boundaries
     section_a_match = re.search(
         r"(?:SECTION\s+A|I\.\s*Details\s+of\s+the\s+[Ll]isted)", text, re.IGNORECASE
@@ -43,27 +43,27 @@ def split_into_sections(text: str) -> dict[str, str]:
     section_c_match = re.search(
         r"(?:SECTION\s+C|PRINCIPLE\s+WISE\s+PERFORMANCE)", text, re.IGNORECASE
     )
-    
+
     if section_a_match and section_b_match:
         sections["section_a"] = text[section_a_match.start():section_b_match.start()]
     elif section_a_match:
         sections["section_a"] = text[section_a_match.start():]
-    
+
     if section_b_match and section_c_match:
         sections["section_b"] = text[section_b_match.start():section_c_match.start()]
     elif section_b_match:
         sections["section_b"] = text[section_b_match.start():]
-    
+
     if section_c_match:
         sections["section_c"] = text[section_c_match.start():]
-    
+
     return sections
 
 
 def extract_section_a(text: str) -> dict[str, str]:
     """Extract Section A - General Disclosures with enhanced patterns."""
     data = {}
-    
+
     patterns = {
         "cin": [
             r"(?:CIN|Corporate\s+Identity\s+Number)[:\s]*([A-Z]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6})",
@@ -121,37 +121,37 @@ def extract_section_a(text: str) -> dict[str, str]:
             r"(?:CSR\s+applicable|Section\s+135\s+applicable)[:\s]*(Yes|No)",
         ],
     }
-    
+
     for key, pattern_list in patterns.items():
         for pattern in pattern_list:
             match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
             if match:
                 data[key] = match.group(1).strip()
                 break
-    
+
     # Employee count extraction from tables
     employee_patterns = [
         # Pattern: "Permanent Employees ... 5000 ... 2000 ... 7000"
-        (r"Permanent\s+[Ee]mployees\D*?(\d[\d,]*)\D+?(\d[\d,]*)\D+?(\d[\d,]*)", 
+        (r"Permanent\s+[Ee]mployees\D*?(\d[\d,]*)\D+?(\d[\d,]*)\D+?(\d[\d,]*)",
          "employees_permanent_male", "employees_permanent_female", "employees_permanent_total"),
         (r"Permanent\s+[Ww]orkers\D*?(\d[\d,]*)\D+?(\d[\d,]*)\D+?(\d[\d,]*)",
          "workers_permanent_male", "workers_permanent_female", "workers_permanent_total"),
     ]
-    
+
     for pattern, key_m, key_f, key_t in employee_patterns:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             data.setdefault(key_m, match.group(1).strip())
             data.setdefault(key_f, match.group(2).strip())
             data.setdefault(key_t, match.group(3).strip())
-    
+
     return data
 
 
 def extract_section_b(text: str) -> dict[str, str]:
     """Extract Section B - Management and Process Disclosures."""
     data = {}
-    
+
     # Policy matrix - typically a Yes/No table across P1-P9
     policy_patterns = {
         "policy_available": [
@@ -178,21 +178,21 @@ def extract_section_b(text: str) -> dict[str, str]:
             r"(?:review.*?(annually|quarterly|half-yearly|periodically))",
         ],
     }
-    
+
     for key, pattern_list in policy_patterns.items():
         for pattern in pattern_list:
             match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
             if match:
                 data[key] = match.group(1).strip()
                 break
-    
+
     return data
 
 
 def extract_section_c(text: str) -> dict[str, str]:
     """Extract Section C - Principle-wise Performance Disclosures."""
     data = {}
-    
+
     # Principle 1 - Ethics
     p1_patterns = {
         "anti_corruption_policy": [
@@ -208,7 +208,7 @@ def extract_section_c(text: str) -> dict[str, str]:
             r"(?:fines?|penalt(?:y|ies)).*?(\d+)\s*(?:case|instance|occasion)",
         ],
     }
-    
+
     # Principle 2 - Products
     p2_patterns = {
         "sustainable_sourcing": [
@@ -222,7 +222,7 @@ def extract_section_c(text: str) -> dict[str, str]:
             r"(?:[Rr]ecycled.*?input|[Rr]ecycled.*?material).*?(\d+(?:\.\d+)?)\s*%",
         ],
     }
-    
+
     # Principle 3 - Employees
     p3_patterns = {
         "health_safety_system": [
@@ -250,7 +250,7 @@ def extract_section_c(text: str) -> dict[str, str]:
             r"(?:[Ss]kill\s+upgradation|[Ss]kill.*?training).*?(\d+(?:\.\d+)?)\s*%",
         ],
     }
-    
+
     # Principle 5 - Human Rights
     p5_patterns = {
         "minimum_wages_compliance": [
@@ -270,7 +270,7 @@ def extract_section_c(text: str) -> dict[str, str]:
             r"(?:[Cc]hild\s+[Ll]abo[u]?r).*?(?:[Ff]iled|[Rr]eceived|complaints?)[:\s]*(\d+)",
         ],
     }
-    
+
     # Principle 6 - Environment
     p6_patterns = {
         "energy_consumption_renewable": [
@@ -323,7 +323,7 @@ def extract_section_c(text: str) -> dict[str, str]:
             r"(?:[Hh]azardous\s+[Ww]aste)[:\s]*([\d,]+(?:\.\d+)?)\s*(?:MT|[Tt]onne)",
         ],
     }
-    
+
     # Principle 8 - Inclusive Growth
     p8_patterns = {
         "csr_spend": [
@@ -337,7 +337,7 @@ def extract_section_c(text: str) -> dict[str, str]:
             r"(?:local|within\s+(?:district|state)).*?(\d+(?:\.\d+)?)\s*%",
         ],
     }
-    
+
     # Principle 9 - Consumer
     p9_patterns = {
         "consumer_complaints_total": [
@@ -356,7 +356,7 @@ def extract_section_c(text: str) -> dict[str, str]:
             r"(?:[Cc]yber\s*[Ss]ecurity.*?[Pp]olicy|[Dd]ata\s+[Pp]rivacy.*?[Pp]olicy)[:\s]*(Yes|No|Available|in\s+place)",
         ],
     }
-    
+
     # Apply all principle patterns
     all_patterns = {}
     all_patterns.update(p1_patterns)
@@ -366,21 +366,21 @@ def extract_section_c(text: str) -> dict[str, str]:
     all_patterns.update(p6_patterns)
     all_patterns.update(p8_patterns)
     all_patterns.update(p9_patterns)
-    
+
     for key, pattern_list in all_patterns.items():
         for pattern in pattern_list:
             match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
             if match:
                 data[key] = match.group(1).strip()
                 break
-    
+
     return data
 
 
 def extract_tables(text: str) -> dict[str, dict]:
     """Extract data from common BRSR table patterns."""
     results = {"section_a": {}, "section_b": {}, "section_c": {}}
-    
+
     # Turnover rate table pattern
     turnover_match = re.search(
         r"[Tt]urnover\s+[Rr]ate.*?(?:Male|M)\D*?(\d+(?:\.\d+)?)\s*%.*?(?:Female|F)\D*?(\d+(?:\.\d+)?)\s*%",
@@ -389,7 +389,7 @@ def extract_tables(text: str) -> dict[str, dict]:
     if turnover_match:
         results["section_a"]["turnover_rate_male"] = turnover_match.group(1)
         results["section_a"]["turnover_rate_female"] = turnover_match.group(2)
-    
+
     # Complaints table (common across P3, P5, P9)
     complaint_types = [
         ("working_conditions_complaints", r"[Ww]orking\s+[Cc]onditions?"),
@@ -400,7 +400,7 @@ def extract_tables(text: str) -> dict[str, dict]:
         ("forced_labor_complaints", r"[Ff]orced.*?[Ll]abo[u]?r"),
         ("wages_complaints", r"[Ww]ages?"),
     ]
-    
+
     for key, pattern in complaint_types:
         match = re.search(
             pattern + r".*?(?:Filed|Received|Current)[:\s]*(\d+)",
@@ -408,5 +408,41 @@ def extract_tables(text: str) -> dict[str, dict]:
         )
         if match:
             results["section_c"][key] = match.group(1)
-    
+
+    # Headcount grids (BRSR A.IV / ESRS S1 workforce tables):
+    #   Particulars | Male | Female | Total
+    #   Permanent Employees | 800 | 320 | 1120
+    # Negative lookbehind keeps "Other than Permanent ..." rows from
+    # matching the bare "Permanent ..." patterns.
+    results["section_a"].update(_extract_headcount_grids(text))
+
     return results
+
+
+_HEADCOUNT_ROWS = [
+    ("wf_other_emp", r"Other\s+than\s+Permanent\s+Employees?"),
+    ("wf_other_work", r"Other\s+than\s+Permanent\s+Workers?"),
+    ("wf_perm_emp", r"(?<!than\s)Permanent\s+Employees?"),
+    ("wf_perm_work", r"(?<!than\s)Permanent\s+Workers?"),
+]
+
+
+def _extract_headcount_grids(text: str) -> dict[str, str]:
+    """Male/Female/Total triples from workforce tables."""
+    out: dict[str, str] = {}
+    if not re.search(r"Male.{0,40}?Female.{0,40}?Total", text, re.IGNORECASE | re.DOTALL):
+        return out
+    for key, label in _HEADCOUNT_ROWS:
+        m = re.search(
+            label + r"[^\d\n]{0,30}?(\d[\d,]*)\s+(\d[\d,]*)\s+(\d[\d,]*)",
+            text, re.IGNORECASE,
+        )
+        if not m:
+            continue
+        try:
+            nums = [int(g.replace(",", "")) for g in m.groups()]
+        except ValueError:
+            continue
+        out[f"{key}_m"], out[f"{key}_f"], out[f"{key}_t"] = (
+            str(nums[0]), str(nums[1]), str(nums[2]))
+    return out
