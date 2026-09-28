@@ -11,5 +11,7 @@ COPY . .
 ENV PORT=8000
 EXPOSE 8000
 
-# 4 workers for concurrent request handling (10 pilot customers)
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 4 --timeout-keep-alive 300"]
+# 2 workers: each worker holds a full document parse + AI context in RAM,
+# and 4 workers sharing the 1536M container cap OOM-kill each other on
+# 50MB filings (socket hang-up mid-extraction). 2 is plenty for pilot load.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 2 --timeout-keep-alive 300"]
