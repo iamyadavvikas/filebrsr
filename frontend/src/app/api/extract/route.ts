@@ -128,7 +128,8 @@ export async function POST(request: NextRequest) {
         headers: {
           Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
         },
-        signal: AbortSignal.timeout(120000),
+        // 50MB filings through the 5-pass agent can take minutes
+        signal: AbortSignal.timeout(280000),
       });
 
       if (!backendRes.ok) {
