@@ -172,6 +172,17 @@ def _is_junk_value(value: Any) -> bool:
 
 _MEASURE_HINTS = ("ghg", "energy", "water", "waste", "emission", "fuel", "electricity")
 
+# Fields whose BRSR answers are Yes/No or prose — a bare number here is
+# almost always a page number, footnote index, or table counter.
+TEXT_EXPECTED_FIELDS = frozenset({
+    "code_of_conduct", "anti_corruption_policy", "policy_available",
+    "policy_approved_by_board", "policy_translated_to_procedures",
+    "policy_extends_value_chain", "sustainability_in_board_committees",
+    "policy_external_assessment", "grievance_mechanism",
+    "grievance_mechanism_employees", "stakeholder_groups_identified",
+    "trade_associations",
+})
+
 
 def _is_measure_field(field: str) -> bool:
     f = field.lower()
@@ -302,6 +313,13 @@ def brsr_fields_to_esrs_candidates(
                     conf_f = min(conf_f, 0.3)
                 else:
                     conf_f = 0.3
+        if (field in TEXT_EXPECTED_FIELDS and isinstance(display_value, (int, float))
+                and not isinstance(display_value, bool)):
+            weak_reasons.append("unexpected_number")
+            if conf_f is not None:
+                conf_f = min(conf_f, 0.3)
+            else:
+                conf_f = 0.3
         # Unit-family validation against the field's physical class.
         expected = _expected_family(field)
         fam = _unit_family(unit) if unit else None
@@ -311,20 +329,27 @@ def brsr_fields_to_esrs_candidates(
                 conf_f = min(conf_f, 0.35)
         for dp in dps:
             dtype = dp.get("data_type") or ""
-            if dtype == "narrative":
-                # Narratives take prose, not bare numbers — propose the
-                # snippet for the assessor to write from instead.
+            bare_number = isinstance(display_value, (int, float)) and not isinstance(display_value, bool)
+            if dtype == "narrative" or (dtype == "semi-narrative" and bare_number):
+                # Prose datapoints take text, not bare numbers — keep the
+                # figure attached but route to snippet-review (in_progress)
+                # so the assessor writes proper prose instead of confirming
+                # a naked number.
                 if not cite.get("snippet"):
-                    continue
+                    weak_reasons.append("no_snippet")
+                    if conf_f is not None:
+                        conf_f = min(conf_f, 0.3)
+                    else:
+                        conf_f = 0.3
                 candidates.append({
                     "datapoint_id": dp["id"],
                     "dr": dp.get("dr"),
                     "standard": dp.get("standard"),
                     "name": dp.get("name"),
-                    "value": None,
-                    "raw_value": None,
-                    "unit": None,
-                    "unit_converted": False,
+                    "value": display_value,
+                    "raw_value": value if display_value != value else None,
+                    "unit": unit or None,
+                    "unit_converted": converted,
                     "confidence": conf_f,
                     "source_page": cite.get("source_page"),
                     "snippet": cite.get("snippet"),

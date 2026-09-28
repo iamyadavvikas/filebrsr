@@ -149,7 +149,7 @@ def test_bridge_maps_fields_to_real_datapoints():
 
     for c in out["candidates"]:
         assert by_id(c["datapoint_id"]) is not None
-        assert c["status"] == "reported"
+        assert c["status"] in ("reported", "in_progress")
     ghg = [c for c in out["candidates"] if c["source_field"] == "ghg_scope1"]
     assert ghg and ghg[0]["value"] == 1200.5
     # No unit context on a measure field -> weak-flagged and capped.
@@ -203,10 +203,45 @@ def test_narrative_datapoints_get_snippets_not_numbers():
         {},
     )
     nar = [c for c in out["candidates"]
-           if c["source_field"] == "anti_corruption_policy" and c["value"] is None]
+           if c["source_field"] == "anti_corruption_policy" and c.get("needs_writing")]
     assert nar, "narrative datapoints should get snippet candidates"
     assert all(c["status"] == "in_progress" and c.get("needs_writing") for c in nar)
     assert all(c["source_page"] == 25 for c in nar)
+    # Figure is kept alongside the snippet so nothing is lost.
+    assert all(c["value"] is not None for c in nar)
+
+
+def test_semi_narrative_bare_numbers_route_to_snippets():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"ghg_scope1": 67.6},
+         "citations": {"section_c": {}}},
+        {},
+    )
+    # E1-3.23 is semi-narrative: bare number without snippet context stays
+    # visible but weak-flagged (recall preserved, trust withheld).
+    e13 = [c for c in out["candidates"] if c["datapoint_id"] == "E1.E1-3.23"]
+    assert not e13  # ghg maps to E1-6, not E1-3 — use the right field below
+    out2 = brsr_fields_to_esrs_candidates(
+        {"section_c": {"r_and_d_spend": 96000000},
+         "citations": {"section_c": {"r_and_d_spend": {
+             "source_page": 9, "snippet": "R&D spend Rs 9.6 Cr on clean tech", "match_kind": "numeric"}}}},
+        {},
+    )
+    e13b = [c for c in out2["candidates"] if c["datapoint_id"] == "E1.E1-3.23"]
+    assert e13b, "E1-3 narrative family should surface with snippet"
+    assert e13b[0]["status"] == "in_progress"
+    assert e13b[0].get("needs_writing") is True
+
+
+def test_policy_field_numerics_flagged_unexpected():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"anti_corruption_policy": 25}},
+        {},
+    )
+    flagged = [c for c in out["candidates"] if c["source_field"] == "anti_corruption_policy"]
+    assert flagged
+    assert all("unexpected_number" in (c.get("weak_reasons") or []) for c in flagged)
+    assert all((c.get("confidence") or 0) <= 0.35 for c in flagged)
 
 
 def test_bridge_passes_citations_and_normalised_units():
