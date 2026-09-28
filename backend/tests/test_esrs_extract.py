@@ -122,7 +122,7 @@ def test_sector_phrase_variants():
         "Revenue: Rs 4,850\nPermanent headcount: 1150\n"
         "Learning hours per employee: 30\nTRIFR: 0.4"
     )
-    assert r["section_a"].get("turnover") == "4,850"
+    assert r["section_a"].get("turnover") == "4850"
     assert r["section_a"].get("employees_permanent") == "1150"
     assert r["section_c"].get("training_hours_per_employee") == "30"
     assert r["section_c"].get("safety_incidents") == "0.4"

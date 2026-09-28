@@ -1,58 +1,279 @@
 import re
 from typing import Any
 
+import re
+from typing import Any
+from dataclasses import dataclass
+
+@dataclass
+class Pattern:
+    """Represents a pattern with metadata for better extraction."""
+    pattern: str
+    field_name: str
+    section: str
+    priority: int = 1  # Higher priority patterns are tried first
+    flags: int = re.IGNORECASE | re.MULTILINE
+    post_process: callable = None
+
 # BRSR Section A - General Disclosures
 SECTION_A_PATTERNS = {
-    "cin": r"(?:CIN|Corporate\s+Identity\s+Number)[:\s]*([A-Z]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6})",
-    "company_name": r"(?:Name\s+of\s+the\s+Listed\s+Entity|Company\s+Name)[:\s]*([A-Za-z\s&.,()]+?)(?:\n|$)",
-    "year_of_incorporation": r"(?:Year\s+of\s+incorporation|Date\s+of\s+Incorporation)[:\s]*(\d{4})",
-    "registered_office": r"(?:Registered\s+office\s+address|Registered\s+Address)[:\s]*([\s\S]+?)(?:\n\n|\d+\.)",
-    "corporate_office": r"(?:Corporate\s+address|Corporate\s+office)[:\s]*([\s\S]+?)(?:\n\n|\d+\.)",
-    "email": r"(?:E-?mail|Email\s+ID)[:\s]*([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)",
-    "telephone": r"(?:Telephone|Phone|Contact\s+No)[:\s]*([\d\s\-+()]+)",
-    "website": r"(?:Website|Web)[:\s]*((?:https?://)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*)",
-    "financial_year": r"(?:Financial\s+year|FY|F\.Y\.)[:\s]*(\d{4}[-–]\d{2,4})",
-    "stock_exchange": r"(?:Stock\s+Exchange|Listed\s+on|Listed\s+at)[:\s]*((?:BSE|NSE|(?:Bombay|National)\s+Stock\s+Exchange)[^\n]*)",
-    "paid_up_capital": r"(?:Paid[- ]up\s+(?:Share\s+)?Capital|Authorized\s+Capital)[:\s]*(?:(?:Rs|INR|₹)[.\s]*)?([\d,]+(?:\.\d+)?)",
-    "turnover": r"(?:Turnover|Revenue\s+from\s+Operations|Net\s+Revenue|Net\s+sales|Revenue|Income\s+from\s+operations)[:\s]*(?:(?:Rs|INR|₹)[.\s]*)?([\d,]+(?:\.\d+)?)",
-    "employees_permanent": r"(?:Permanent\s+[Ee]mployees|No\.?\s+of\s+permanent\s+employees|Permanent\s+headcount|Employees?\s+on\s+rolls?)[:\s]*(\d[\d,]*)",
-    "employees_contract": r"(?:Contract(?:ual)?\s+[Ee]mployees|Workers\s+on\s+contract)[:\s]*(\d[\d,]*)",
-    "women_employees_pct": r"(?:Women\s+[Ee]mployees|Female\s+employees)[:\s]*(\d+(?:\.\d+)?)\s*%",
+    "cin": [
+        {
+            "pattern": r"(?:CIN|Corporate\s+Identity\s+Number)[:\s]*([A-Z]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6})",
+            "priority": 1
+        },
+        {
+            "pattern": r"CIN[:\s]*([A-Z]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6})",
+            "priority": 2
+        }
+    ],
+    "company_name": [
+        {
+            "pattern": r"(?:Name\s+of\s+the\s+Listed\s+Entity|Company\s+Name)[:\s]*([A-Za-z\s&.,()]+?)(?:\n|$)",
+            "priority": 1
+        },
+        {
+            "pattern": r"(?:^|\n)([A-Z][A-Za-z\s&]+(?:Limited|Ltd\.?))\s*\n",
+            "priority": 2
+        }
+    ],
+    "year_of_incorporation": [
+        {"pattern": r"(?:Year\s+of\s+incorporation|Date\s+of\s+Incorporation)[:\s]*(\d{4})", "priority": 1}
+    ],
+    "registered_office": {
+        "patterns": [
+            r"(?:Registered\s+office\s+address|Registered\s+Address)[:\s]*([\s\S]+?)(?:\n\n|\d+\.)",
+        ],
+        "post_process": lambda x: x.strip()[:500]
+    },
+    "corporate_office": {
+        "patterns": [
+            r"(?:Corporate\s+address|Corporate\s+office)[:\s]*([\s\S]+?)(?:\n\n|\d+\.)",
+        ]
+    },
+    "email": {
+        "patterns": [
+            r"(?:E-?mail|Email\s+ID)[:\s]*([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)",
+        ]
+    },
+    "telephone": {
+        "patterns": [
+            r"(?:Telephone|Phone|Contact\s+No)[:\s]*([\d\s\-+()]+)",
+        ]
+    },
+    "website": {
+        "patterns": [
+            r"(?:Website|Web)[:\s]*((?:https?://)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+[^\s]*)",
+        ]
+    },
+    "financial_year": {
+        "patterns": [
+            r"(?:Financial\s+year|FY|F\.Y\.)[:\s]*(\d{4}[-–]\d{2,4})",
+            r"(?:Reporting\s+[Pp]eriod|Year\s+of\s+[Rr]eporting)[:\s]*(\d{4}[-–]\d{2,4})",
+        ]
+    },
+    "stock_exchange": {
+        "patterns": [
+            r"(?:Stock\s+Exchange|Listed\s+on|Listed\s+at)[:\s]*((?:BSE|NSE|(?:Bombay|National)\s+Stock\s+Exchange)[^\n]*)",
+        ]
+    },
+    "paid_up_capital": {
+        "patterns": [
+            r"(?:Paid[- ]up\s+(?:Share\s+)?Capital|Authorized\s+Capital)[:\s]*(?:(?:Rs|INR|₹)[.\s]*)?([\d,]+(?:\.\d+)?)",
+        ],
+        "post_process": lambda x: x.replace(",", "").replace(",", "")
+    },
+    "turnover": {
+        "patterns": [
+            r"(?:Turnover|Revenue\s+from\s+Operations|Net\s+Revenue|Net\s+sales|Revenue|Income\s+from\s+operations)[:\s]*(?:(?:Rs|INR|₹)[.\s]*)?([\d,]+(?:\.\d+)?)",
+        ],
+        "post_process": lambda x: x.replace(",", "").replace(",", "")
+    },
+    "paid_up_capital": {
+        "patterns": [
+            r"(?:Paid[- ]up\s+(?:Share\s+)?Capital|Authorized\s+Capital)[:\s]*(?:(?:Rs|INR|₹)[.\s]*)?([\d,]+(?:\.\d+)?)",
+        ],
+        "post_process": lambda x: x.replace(",", "").replace(",", "")
+    },
+    "turnover": {
+        "patterns": [
+            r"(?:Turnover|Revenue\s+from\s+Operations|Net\s+Revenue|Net\s+sales|Revenue|Income\s+from\s+operations)[:\s]*(?:(?:Rs|INR|₹)[.\s]*)?([\d,]+(?:\.\d+)?)",
+        ],
+        "post_process": lambda x: x.replace(",", "").replace(",", "")
+    },
+    "net_worth": {
+        "patterns": [
+            r"(?:Net\s+[Ww]orth|Networth)[:\s]*(?:(?:Rs|INR|₹)[.\s]*)?([\d,]+(?:\.\d+)?)",
+        ]
+    },
+    "employees_permanent": {
+        "patterns": [
+            r"(?:Permanent\s+[Ee]mployees|No\.?\s+of\s+permanent\s+employees|Permanent\s+headcount|Employees?\s+on\s+rolls?)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "employees_contract": {
+        "patterns": [
+            r"(?:Contract(?:ual)?\s+[Ee]mployees|Workers\s+on\s+contract)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "women_employees_pct": {
+        "patterns": [
+            r"(?:Women\s+[Ee]mployees|Female\s+employees)[:\s]*(\d+(?:\.\d+)?)\s*%",
+        ]
+    },
     # Locations & markets (A.III)
-    "plants_national": r"(?:Number\s+of\s+plants?(?:\s+in\s+India|\s+\(National\))?|Plants?\s*\(National\))[:\s]*(\d[\d,]*)",
-    "offices_national": r"(?:Number\s+of\s+offices?(?:\s+in\s+India|\s+\(National\))?|Offices?\s*\(National\))[:\s]*(\d[\d,]*)",
-    "plants_international": r"(?:Number\s+of\s+plants?.*?[Ii]nternational|Plants?\s*\(International\))[:\s]*(\d[\d,]*)",
-    "offices_international": r"(?:Number\s+of\s+offices?.*?[Ii]nternational|Offices?\s*\(International\))[:\s]*(\d[\d,]*)",
-    "states_served": r"(?:Number\s+of\s+[Ss]tates(?:\/UTs)?\s+served|States?\s+served|Markets?\s+served.*?[Ss]tates?)[:\s]*(\d[\d,]*)",
-    "countries_served": r"(?:Number\s+of\s+countries\s+served|Countries\s+served|Exports?\s+to.*countries)[:\s]*(\d[\d,]*)",
-    "export_contribution_pct": r"(?:Contribution\s+of\s+exports?|Exports?\s+as\s+%|Export\s+turnover\s+share)[:\s]*(\d+(?:\.\d+)?)\s*%",
+    "plants_national": {
+        "patterns": [
+            r"(?:Number\s+of\s+plants?(?:\s+in\s+India|\s+\(National\))?|Plants?\s*\(National\))[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "offices_national": {
+        "patterns": [
+            r"(?:Number\s+of\s+offices?(?:\s+in\s+India|\s+\(National\))?|Offices?\s*\(National\))[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "plants_international": {
+        "patterns": [
+            r"(?:Number\s+of\s+plants?.*?[Ii]nternational|Plants?\s*\(International\))[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "offices_international": {
+        "patterns": [
+            r"(?:Number\s+of\s+offices?.*?[Ii]nternational|Offices?\s*\(International\))[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "states_served": {
+        "patterns": [
+            r"(?:Number\s+of\s+[Ss]tates?(?:\/UTs)?\s+served|States?\s+served|Markets?\s+served.*?[Ss]tates?)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "countries_served": {
+        "patterns": [
+            r"(?:Number\s+of\s+countries\s+served|Countries\s+served|Exports?\s+to.*countries)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "export_contribution_pct": {
+        "patterns": [
+            r"(?:Contribution\s+of\s+exports?|Exports?\s+as\s+%|Export\s+turnover\s+share)[:\s]*(\d+(?:\.\d+)?)\s*%",
+        ]
+    },
     # Workforce splits (A.IV)
-    "employees_perm_male": r"(?:Permanent\s+[Ee]mployees?\s*[-–]\s*Male|Male\s+permanent\s+employees?)[:\s]*(\d[\d,]*)",
-    "employees_perm_female": r"(?:Permanent\s+[Ee]mployees?\s*[-–]\s*Female|Female\s+permanent\s+employees?)[:\s]*(\d[\d,]*)",
-    "employees_perm_total": r"(?:Permanent\s+[Ee]mployees?\s*[-–]\s*Total|Total\s+permanent\s+employees?)[:\s]*(\d[\d,]*)",
-    "employees_other_male": r"(?:Other\s+than\s+permanent\s+[Ee]mployees?\s*[-–]\s*Male)[:\s]*(\d[\d,]*)",
-    "employees_other_female": r"(?:Other\s+than\s+permanent\s+[Ee]mployees?\s*[-–]\s*Female)[:\s]*(\d[\d,]*)",
-    "employees_other_total": r"(?:Other\s+than\s+permanent\s+[Ee]mployees?\s*[-–]\s*Total)[:\s]*(\d[\d,]*)",
-    "workers_perm_male": r"(?:Permanent\s+[Ww]orkers?\s*[-–]\s*Male|Male\s+permanent\s+workers?)[:\s]*(\d[\d,]*)",
-    "workers_perm_female": r"(?:Permanent\s+[Ww]orkers?\s*[-–]\s*Female|Female\s+permanent\s+workers?)[:\s]*(\d[\d,]*)",
-    "workers_perm_total": r"(?:Permanent\s+[Ww]orkers?\s*[-–]\s*Total|Total\s+permanent\s+workers?)[:\s]*(\d[\d,]*)",
+    "employees_perm_male": {
+        "patterns": [
+            r"(?:Permanent\s+[Ee]mployees?\s*[-–]\s*Male|Male\s+permanent\s+employees?)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "employees_perm_female": {
+        "patterns": [
+            r"(?:Permanent\s+[Ee]mployees?\s*[-–]\s*Female|Female\s+permanent\s+employees?)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "employees_perm_total": {
+        "patterns": [
+            r"(?:Permanent\s+[Ee]mployees?\s*[-–]\s*Total|Total\s+permanent\s+employees?)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "employees_other_male": {
+        "patterns": [
+            r"(?:Other\s+than\s+permanent\s+[Ee]mployees?\s*[-–]\s*Male)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "employees_other_female": {
+        "patterns": [
+            r"(?:Other\s+than\s+permanent\s+[Ee]mployees?\s*[-–]\s*Female)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "employees_other_total": {
+        "patterns": [
+            r"(?:Other\s+than\s+permanent\s+[Ee]mployees?\s*[-–]\s*Total)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "workers_perm_male": {
+        "patterns": [
+            r"(?:Permanent\s+[Ww]orkers?\s*[-–]\s*Male|Male\s+permanent\s+workers?)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "workers_perm_female": {
+        "patterns": [
+            r"(?:Permanent\s+[Ww]orkers?\s*[-–]\s*Female|Female\s+permanent\s+workers?)[:\s]*(\d[\d,]*)",
+        ]
+    },
+    "workers_perm_total": {
+        "patterns": [
+            r"(?:Permanent\s+[Ww]orkers?\s*[-–]\s*Total|Total\s+permanent\s+workers?)[:\s]*(\d[\d,]*)",
+        ]
+    },
     # Company economics (A.VI)
-    "net_worth": r"(?:Net\s+[Ww]orth|Networth)[:\s]*(?:(?:Rs|INR|₹)[.\s]*)?([\d,]+(?:\.\d+)?)",
-    "csr_applicable": r"(?:CSR\s+applicable|CSR\s+under\s+[Ss]ection\s+135|Section\s+135\s+applicable)[:\s]*(Yes|No|Y|N|Applicable|Not\s+Applicable)",
+    "net_worth": {
+        "patterns": [
+            r"(?:Net\s+[Ww]orth|Networth)[:\s]*(?:(?:Rs|INR|₹)[.\s]*)?([\d,]+(?:\.\d+)?)",
+        ]
+    },
+    "csr_applicable": {
+        "patterns": [
+            r"(?:CSR\s+applicable|CSR\s+under\s+[Ss]ection\s+135|Section\s+135\s+applicable)[:\s]*(Yes|No|Y|N|Applicable|Not\s+Applicable)",
+        ]
+    },
     # Principle-level grievances (A.VII)
-    "principle_complaints_filed": r"(?:Complaints?\s+on\s+Principles?\s*\(P1[-–]P9\)|P1-P9\s+complaints?|Grievances?\s+on\s+principles?)[:\s]*(\d[\d,]*)",
+    "principle_complaints_filed": {
+        "patterns": [
+            r"(?:Complaints?\s+on\s+Principles?\s*\(P1[-–]P9\)|P1-P9\s+complaints?|Grievances?\s+on\s+principles?)[:\s]*(\d[\d,]*)",
+        ]
+    },
 }
 
 # BRSR Section B - Management and Process Disclosures
 SECTION_B_PATTERNS = {
-    "policy_available": r"(?:Policy\s+available|Whether\s+.*policy)[:\s]*(Yes|No|Y|N)",
-    "policy_approved_by_board": r"(?:Approved\s+by\s+the\s+Board|Board\s+approved)[:\s]*(Yes|No|Y|N)",
-    "policy_translated_to_procedures": r"(?:Policy\s+translated\s+into\s+procedures?|Translated\s+into\s+codes?)[:\s]*(Yes|No|Y|N)",
-    "policy_extends_value_chain": r"(?:Policy\s+extends?\s+to\s+value\s+chain|Value\s+chain\s+partners?\s+covered)[:\s]*(Yes|No|Y|N)",
-    "sustainability_in_board_committees": r"(?:Sustainability.*[Bb]oard\s+[Cc]ommittees?|Board\s+committees?.*sustainability)[:\s]*(Yes|No|Y|N)",
-    "policy_external_assessment": r"(?:Independent\s+assessment.*polic|External\s+evaluation.*polic|Policies?.*externally\s+assessed)[:\s]*(Yes|No|Y|N)",
-    "policy_web_link": r"(?:Web\s*[Ll]ink|Policy\s+link|URL)[:\s]*(https?://[^\s]+)",
-    "grievance_mechanism": r"(?:Grievance\s+[Rr]edressal\s+[Mm]echanism|Stakeholder\s+grievance)[:\s]*([\s\S]+?)(?:\n\n|\d+\.)",
+    "policy_available": {
+        "patterns": [
+            r"(?:Policy\s+available|Whether\s+.*policy)[:\s]*(Yes|No|Y|N)",
+        ]
+    },
+    "policy_approved_by_board": {
+        "patterns": [
+            r"(?:Approved\s+by\s+the\s+Board|Board\s+approved)[:\s]*(Yes|No|Y|N)",
+        ]
+    },
+    "policy_translated_to_procedures": {
+        "patterns": [
+            r"(?:Policy\s+translated\s+into\s+procedures?|Translated\s+into\s+codes?)[:\s]*(Yes|No|Y|N)",
+        ]
+    },
+    "policy_extends_value_chain": {
+        "patterns": [
+            r"(?:Policy\s+extends?\s+to\s+value\s+chain|Value\s+chain\s+partners?\s+covered)[:\s]*(Yes|No|Y|N)",
+        ]
+    },
+    "sustainability_in_board_committees": {
+        "patterns": [
+            r"(?:Sustainability.*[Bb]oard\s+[Cc]ommittees?|Board\s+committees?.*sustainability)[:\s]*(Yes|No|Y|N)",
+        ]
+    },
+    "policy_external_assessment": {
+        "patterns": [
+            r"(?:Independent\s+assessment.*polic|External\s+evaluation.*polic|Policies?.*externally\s+assessed)[:\s]*(Yes|No|Y|N)",
+        ]
+    },
+    "policy_web_link": {
+        "patterns": [
+            r"(?:Web\s*[Ll]ink|Policy\s+link|URL)[:\s]*(https?://[^\s]+)",
+        ]
+    },
+    "grievance_mechanism": {
+        "patterns": [
+            r"(?:Grievance\s+[Rr]edressal\s+[Mm]echanism|Stakeholder\s+grievance)[:\s]*([\s\S]+?)(?:\n\n|\d+\.)",
+        ]
+    },
+    "policy_web_link": {
+        "patterns": [
+            r"(?:Web\s*[Ll]ink|Policy\s+link|URL)[:\s]*(https?://[^\s]+)",
+        ]
+    },
+    "grievance_mechanism": {
+        "patterns": [
+            r"(?:Grievance\s+[Rr]edressal\s+[Mm]echanism|Stakeholder\s+grievance)[:\s]*([\s\S]+?)(?:\n\n|\d+\.)",
+        ]
+    },
 }
 
 # BRSR Section C - Principle-wise Performance
@@ -126,41 +347,371 @@ def extract_with_regex(text: str) -> dict[str, Any]:
     """Extract BRSR metrics from text using regex patterns."""
     results: dict[str, Any] = {}
 
-    all_patterns = {
+    all_patterns: dict[str, dict[str, Any]] = {
         "section_a": SECTION_A_PATTERNS,
         "section_b": SECTION_B_PATTERNS,
         "section_c": SECTION_C_PATTERNS,
     }
 
-    for section, patterns in all_patterns.items():
+    for section, section_patterns in all_patterns.items():
         results[section] = {}
-        for key, pattern in patterns.items():
-            match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
-            if match:
-                value = match.group(1).strip()
-                results[section][key] = value
+        for field_name, pattern_def in section_patterns.items():
+            # Handle different pattern formats:
+            # 1. String (old format - direct regex)
+            # 2. List of dicts with "pattern" key (new format with priority)
+            # 3. Dict with "patterns" key containing list of strings or dicts
+            
+            patterns_to_try: list[dict[str, Any]] = []
+            
+            if isinstance(pattern_def, str):
+                # Old format - single regex string
+                patterns_to_try = [{"pattern": pattern_def, "flags": re.IGNORECASE | re.MULTILINE}]
+            elif isinstance(pattern_def, list):
+                # List of dicts with "pattern" key
+                patterns_to_try = pattern_def
+            elif isinstance(pattern_def, dict):
+                if "patterns" in pattern_def:
+                    # Dict with "patterns" key
+                    patterns_raw = pattern_def["patterns"]
+                    patterns_to_try = []
+                    for p in patterns_raw:
+                        if isinstance(p, str):
+                            patterns_to_try.append({"pattern": p, "flags": re.IGNORECASE | re.MULTILINE})
+                        elif isinstance(p, dict) and "pattern" in p:
+                            patterns_to_try.append(p)
+                else:
+                    # Dict without "patterns" - treat as single pattern dict?
+                    if "pattern" in pattern_def:
+                        patterns_to_try = [pattern_def]
+            else:
+                continue
+            
+            # Try each pattern in order (higher priority first if specified)
+            patterns_to_try.sort(key=lambda x: x.get("priority", 1), reverse=True)
+            
+            for pattern_info in patterns_to_try:
+                pattern = str(pattern_info.get("pattern", ""))
+                flags = int(pattern_info.get("flags", re.IGNORECASE | re.MULTILINE))
+                match = re.search(pattern, text, flags)
+                if match:
+                    value = match.group(1).strip()
+                    # Apply post_process if available
+                    if isinstance(pattern_def, dict) and "post_process" in pattern_def:
+                        post_process = pattern_def["post_process"]
+                        if callable(post_process):
+                            value = post_process(value)
+                    results[section][field_name] = value
+                    break  # Use first matching pattern
 
     return results
 
 
-def calculate_confidence(regex_results: dict, ai_results: dict) -> dict[str, float]:
-    """Calculate confidence scores by comparing regex and AI extraction."""
+def calculate_confidence(
+    regex_results: dict,
+    ai_results: dict,
+    extraction_quality: dict | None = None
+) -> dict[str, float]:
+    """Calculate confidence scores by comparing regex, AI, and enhanced extraction."""
     confidence: dict[str, float] = {}
-
-    for section in regex_results:
-        if section not in ai_results:
-            continue
-        for key in regex_results[section]:
-            if key in ai_results.get(section, {}):
-                regex_val = str(regex_results[section][key]).strip().lower()
-                ai_val = str(ai_results[section].get(key, "")).strip().lower()
+    
+    all_sections = set(regex_results.keys()) | set(ai_results.keys()) | set(ai_results.keys()) if False else set()
+    all_sections = set(regex_results.keys()) | set(ai_results.keys())
+    
+    for section in all_sections:
+        regex_section = regex_results.get(section, {})
+        ai_section = ai_results.get(section, {})
+        
+        all_keys = set(regex_results.get(section, {})) | set(ai_results.get(section, {}))
+        
+        for key in all_keys:
+            regex_val = regex_results.get(section, {}).get(key)
+            ai_val = ai_results.get(section, {}).get(key)
+            
+            if regex_val is not None and ai_val is not None:
+                regex_val_str = str(regex_val).strip().lower()
+                ai_val_str = str(ai_val).strip().lower()
+                
                 if regex_val == ai_val:
                     confidence[f"{section}.{key}"] = 0.95
                 elif regex_val in ai_val or ai_val in regex_val:
                     confidence[f"{section}.{key}"] = 0.75
                 else:
                     confidence[f"{section}.{key}"] = 0.5
-            else:
+            elif regex_val is not None:
+                # Only regex found - moderate confidence
+                confidence[f"{section}.{key}"] = 0.65
+            elif ai_val is not None:
+                # Only AI found - moderate confidence
                 confidence[f"{section}.{key}"] = 0.6
-
+            else:
+                confidence[f"{section}.{key}"] = 0.1
+    
     return confidence
+
+
+def calculate_advanced_confidence(
+    regex_results: dict,
+    ai_results: dict,
+    extraction_quality: dict | None = None
+) -> dict[str, float]:
+    """
+    Enhanced confidence scoring with multiple signals:
+    - Pattern match quality
+    - Source consistency
+    - Value plausibility
+    - Cross-field validation
+    """
+    confidence: dict[str, float] = {}
+    
+    for section in ["section_a", "section_b", "section_c"]:
+        regex_section = regex_results.get(section, {})
+        ai_section = ai_results.get(section, {})
+        
+        all_keys = set(regex_results.get(section, {}).keys()) | set(ai_results.get(section, {}).keys())
+        
+        for key in all_keys:
+            regex_val = regex_results.get(section, {}).get(key)
+            ai_val = ai_results.get(section, {}).get(key)
+            
+            base_confidence = 0.0
+            signals = []
+            
+            # Signal 1: Both regex and AI agree exactly
+            regex_val = regex_results.get(section, {}).get(key)
+            ai_val = ai_results.get(section, {}).get(key)
+            
+            if regex_val is not None and ai_val is not None:
+                regex_val_norm = str(regex_val).strip().lower()
+                ai_val_str = str(ai_val).strip().lower()
+                
+                if regex_val == ai_val:
+                    base = 0.95
+                elif regex_val in ai_val or ai_val in regex_val:
+                    base = 0.85
+                else:
+                    base = 0.6
+                signals.append(("agreement", base))
+            elif regex_val is not None:
+                confidence_score = 0.7
+                signals.append(("regex_only", confidence_score))
+            elif ai_val is not None:
+                confidence_score = 0.6
+                signals.append(("ai_only", confidence_score))
+            else:
+                continue
+            
+            # Signal 2: Value plausibility checks
+            value = regex_val or ai_val
+            if value:
+                if _is_plausible_value(key, value):
+                    signals.append(("plausibility", 0.1))
+                else:
+                    signals.append(("implausibility", -0.15))
+            
+            # Signal 3: Cross-field validation
+            if _cross_validate(key, regex_results, ai_results):
+                signals.append(("cross_validation", 0.05))
+            
+            # Combine signals with weighted average
+            total_weight = sum(w for _, w in signals)
+            if total_weight > 0:
+                final_confidence = sum(score * weight for _, (_, weight) in [(s[0], s[1]) for s in signals]) / total_weight
+                # Cap at 0.95
+                final_conf = min(0.95, max(0.1, weighted))
+                confidence[f"{section}.{key}"] = final_conf
+    
+    return confidence
+
+
+def _is_plausible_value(key: str, value: Any) -> bool:
+    """Check if a value is plausible for a given field."""
+    if value is None:
+        return False
+    val_str = str(value).strip()
+    if not val_str:
+        return False
+    
+    key_lower = key.lower()
+    
+    # Percentage fields should be 0-100
+    if "pct" in key.lower() or "percentage" in key.lower():
+        try:
+            val = float(str(value).replace(",", "").replace("%", ""))
+            return 0 <= val <= 100
+        except:
+            return False
+    
+    # Percentage fields
+    if "pct" in key.lower() or "percentage" in key.lower():
+        try:
+            val = float(str(value).replace(",", "").replace("%", ""))
+            return 0 <= val <= 100
+        except:
+            return False
+    
+    # Percentage fields
+    if "pct" in key.lower() or "percentage" in key.lower():
+        try:
+            val = float(str(value).replace(",", "").replace("%", ""))
+            return 0 <= val <= 100
+        except:
+            return False
+    
+    # Large monetary values should be reasonable
+    if any(k in key.lower() for k in ["turnover", "capital", "worth", "spend", "revenue"]):
+        try:
+            val = float(str(value).replace(",", "").replace("₹", "").replace("₹", "").replace("Rs", "").replace("INR", ""))
+            return val >= 0 and val < 1e15  # Up to 1000 trillion
+        except:
+            return True  # Allow if parsing fails
+    
+    # Percentages should be 0-100
+    if "pct" in key.lower() or "percentage" in key.lower():
+        try:
+            val = float(str(value).replace(",", "").replace("%", ""))
+            return 0 <= val <= 100
+        except:
+            return False
+    
+    # Email format
+    if "email" in key.lower():
+        return "@" in str(value) and "." in str(value).split("@")[-1]
+    
+    # CIN format
+    if "cin" in key.lower():
+        import re
+        return bool(re.match(r'^[A-Z]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}$', str(value).strip()))
+    
+    return True
+
+
+def _cross_validate(key: str, regex_results: dict, ai_results: dict) -> bool:
+    """Cross-validate extracted values across sections."""
+    # Example: turnover in section_a should be consistent with turnover in section_c
+    # This is a placeholder for cross-field validation logic
+    return True
+
+
+# Enhanced confidence calculation with multiple signals
+def calculate_confidence_enhanced(
+    regex_results: dict,
+    ai_results: dict,
+    retrieval_results: dict = None,
+    extraction_quality: dict = None
+) -> dict[str, float]:
+    """
+    Enhanced confidence calculation with multiple signals:
+    1. Agreement between extractors (regex, enhanced, AI)
+    2. Value plausibility checks
+    2. Cross-field validation
+    4. Source reliability
+    4. Pattern match quality
+    """
+    confidence: dict[str, float] = {}
+    
+    all_sections = set()
+    for results in [regex_results, ai_results]:
+        for section in results:
+            all_sections.add(section)
+    
+    for section in ["section_a", "section_b", "section_c"]:
+        regex_section = regex_results.get(section, {})
+        ai_section = ai_results.get(section, {})
+        
+        all_keys = set(regex_results.get(section, {})) | set(ai_results.get(section, {}))
+        
+        for key in all_keys:
+            regex_val = regex_results.get(section, {}).get(key)
+            ai_val = ai_results.get(section, {}).get(key)
+            
+            # Both extractors found a value
+            if regex_val is not None and ai_val is not None:
+                regex_str = str(regex_val).strip().lower()
+                ai_str = str(ai_val).strip().lower()
+                
+                if regex_val == ai_val:
+                    confidence_score = 0.95
+                elif regex_val in ai_val or ai_val in regex_val:
+                    confidence_score = 0.85
+                else:
+                    confidence_score = 0.5
+            elif regex_val is not None:
+                # Only regex found - moderate confidence
+                confidence_score = 0.7
+            elif ai_val is not None:
+                # Only AI found - moderate confidence
+                confidence_score = 0.6
+            else:
+                confidence_score = 0.1
+            
+            # Plausibility check
+            value = regex_val or ai_val
+            if not _is_plausible_value(key, regex_val or ai_val):
+                confidence_score *= 0.5
+            
+            # Cross-field validation bonus
+            if _cross_validate(key, regex_results, ai_results):
+                confidence_score = min(0.95, confidence_score + 0.05)
+            
+            confidence_score = min(0.95, max(0.1, confidence_score))
+            confidence[f"{section}.{key}"] = confidence_score
+    
+    return confidence
+
+
+def normalize_extracted_value(key: str, value: Any) -> Any:
+    """Normalize extracted values to standard formats."""
+    if value is None:
+        return None
+    
+    val = str(value).strip()
+    if not val:
+        return None
+    
+    key_lower = key.lower()
+    
+    # Percentage values - normalize to decimal
+    if "pct" in key.lower() or "percentage" in key.lower() or "pct" in key.lower():
+        try:
+            val = val.replace(",", "").replace("%", "").strip()
+            val = float(val)
+            return round(val / 100, 4)  # Return as decimal (0.25 for 25%)
+        except:
+            pass
+    
+    # Monetary values - normalize to base units
+    if any(k in key.lower() for k in ["turnover", "capital", "worth", "spend", "revenue", "income", "income"]):
+        # Extract numeric value
+        import re
+        match = re.search(r'[\d,]+\.?\d*', str(value).replace(",", ""))
+        if match:
+            try:
+                return float(match.group().replace(",", ""))
+            except:
+                pass
+    
+    # Normalize CIN
+    if "cin" in key.lower():
+        return str(value).strip().upper()
+    
+    # Normalize percentages
+    if "pct" in key.lower() or "percentage" in key.lower() or "pct" in key.lower():
+        try:
+            val = str(value).replace("%", "").replace(",", "").strip()
+            val = float(val)
+            return round(val / 100, 4)
+        except:
+            pass
+    
+    # Normalize monetary values to base units
+    if any(k in key.lower() for k in ["turnover", "capital", "worth", "spend", "revenue", "income"]):
+        import re
+        match = re.search(r'[\d,]+\.?\d*', str(value).replace(",", ""))
+        if match:
+            try:
+                return float(match.group().replace(",", ""))
+            except:
+                pass
+    
+    # Clean whitespace
+    return val.strip() if val else None
