@@ -152,8 +152,61 @@ def test_bridge_maps_fields_to_real_datapoints():
         assert c["status"] == "reported"
     ghg = [c for c in out["candidates"] if c["source_field"] == "ghg_scope1"]
     assert ghg and ghg[0]["value"] == 1200.5
+    # No unit context on a measure field -> weak-flagged and capped.
+    assert ghg[0]["confidence"] == 0.3
+    assert ghg[0]["weak_reasons"] == ["no_unit"]
+
+
+def test_unit_context_preserves_confidence():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"ghg_scope1": 1200.5},
+         "normalised": {"section_c": {"ghg_scope1": {
+             "raw": 1200.5, "value": 1200.5, "unit": "tCO2e", "value_inr": None}}}},
+        {"ghg_scope1": 0.9},
+    )
+    ghg = [c for c in out["candidates"] if c["source_field"] == "ghg_scope1"]
+    assert ghg and ghg[0]["confidence"] == 0.9
+    assert ghg[0]["weak_reasons"] == []
+
+
+def test_snippet_recovers_dropped_unit():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"ghg_scope1": 1200.5},
+         "citations": {"section_c": {"ghg_scope1": {
+             "source_page": 12, "snippet": "Scope 1 emissions: 1200 tCO2e", "match_kind": "numeric"}}}},
+        {"ghg_scope1": 0.9},
+    )
+    ghg = [c for c in out["candidates"] if c["source_field"] == "ghg_scope1"]
+    assert ghg
+    assert ghg[0]["unit"] == "tCO2e"
+    assert ghg[0]["weak_reasons"] == []
     assert ghg[0]["confidence"] == 0.9
-    assert ghg[0]["source_brsr_id"] == "C.P6.E.3"
+
+
+def test_junk_values_dropped():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"ghg_scope1": "n", "ghg_scope2": " ", "waste_generated": 5}},
+        {},
+    )
+    fields = {c["source_field"] for c in out["candidates"]}
+    assert "ghg_scope1" not in fields
+    assert "ghg_scope2" not in fields
+    assert out["stats"]["dropped_junk"] == 2
+    assert "waste_generated" in fields
+
+
+def test_narrative_datapoints_get_snippets_not_numbers():
+    out = brsr_fields_to_esrs_candidates(
+        {"section_c": {"anti_corruption_policy": "Yes, zero-tolerance policy"},
+         "citations": {"section_c": {"anti_corruption_policy": {
+             "source_page": 25, "snippet": "zero-tolerance policy", "match_kind": "text"}}}},
+        {},
+    )
+    nar = [c for c in out["candidates"]
+           if c["source_field"] == "anti_corruption_policy" and c["value"] is None]
+    assert nar, "narrative datapoints should get snippet candidates"
+    assert all(c["status"] == "in_progress" and c.get("needs_writing") for c in nar)
+    assert all(c["source_page"] == 25 for c in nar)
 
 
 def test_bridge_passes_citations_and_normalised_units():

@@ -1068,6 +1068,8 @@ export interface ExtractCandidate {
   source_brsr_id?: string | null;
   source_field?: string | null;
   status: string;
+  needs_writing?: boolean;
+  weak_reasons?: string[];
 }
 
 export interface ExtractResult {
@@ -1110,11 +1112,12 @@ export async function extractPdf(file: File): Promise<ExtractResult> {
 export async function confirmCandidate(
   financialYear: string,
   c: ExtractCandidate,
-  status: string
+  status?: string
 ): Promise<void> {
+  const finalStatus = status || c.status || "reported";
   await saveEntry(financialYear, {
     datapoint_id: c.datapoint_id,
-    status,
+    status: finalStatus,
     value: c.value,
     evidence: null,
     notes: `AI-extracted from annual report${c.confidence != null ? ` (confidence ${c.confidence})` : ""} — verify before filing.`,

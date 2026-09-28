@@ -1166,7 +1166,7 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
   const confirmOne = async (c: ExtractCandidate) => {
     setConfirming(c.datapoint_id);
     try {
-      await confirmCandidate(financialYear, c, "reported");
+      await confirmCandidate(financialYear, c);
       setConfirmed((prev) => new Set(prev).add(c.datapoint_id));
       onConfirmed();
       refreshDrift();
@@ -1182,7 +1182,7 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
     for (const c of list) {
       if (confirmed.has(c.datapoint_id)) continue;
       try {
-        await confirmCandidate(financialYear, c, "reported");
+        await confirmCandidate(financialYear, c);
         setConfirmed((prev) => new Set(prev).add(c.datapoint_id));
       } catch (e) {
         notify(e as Error, false);
@@ -1293,10 +1293,13 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
                         <li key={c.datapoint_id} className="px-3 py-2 text-sm">
                           <div className="flex items-center gap-3">
                             <span className="font-mono text-xs text-slate-500 w-32 shrink-0 truncate" title={c.datapoint_id}>{c.datapoint_id}</span>
-                            <span className="flex-1 text-slate-700 truncate" title={String(c.value ?? "")}>
-                              {String(c.value ?? "—")}
+                            <span className="flex-1 text-slate-700 truncate" title={String(c.value ?? c.snippet ?? "")}>
+                              {c.needs_writing ? <span className="text-slate-400 italic">write from snippet ↓</span> : String(c.value ?? "—")}
                               {c.unit && <span className="ml-1 text-[10px] text-slate-400">{c.unit}{c.unit_converted ? " · converted" : ""}</span>}
                             </span>
+                            {(c.weak_reasons || []).length > 0 && (
+                              <span className="shrink-0 text-[10px] font-bold text-amber-600" title={`Check: ${c.weak_reasons!.join(", ")}`}>verify</span>
+                            )}
                             {c.source_page != null && (
                               <span className="shrink-0 text-[10px] font-bold text-slate-400" title={c.snippet || ""}>p.{c.source_page}</span>
                             )}
@@ -1307,7 +1310,7 @@ function ExtractImport({ financialYear, notify, onConfirmed }: { financialYear: 
                             )}
                             {confirmed.has(c.datapoint_id)
                               ? <span className="text-[11px] font-bold text-emerald-600">Confirmed</span>
-                              : <button onClick={() => confirmOne(c)} disabled={confirming === c.datapoint_id} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold disabled:opacity-50">Confirm</button>}
+                              : <button onClick={() => confirmOne(c)} disabled={confirming === c.datapoint_id} className="rounded-lg bg-blue-600 text-white px-2.5 py-1 text-xs font-bold disabled:opacity-50">{c.needs_writing ? "Attach" : "Confirm"}</button>}
                           </div>
                           {c.snippet && (
                             <p className="mt-1 pl-0 text-[11px] text-slate-400 truncate" title={c.snippet}>“{c.snippet}”</p>

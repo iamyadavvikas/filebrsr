@@ -153,6 +153,77 @@ def _resolve_esrs(brsr_id: str) -> tuple[str, str] | None:
     return None
 
 
+def _is_junk_value(value: Any) -> bool:
+    """Single characters and empty strings carry no disclosure content."""
+    if value is None:
+        return True
+    if isinstance(value, str):
+        s = value.strip().replace(",", "")
+        if s == "":
+            return True
+        if len(s) <= 1:
+            try:
+                float(s)
+                return False
+            except ValueError:
+                return True
+    return False
+
+
+_MEASURE_HINTS = ("ghg", "energy", "water", "waste", "emission", "fuel", "electricity")
+
+
+def _is_measure_field(field: str) -> bool:
+    f = field.lower()
+    return any(k in f for k in _MEASURE_HINTS)
+
+
+def _unit_family(unit: str) -> str | None:
+    """Which physical family a unit token belongs to (None if unknown)."""
+    from app.normalise import ENERGY_TO_MWH, MASS_TO_TONNES, VOLUME_TO_M3
+
+    u = (unit or "").upper()
+    if u in ENERGY_TO_MWH:
+        return "energy"
+    if u in VOLUME_TO_M3:
+        return "volume"
+    if u in MASS_TO_TONNES:
+        return "mass"
+    if u == "%":
+        return "percent"
+    return None
+
+
+def _expected_family(field: str) -> str | None:
+    f = field.lower()
+    if any(k in f for k in ("ghg", "emission", "waste")):
+        return "mass"
+    if "energy" in f or "fuel" in f or "electricity" in f:
+        return "energy"
+    if "water" in f:
+        return "volume"
+    return None
+
+
+_UNIT_TOKEN_RE = re.compile(
+    r"(tCO2e?|tonnes?|MT\b|kg\b|MWh|kWh|GWh|[GTM]J\b|ML\b|KL\b|m3\b|%|Rs\b|INR\b|EUR\b|USD\b)",
+    re.IGNORECASE,
+)
+
+
+def _snippet_unit(snippet: str | None) -> str | None:
+    """Recover a unit token from the citation snippet.
+
+    Regex captures numbers but drops their units; the snippet usually
+    still carries them ("Scope 1 emissions: 1200 tCO2e"). Without this,
+    good extractions look unitless and get weak-flagged.
+    """
+    if not snippet:
+        return None
+    m = _UNIT_TOKEN_RE.search(snippet)
+    return m.group(1) if m else None
+
+
 def _flat_fields(extracted_data: dict[str, Any]) -> dict[str, tuple[str, Any]]:
     """Flatten sections to field -> (section, value), skipping empties."""
     flat: dict[str, tuple[str, Any]] = {}
@@ -184,9 +255,13 @@ def brsr_fields_to_esrs_candidates(
     candidates: list[dict[str, Any]] = []
     fields_seen = 0
     fields_mapped = 0
+    dropped_junk = 0
     for field, (section, value) in _flat_fields(extracted_data).items():
         brsr_id = FIELD_TO_BRSR.get(field)
         if not brsr_id:
+            continue
+        if _is_junk_value(value):
+            dropped_junk += 1
             continue
         fields_seen += 1
         parsed = _resolve_esrs(brsr_id)
@@ -213,7 +288,54 @@ def brsr_fields_to_esrs_candidates(
         else:
             display_value = value
             converted = False
+        # Sanity: measure-class fields with no unit context are weak
+        # (page numbers, table indices, stray counts). Snippets often
+        # retain the unit the regex capture dropped — recover it first.
+        weak_reasons: list[str] = []
+        if _is_measure_field(field) and not unit:
+            recovered = _snippet_unit(cite.get("snippet"))
+            if recovered:
+                unit = recovered
+            else:
+                weak_reasons.append("no_unit")
+                if conf_f is not None:
+                    conf_f = min(conf_f, 0.3)
+                else:
+                    conf_f = 0.3
+        # Unit-family validation against the field's physical class.
+        expected = _expected_family(field)
+        fam = _unit_family(unit) if unit else None
+        if unit and expected and fam and fam != expected and fam != "percent":
+            weak_reasons.append(f"unit_mismatch:{unit}")
+            if conf_f is not None:
+                conf_f = min(conf_f, 0.35)
         for dp in dps:
+            dtype = dp.get("data_type") or ""
+            if dtype == "narrative":
+                # Narratives take prose, not bare numbers — propose the
+                # snippet for the assessor to write from instead.
+                if not cite.get("snippet"):
+                    continue
+                candidates.append({
+                    "datapoint_id": dp["id"],
+                    "dr": dp.get("dr"),
+                    "standard": dp.get("standard"),
+                    "name": dp.get("name"),
+                    "value": None,
+                    "raw_value": None,
+                    "unit": None,
+                    "unit_converted": False,
+                    "confidence": conf_f,
+                    "source_page": cite.get("source_page"),
+                    "snippet": cite.get("snippet"),
+                    "match_kind": cite.get("match_kind"),
+                    "source_brsr_id": brsr_id,
+                    "source_field": field,
+                    "status": "in_progress",
+                    "needs_writing": True,
+                    "weak_reasons": weak_reasons,
+                })
+                continue
             candidates.append({
                 "datapoint_id": dp["id"],
                 "dr": dp.get("dr"),
@@ -223,13 +345,14 @@ def brsr_fields_to_esrs_candidates(
                 "raw_value": value if display_value != value else None,
                 "unit": unit or None,
                 "unit_converted": converted,
-                "confidence": conf_f,
+                "confidence": conf_f if conf_f is not None else (0.3 if weak_reasons else None),
                 "source_page": cite.get("source_page"),
                 "snippet": cite.get("snippet"),
                 "match_kind": cite.get("match_kind"),
                 "source_brsr_id": brsr_id,
                 "source_field": field,
                 "status": "reported",
+                "weak_reasons": weak_reasons,
             })
             if len(candidates) >= max_candidates:
                 break
@@ -241,6 +364,7 @@ def brsr_fields_to_esrs_candidates(
         "stats": {
             "fields_seen": fields_seen,
             "fields_mapped": fields_mapped,
+            "dropped_junk": dropped_junk,
             "candidates": len(candidates),
             "capped": len(candidates) >= max_candidates,
         },
