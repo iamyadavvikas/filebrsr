@@ -38,6 +38,24 @@ echo "TAG=$TAG"                   >> .env.tmp
 echo "ECR_REGISTRY=$ECR_REGISTRY" >> .env.tmp
 mv .env.tmp .env
 
+# 3b. Refresh runtime secrets from AWS Secrets Manager so rotated keys
+# (e.g. GEMINI_API_KEY) take effect on every deploy with no SSH needed.
+# fetch-secrets.sh is idempotent; placeholder lines are skipped so a
+# failed fetch never clobbers a good value already in .env.
+echo "→ Refreshing secrets from AWS Secrets Manager"
+if ./scripts/fetch-secrets.sh > .secrets.tmp 2>/dev/null; then
+  while IFS='=' read -r skey svalue; do
+    [[ -z "$skey" || "$svalue" == "placeholder-replace-me" ]] && continue
+    grep -v "^${skey}=" .env > .env.tmp 2>/dev/null || true
+    echo "${skey}=${svalue}" >> .env.tmp
+    mv .env.tmp .env
+  done < .secrets.tmp
+  echo "   ✓ secrets refreshed"
+else
+  echo "⚠ secret refresh failed — keeping existing .env values"
+fi
+rm -f .secrets.tmp
+
 # 4. Recreate containers (zero-downtime for nginx: it only restarts if config changed)
 echo "→ Bringing up services"
 docker compose -f docker-compose.prod.yml up -d --remove-orphans \
