@@ -338,10 +338,13 @@ async def guest_extract_brsr(
 
         # Unified pipeline — guest path: report_id="guest" disables chunk
         # persistence so anonymous uploads never touch extraction_chunks.
+        # Small OCR cap: this is one synchronous HTTP request, so bounded
+        # work (deep OCR belongs to the background worker path).
         result = await run_full_extraction(
             file_bytes=content,
             settings=settings,
             report_id="guest",
+            ocr_max_pages=20,
         )
         if result["status"] != "completed":
             return {"status": "failed", "error": result["error"]}
