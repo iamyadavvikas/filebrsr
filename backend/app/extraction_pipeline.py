@@ -203,6 +203,7 @@ async def run_full_extraction(
     user_id: str | None = None,
     supabase_client=None,
     max_pages: int | None = None,
+    ocr_max_pages: int | None = 200,
 ) -> dict[str, Any]:
     """Run the full BRSR extraction pipeline on a PDF byte string.
 
@@ -256,10 +257,16 @@ async def run_full_extraction(
             "_raw": {},
         }
 
-    # 2. OCR fallback for blank pages (no-op if no key or no empty pages)
+    # 2. OCR fallback for blank pages (no-op if no key or no empty pages).
+    # Sync callers (guest single-shot) pass a small cap — 200 vision calls
+    # inside one HTTP request outlives every frontend timeout and risks
+    # OOM-killing the container mid-request (socket hang-up downstream).
     if settings.GEMINI_API_KEY:
         try:
-            await ocr_document(doc, file_bytes, api_key=settings.GEMINI_API_KEY)
+            await ocr_document(
+                doc, file_bytes,
+                api_key=settings.GEMINI_API_KEY, max_pages=ocr_max_pages,
+            )
         except Exception as exc:  # noqa: BLE001
             logger.warning("OCR failed (continuing without it): %s", exc)
 

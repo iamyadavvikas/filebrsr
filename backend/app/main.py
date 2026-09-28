@@ -1,4 +1,6 @@
 import logging
+import os
+import resource
 import time
 
 import sentry_sdk
@@ -17,6 +19,35 @@ logging.basicConfig(
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
 logger = logging.getLogger("filebrsr")
+
+_BOOT_TIME = time.time()
+# In-memory ring of recent extraction outcomes (no PII — status/error only).
+# If the container is being OOM-killed mid-request, the tell is a small
+# uptime_at_request combined with no completed entries here.
+_RECENT_EXTRACTIONS: list[dict] = []
+
+
+def _record_extraction_outcome(status: str, error: str | None, duration_s: float) -> None:
+    _RECENT_EXTRACTIONS.append({
+        "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "status": status,
+        "error": (error or "")[:300],
+        "duration_s": round(duration_s, 1),
+    })
+    del _RECENT_EXTRACTIONS[:-20]
+
+
+def _diag_payload() -> dict:
+    rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    # macOS reports bytes, Linux KB — normalise roughly.
+    if rss_mb > 10_000_000:  # clearly bytes
+        rss_mb /= 1024
+    return {
+        "uptime_s": round(time.time() - _BOOT_TIME, 1),
+        "rss_mb": round(rss_mb, 1),
+        "pid": os.getpid(),
+        "recent_extractions": _RECENT_EXTRACTIONS,
+    }
 
 
 def _require_service_auth(authorization: str) -> None:
@@ -82,6 +113,19 @@ from app.xbrl_export import router as xbrl_router
 from app.xbrl_filing import router as xbrl_filing_router
 
 app = FastAPI(title="FileBRSR Platform API", version="4.0.0")
+
+
+@app.get("/api/diag")
+async def diag(authorization: str = Header(...)):
+    """Service-only liveness detail: uptime, memory, recent outcomes.
+
+    No secrets, no document content — safe to expose behind the service
+    bearer. Low uptime + extraction attempts with no completions =
+    container is being killed mid-request (OOM prime suspect).
+    """
+    _require_service_auth(authorization)
+    return _diag_payload()
+
 
 settings = get_settings()
 
@@ -338,10 +382,17 @@ async def guest_extract_brsr(
 
         # Unified pipeline — guest path: report_id="guest" disables chunk
         # persistence so anonymous uploads never touch extraction_chunks.
+        # Small OCR cap: this is one synchronous HTTP request, so bounded
+        # work (deep OCR belongs to the background worker path).
+        _t0 = time.time()
         result = await run_full_extraction(
             file_bytes=content,
             settings=settings,
             report_id="guest",
+            ocr_max_pages=20,
+        )
+        _record_extraction_outcome(
+            result.get("status", "?"), result.get("error"), time.time() - _t0,
         )
         if result["status"] != "completed":
             return {"status": "failed", "error": result["error"]}

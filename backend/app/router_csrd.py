@@ -1456,6 +1456,8 @@ async def extract_pdf_to_candidates(
             report_id="csrd-extract",
             user_id=None if _is_guest(user_id) else user_id,
             supabase_client=sb,
+            # Synchronous request — bounded OCR; deep OCR is worker-only.
+            ocr_max_pages=20,
         )
     except Exception as exc:  # noqa: BLE001 - pipeline failures surface as 422
         raise HTTPException(status_code=422, detail=f"extraction failed: {exc}") from exc
