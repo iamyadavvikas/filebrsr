@@ -61,8 +61,13 @@ echo "→ Bringing up services"
 docker compose -f docker-compose.prod.yml up -d --remove-orphans \
   --force-recreate frontend backend worker
 
-# Observability stack (Prometheus scrapes backend; Grafana serves /grafana/)
-docker compose -f docker-compose.prod.yml up -d prometheus grafana
+# Observability stack is OFF on this box (2026-09-28): Prometheus + Grafana
+# (~1 GB RAM + 15d metrics disk) were overcommitting host memory and
+# contributing to OOM-kills. Re-enable by flipping this block back to
+# `up -d` once the instance is sized ≥8 GB.
+echo "→ Stopping observability stack (host memory)"
+docker compose -f docker-compose.prod.yml stop prometheus grafana >/dev/null 2>&1 || true
+docker compose -f docker-compose.prod.yml rm -f prometheus grafana >/dev/null 2>&1 || true
 
 # nginx + certbot only restart if their config / image changed
 docker compose -f docker-compose.prod.yml up -d nginx certbot
