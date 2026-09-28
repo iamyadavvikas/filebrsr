@@ -114,7 +114,7 @@ async def ocr_pages(
     *,
     api_key: str,
     model: str = "gemini-2.0-flash",
-    concurrency: int = 4,
+    concurrency: int = 6,
     timeout: float = 30.0,
 ) -> dict[int, str]:
     """
@@ -124,7 +124,7 @@ async def ocr_pages(
     - Pages that fail to render or transcribe are returned with "" so the
       caller can distinguish "tried and got nothing" from "never tried".
     - Concurrency bounded by semaphore to stay under Gemini Flash's 15 RPM
-      free-tier limit (4 in-flight + ~30s round-trip ≈ comfortable).
+      free-tier limit (6 in-flight + ~30s round-trip ≈ ~12 RPM, comfortable).
     """
     if not pages:
         return {}
@@ -152,9 +152,9 @@ async def ocr_document(
     *,
     api_key: str,
     model: str = "gemini-2.0-flash",
-    concurrency: int = 4,
+    concurrency: int = 6,
     timeout: float = 30.0,
-    max_pages: int | None = 20,
+    max_pages: int | None = 200,
 ) -> Document:
     """
     Fill in OCR text for `doc.empty_pages` and return the same Document.
@@ -162,9 +162,10 @@ async def ocr_document(
     - Mutates `doc` by appending one `Chunk(kind="text", ...)` per OCR'd page,
       keyed to that page_number. `to_text()` will then surface the OCR text
       under the existing `--- Page N ---` marker.
-    - `max_pages` caps how many empty pages we'll OCR per document to stay
-      under free-tier rate limits when someone uploads a fully scanned 200-
-      page report (default 20 pages ≈ 80 KB of extra prompt).
+    - `max_pages` caps how many empty pages we'll OCR per document (default
+      200). A fully scanned 200-pager takes ~15-20 min on the free tier —
+      fine for the background worker/async path, but guest single-shot
+      requests will time out first; those fall back to parsed text only.
     - No-op if `doc.empty_pages` is empty or `api_key` is falsy.
     """
     if not doc.empty_pages:
