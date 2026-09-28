@@ -125,12 +125,12 @@ export default function UploadExtractClient({ userId, initialReports }: { userId
       track("extraction_completed", "extraction", { report_id: data.reportId });
       setSuccess(true);
       setProgress("");
-      if (data.reportId) {
-        setReportId(data.reportId);
-      } else if (data.results) {
-        // Guest-style inline results
+      if (data.results) {
+        // Guest-style inline results (never persisted — viewer reads sessionStorage)
         sessionStorage.setItem("guestResults", JSON.stringify(data.results));
         setReportId("guest");
+      } else if (data.reportId) {
+        setReportId(data.reportId);
       }
     } catch {
       setError("Network error. Please check your connection and try again.");
@@ -162,21 +162,23 @@ export default function UploadExtractClient({ userId, initialReports }: { userId
           </p>
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={() => router.push(`/platform/reports/${reportId}`)}
+              onClick={() => router.push(reportId === "guest" ? "/results/guest" : `/platform/reports/${reportId}`)}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
             >
               <FileText className="w-4 h-4" />
               View Extraction Results
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={() => router.push("/platform/data-entry?autofill=" + reportId)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-            >
-              <Sparkles className="w-4 h-4" />
-              Auto-fill Data Entry
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            {reportId !== "guest" && (
+              <button
+                onClick={() => router.push("/platform/data-entry?autofill=" + reportId)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+              >
+                <Sparkles className="w-4 h-4" />
+                Auto-fill Data Entry
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button
               onClick={() => {
                 setFile(null);
