@@ -18,6 +18,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger("filebrsr")
 
+
+def _require_service_auth(authorization: str) -> None:
+    """Validate the shared Next.js → FastAPI service bearer.
+
+    Tolerates surrounding whitespace on both sides (dashboard-pasted
+    secrets commonly carry a trailing newline). Logs lengths only —
+    never the secret — so a 401 is diagnosable from backend logs.
+    """
+    settings = get_settings()
+    expected = f"Bearer {settings.SUPABASE_SERVICE_KEY.strip()}"
+    got = (authorization or "").strip()
+    if got != expected:
+        logger.warning(
+            "service auth rejected: got_len=%d expected_len=%d",
+            len(got), len(expected),
+        )
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
 # ─── Sentry Error Tracking ────────────────────────────────────
 _settings = get_settings()
 if _settings.SENTRY_DSN:
@@ -210,9 +228,7 @@ async def extract_brsr(
     authorization: str = Header(...),
 ):
     # Verify the request comes from our Next.js backend
-    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
-    if authorization != expected_token:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    _require_service_auth(authorization)
 
     supabase = get_supabase_admin()
 
@@ -427,9 +443,7 @@ async def notify_extraction_complete(
     authorization: str = Header(...),
 ):
     """Send email notification after extraction completes."""
-    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
-    if authorization != expected_token:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    _require_service_auth(authorization)
 
     from app.email_service import send_extraction_complete
 
@@ -475,19 +489,21 @@ class ExtractAsyncRequest(BaseModel):
 @app.post("/api/extract-queue")
 async def queue_extraction(req: ExtractAsyncRequest, authorization: str = Header(...)):
     """Queue an extraction job for background processing. Returns immediately."""
-    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
-    if authorization != expected_token:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    _require_service_auth(authorization)
 
     supabase = get_supabase_admin()
 
     # Insert into extraction_jobs queue
-    result = supabase.table("extraction_jobs").insert({
-        "report_id": req.report_id,
-        "user_id": req.user_id,
-        "file_url": req.file_url,
-        "status": "queued",
-    }).execute()
+    try:
+        result = supabase.table("extraction_jobs").insert({
+            "report_id": req.report_id,
+            "user_id": req.user_id,
+            "file_url": req.file_url,
+            "status": "queued",
+        }).execute()
+    except Exception as exc:  # noqa: BLE001 - surface as 500 with detail, not bare traceback
+        logger.error("extract-queue insert failed for report=%s: %s", req.report_id, exc)
+        raise HTTPException(status_code=500, detail=f"Failed to queue extraction: {exc}") from exc
 
     return {"status": "queued", "report_id": req.report_id, "job_id": result.data[0]["id"] if result.data else None}
 
@@ -495,9 +511,7 @@ async def queue_extraction(req: ExtractAsyncRequest, authorization: str = Header
 @app.get("/api/extract-status/{report_id}")
 async def get_extraction_status(report_id: str, authorization: str = Header(...)):
     """Poll extraction status for a report."""
-    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
-    if authorization != expected_token:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    _require_service_auth(authorization)
 
     supabase = get_supabase_admin()
     result = supabase.table("reports").select("status, company_name, financial_year").eq("id", report_id).single().execute()
@@ -529,9 +543,7 @@ async def submit_correction(req: CorrectionRequest, authorization: str = Header(
     the body and trust the shared-bearer pattern the rest of /api/*
     already uses.
     """
-    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
-    if authorization != expected_token:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    _require_service_auth(authorization)
 
     if req.section not in {"section_a", "section_b", "section_c"}:
         raise HTTPException(status_code=400, detail="Invalid section")
@@ -569,9 +581,7 @@ async def extract_brsr_async(
     authorization: str = Header(...),
 ):
     """Pull file from Supabase Storage and process. Called by frontend fire-and-forget."""
-    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
-    if authorization != expected_token:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    _require_service_auth(authorization)
 
     supabase = get_supabase_admin()
 
@@ -720,12 +730,13 @@ async def generate_sebi_filing(req: SEBIFilingRequest, authorization: str = Head
     from app.brsr_core_assurance import assurance_gate, resolve_org_for_gate
     from app.sebi_pdf_generator import generate_sebi_brsr_filing
 
-    expected_token = f"Bearer {settings.SUPABASE_SERVICE_KEY}"
-    if authorization != expected_token:
+    try:
+        _require_service_auth(authorization)
+    except HTTPException:
         # Allow user JWTs too
-        token = authorization.replace("Bearer ", "")
+        token = (authorization or "").replace("Bearer ", "").strip()
         if not token:
-            raise HTTPException(status_code=401, detail="Unauthorized")
+            raise
 
     # Optional BRSR Core assurance gate — resolves only for user JWTs;
     # service-key / org-less callers are never blocked (gate not applicable).
