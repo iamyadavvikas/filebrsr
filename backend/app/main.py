@@ -482,12 +482,16 @@ async def queue_extraction(req: ExtractAsyncRequest, authorization: str = Header
     supabase = get_supabase_admin()
 
     # Insert into extraction_jobs queue
-    result = supabase.table("extraction_jobs").insert({
-        "report_id": req.report_id,
-        "user_id": req.user_id,
-        "file_url": req.file_url,
-        "status": "queued",
-    }).execute()
+    try:
+        result = supabase.table("extraction_jobs").insert({
+            "report_id": req.report_id,
+            "user_id": req.user_id,
+            "file_url": req.file_url,
+            "status": "queued",
+        }).execute()
+    except Exception as exc:  # noqa: BLE001 - surface as 500 with detail, not bare traceback
+        logger.error("extract-queue insert failed for report=%s: %s", req.report_id, exc)
+        raise HTTPException(status_code=500, detail=f"Failed to queue extraction: {exc}") from exc
 
     return {"status": "queued", "report_id": req.report_id, "job_id": result.data[0]["id"] if result.data else None}
 

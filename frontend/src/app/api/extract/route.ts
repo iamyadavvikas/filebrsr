@@ -305,9 +305,11 @@ export async function POST(request: NextRequest) {
       reportId: report.id,
       message: "Extraction complete.",
     });
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("POST /api/extract failed:", message, err);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", detail: message },
       { status: 500 }
     );
   }
