@@ -118,7 +118,7 @@ export default function UploadPage() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        setError(errData.error || errData.detail || "Upload failed. Please try again.");
+        setError([errData.error, errData.detail].filter(Boolean).join(" — ") || "Upload failed. Please try again.");
         setUploading(false);
         setProgress("");
         return;
