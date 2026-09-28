@@ -18,6 +18,8 @@ Falls back to Bedrock Llama 3 70B if Groq fails.
 import json
 import re
 import asyncio
+
+from app.ai_extraction import _fit_text
 import time
 from typing import Any
 from groq import Groq
@@ -288,9 +290,9 @@ class BRSRExtractionAgent:
 
     async def _call_llm(self, prompt: str, text: str, max_chars: int = 100000) -> dict[str, Any]:
         """Call LLM with rate limiting. Tries Groq first, falls back to Bedrock."""
-        # Truncate text for context window
+        # Truncate text for context window (head+tail: BRSR lives at doc end)
         if len(text) > max_chars:
-            text = text[:max_chars]
+            text = _fit_text(text, max_chars)
 
         formatted_prompt = prompt.replace("{text}", text)
 

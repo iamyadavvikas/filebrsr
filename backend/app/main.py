@@ -610,15 +610,15 @@ async def extract_brsr_async(
             logger.warning("failed to resolve user_id for report=%s: %s",
                            req.report_id, exc)
 
-        # Unified pipeline (Phase 5.1). 80-page cap preserved for free-tier
-        # LLM quota on huge filings.
+        # Unified pipeline (Phase 5.1). 200-page cap covers full 50MB
+        # filings (BRSR annexure sits at doc end — truncating loses it).
         result = await run_full_extraction(
             file_bytes=file_bytes,
             settings=settings,
             report_id=req.report_id,
             user_id=worker_user_id,
             supabase_client=supabase,
-            max_pages=80,
+            max_pages=200,
         )
 
         if result["status"] != "completed":

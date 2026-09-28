@@ -59,14 +59,15 @@ async def process_job(job: dict) -> None:
 
         # Unified pipeline (Phase 5.1). Worker now picks up OCR, citations
         # and opt-in retrieval — capabilities the legacy pdfplumber-only
-        # worker was missing. 80-page cap preserves free-tier LLM quota.
+        # worker was missing. 200-page cap covers full 50MB filings
+        # (BRSR annexure sits at doc end — truncating loses it).
         result = await run_full_extraction(
             file_bytes=file_bytes,
             settings=settings,
             report_id=report_id,
             user_id=user_id,
             supabase_client=sb,
-            max_pages=80,
+            max_pages=200,
         )
 
         if result["status"] != "completed":

@@ -34,6 +34,20 @@ TEXT:
 """
 
 
+def _fit_text(text: str, max_chars: int) -> str:
+    """Fit long documents into a provider context window.
+
+    BRSR annexures sit at the END of annual reports while company
+    identifiers sit at the START, so head-only truncation drops the
+    BRSR section on 50MB filings. Keep 30% head + 70% tail instead.
+    """
+    if len(text) <= max_chars:
+        return text
+    head = int(max_chars * 0.3)
+    tail = max_chars - head
+    return text[:head] + "\n\n[... middle truncated for context window ...]\n\n" + text[-tail:]
+
+
 def _parse_ai_response(response_text: str) -> dict[str, Any]:
     """Parse JSON from AI response text."""
     try:
@@ -55,7 +69,7 @@ async def _extract_with_claude(text: str, api_key: str) -> dict[str, Any]:
     # Claude context is 200K tokens (~800K chars)
     max_chars = 600000
     if len(text) > max_chars:
-        text = text[:max_chars]
+        text = _fit_text(text, max_chars)
 
     response = await asyncio.wait_for(
         asyncio.to_thread(
@@ -78,7 +92,7 @@ async def _extract_with_bedrock(text: str, region: str = "ap-south-1") -> dict[s
 
     max_chars = 600000
     if len(text) > max_chars:
-        text = text[:max_chars]
+        text = _fit_text(text, max_chars)
 
     # Try Claude first (requires valid payment method)
     try:
@@ -110,7 +124,7 @@ async def _extract_with_bedrock(text: str, region: str = "ap-south-1") -> dict[s
 
     # Fallback to Llama 3 70B
     max_chars_llama = 120000
-    text_llama = text[:max_chars_llama] if len(text) > max_chars_llama else text
+    text_llama = _fit_text(text, max_chars_llama)
     prompt = f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\nYou extract structured data from documents. Return ONLY valid JSON, no explanation.<|eot_id|><|start_header_id|>user<|end_header_id|>\n{BRSR_EXTRACTION_PROMPT.format(text=text_llama)}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n"
     body = json.dumps({"prompt": prompt, "max_gen_len": 4096, "temperature": 0.1})
 
@@ -142,7 +156,7 @@ async def _extract_with_gemini(text: str, api_key: str) -> dict[str, Any]:
 
     max_chars = 900000
     if len(text) > max_chars:
-        text = text[:max_chars]
+        text = _fit_text(text, max_chars)
 
     response = await asyncio.wait_for(
         asyncio.to_thread(
@@ -167,7 +181,7 @@ async def _extract_with_groq(text: str, api_key: str) -> dict[str, Any]:
     # Groq context window is 128K tokens (~500K chars)
     max_chars = 120000
     if len(text) > max_chars:
-        text = text[:max_chars]
+        text = _fit_text(text, max_chars)
 
     response = await asyncio.wait_for(
         asyncio.to_thread(
