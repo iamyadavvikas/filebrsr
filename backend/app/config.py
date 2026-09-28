@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -70,6 +71,19 @@ class Settings(BaseSettings):
     RETRIEVAL_MAX_DATAPOINTS: int = 40
     RETRIEVAL_BATCH_SIZE: int = 5
     RETRIEVAL_TOP_K: int = 3
+
+    @field_validator(
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_KEY",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_JWT_SECRET",
+        mode="before",
+    )
+    @classmethod
+    def _strip_secrets(cls, v):
+        # Dashboard-pasted secrets often carry a trailing newline/space,
+        # which silently breaks the shared-bearer check (401 on /api/extract).
+        return v.strip() if isinstance(v, str) else v
 
     class Config:
         env_file = str(Path(__file__).resolve().parent.parent / ".env")
