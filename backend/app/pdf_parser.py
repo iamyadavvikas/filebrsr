@@ -151,6 +151,13 @@ def _render_table_as_markdown(rows: list[list[str | None]]) -> str:
     return "\n".join(lines)
 
 
+# Anti-poison guards: a single vector-junk page (CAD drawings, embedded
+# spreadsheets) can yield MBs of tables/chars, ballooning RAM until the
+# container is OOM-killed mid-request (socket hang-up downstream).
+MAX_TABLES_PER_PAGE = 50
+MAX_CHARS_PER_PAGE = 200_000
+
+
 def parse_pdf(content: bytes, *, min_page_chars: int = 500, max_pages: int | None = None) -> Document:
     """
     Parse a PDF into structured chunks.
@@ -164,6 +171,10 @@ def parse_pdf(content: bytes, *, min_page_chars: int = 500, max_pages: int | Non
 
     `max_pages`, if set, caps how many pages are parsed (callers on free-tier
     LLM quotas use this to keep prompts under context limits).
+
+    Poison-page guards (`MAX_TABLES_PER_PAGE`, `MAX_CHARS_PER_PAGE`) truncate
+    pathological pages instead of letting one bad page OOM the container —
+    normal BRSR pages (~5-20K chars) are never near these caps.
     """
     doc = Document()
 
@@ -181,6 +192,13 @@ def parse_pdf(content: bytes, *, min_page_chars: int = 500, max_pages: int | Non
             except Exception as e:
                 logger.warning("table extraction failed on page %d: %s", page_idx, e)
                 tables = []
+
+            if len(tables) > MAX_TABLES_PER_PAGE:
+                logger.warning(
+                    "page %d: %d tables exceed cap %d, truncating",
+                    page_idx, len(tables), MAX_TABLES_PER_PAGE,
+                )
+                tables = tables[:MAX_TABLES_PER_PAGE]
 
             for tbl_idx, rows in enumerate(tables):
                 rendered = _render_table_as_markdown(rows)
@@ -210,6 +228,12 @@ def parse_pdf(content: bytes, *, min_page_chars: int = 500, max_pages: int | Non
             if text.strip():
                 sub_sections = _split_text_by_headings(text)
                 for sub_idx, (heading, body) in enumerate(sub_sections):
+                    if page_chars >= MAX_CHARS_PER_PAGE:
+                        logger.warning(
+                            "page %d exceeds %d chars, truncating remainder",
+                            page_idx, MAX_CHARS_PER_PAGE,
+                        )
+                        break
                     block = (heading + "\n" + body).strip() if heading else body
                     if not block:
                         continue
@@ -228,6 +252,12 @@ def parse_pdf(content: bytes, *, min_page_chars: int = 500, max_pages: int | Non
                 doc.empty_pages.append(page_idx)
 
             doc.total_chars += page_chars
+
+    if doc.total_chars > 5_000_000:
+        logger.warning(
+            "parse produced %d chars — oversized document, downstream truncated",
+            doc.total_chars,
+        )
 
     return doc
 
