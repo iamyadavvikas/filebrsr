@@ -28,7 +28,7 @@ import logging
 from typing import Any
 
 from app.agent_extraction import extract_with_agent
-from app.ai_extraction import extract_with_ai
+from app.ai_extraction import _fit_text, extract_with_ai
 from app.citations import attach_citations
 from app.config import Settings
 from app.extract_retrieval import (
@@ -286,10 +286,18 @@ async def run_full_extraction(
             "_raw": {},
         }
 
-    # 3. Triple extraction
+    # 3. Triple extraction. Regex/enhanced see the FULL text (cheap, must
+    # cover every page); AI legs get a capped head+tail slice — no provider
+    # reads past ~900K chars, so anything beyond 1M is pure RAM with zero
+    # recall value on 50MB filings.
     regex_results = extract_with_regex(text)
     enhanced_results = extract_enhanced(text)
-    ai_results = await _run_ai_with_fallback(text, settings=settings)
+    ai_text = _fit_text(text, 1_000_000) if len(text) > 1_000_000 else text
+    if ai_text is not text:
+        logger.info(
+            "AI input capped: %d chars -> head+tail slice", len(text),
+        )
+    ai_results = await _run_ai_with_fallback(ai_text, settings=settings)
 
     # 4. Merge
     merged = _merge_extractor_outputs(

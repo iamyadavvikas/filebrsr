@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     ESEF_ARRELLE_CMDLINE: str = "arelleCmdLine"
     ESEF_ARRELLE_TIMEOUT_SECONDS: int = 180
 
+    # ─── Extraction worker concurrency ─────────────────────────────────
+    # How many extractions the worker runs in parallel. Each concurrent job
+    # holds a full document parse plus rendered OCR bitmaps, so this is the
+    # single biggest driver of peak host memory. Set to 1 on hosts that
+    # cannot fit two large scanned PDFs at once (e.g. 4 GB instances) and
+    # queue the rest instead of risking an OOM stall of the whole box.
+    WORKER_MAX_CONCURRENT: int = 2
+
     # ─── Open-to-all guest sandbox (no sign-in exploration) ─────────────
     # When enabled, logged-out visitors can mint a throwaway sandbox org
     # (esrs_guest_sessions) and run the full CSRD workflow: seed, entries,

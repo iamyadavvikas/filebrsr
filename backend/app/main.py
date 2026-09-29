@@ -533,7 +533,7 @@ async def notify_extraction_complete(
 
 class ExtractAsyncRequest(BaseModel):
     report_id: str
-    user_id: str
+    user_id: str | None = None  # None for guest (async) extractions
     file_url: str  # Supabase Storage path e.g. "user_id/timestamp-filename.pdf"
 
 

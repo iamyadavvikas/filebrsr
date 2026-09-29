@@ -196,3 +196,51 @@ async def metrics_backfill(days: int = 30, authorization: str = Header(...)):
         results.append(result)
 
     return {"status": "ok", "days_processed": len(results)}
+
+
+# ═══════════════════════════════════════════════════════════════
+# GUEST PURGE — Run daily: delete anonymous uploads older than 24h
+# ═══════════════════════════════════════════════════════════════
+
+@router.post("/purge-guests")
+async def purge_guests(
+    older_than_hours: int = 24,
+    authorization: str = Header(...),
+):
+    """Delete guest reports/jobs/storage objects older than the cutoff.
+
+    extraction_jobs rows cascade via reports(id) ON DELETE CASCADE.
+    Storage objects under guest/ are removed in batches of 100.
+    """
+    verify_service_key(authorization)
+    sb = get_supabase_admin()
+
+    cutoff = (datetime.utcnow() - timedelta(hours=older_than_hours)).isoformat()
+    old = sb.table("reports").select("id,file_url").eq(
+        "is_guest", True,
+    ).lt("created_at", cutoff).execute()
+    rows = old.data or []
+
+    files_removed = 0
+    for row in rows:
+        furl = row.get("file_url")
+        if furl:
+            try:
+                sb.storage.from_("brsr-reports").remove([furl])
+                files_removed += 1
+            except Exception:
+                pass  # object already gone — row delete still proceeds
+
+    reports_removed = 0
+    if rows:
+        ids = [r["id"] for r in rows]
+        # Chunked deletes to stay under query limits
+        for i in range(0, len(ids), 100):
+            sb.table("reports").delete().in_("id", ids[i:i + 100]).execute()
+            reports_removed += len(ids[i:i + 100])
+
+    return {
+        "status": "ok",
+        "reports_removed": reports_removed,
+        "files_removed": files_removed,
+    }

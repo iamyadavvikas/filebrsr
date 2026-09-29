@@ -27,7 +27,10 @@ logger = logging.getLogger("worker")
 settings = get_settings()
 
 POLL_INTERVAL = 3  # seconds
-MAX_CONCURRENT = 2  # max parallel extractions
+# Parallel extractions. Tunable via WORKER_MAX_CONCURRENT because each job
+# holds a full parse + OCR bitmaps; 1 on memory-constrained hosts.
+MAX_CONCURRENT = max(1, settings.WORKER_MAX_CONCURRENT)
+logger.info("worker concurrency: %d", MAX_CONCURRENT)
 
 
 def get_supabase():

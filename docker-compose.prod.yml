@@ -79,11 +79,12 @@ services:
       - ENVIRONMENT=production
       - SENTRY_DSN=${SENTRY_DSN}
       - RESEND_API_KEY=${RESEND_API_KEY}
+      - WORKER_MAX_CONCURRENT=${WORKER_MAX_CONCURRENT:-1}
     restart: always
     deploy:
       resources:
         limits:
-          memory: 1024M
+          memory: 2048M
 
   prometheus:
     image: prom/prometheus:v2.54.1
