@@ -152,50 +152,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Guest: send directly to backend, return inline results
-    if (!user) {
-      const backendForm = new FormData();
-      backendForm.append("file", file);
-      backendForm.append("report_id", "guest");
-      backendForm.append("user_id", "guest");
-
-      const backendRes = await backendFetch("guest-extract", `${backendUrl}/api/extract`, {
-        method: "POST",
-        body: backendForm,
-        headers: {
-          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-        },
-        // 50MB filings through the 5-pass agent can take minutes
-        signal: AbortSignal.timeout(280000),
-      });
-
-      if (!backendRes.ok) {
-        const errorBody = await backendRes.text();
-        console.error("Backend extraction failed:", backendRes.status, errorBody);
-        return NextResponse.json(
-          { error: `Extraction failed (status ${backendRes.status})` },
-          { status: 502 }
-        );
-      }
-
-      const backendData = await backendRes.json();
-
-      if (backendData.status === "failed") {
-        return NextResponse.json(
-          { error: backendData.error || "Extraction failed" },
-          { status: 422 }
-        );
-      }
-
-      return NextResponse.json({
-        reportId: "guest",
-        message: "Extraction complete.",
-        results: backendData,
-      });
-    }
-
-    // Authenticated user: upload to storage, call backend, wait for result
-    const fileName = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+    // Guest + authenticated share one path now: persist the file, queue a
+    // worker job, poll for completion. No request ever holds a multi-minute
+    // extraction open — the old guest single-shot POST died with bare
+    // `fetch failed` whenever the backend wobbled mid-request.
+    const fileName = user
+      ? `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`
+      : `guest/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
     const { error: uploadError } = await adminDb.storage
       .from("brsr-reports")
       .upload(fileName, file);
@@ -208,11 +171,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create report record
+    // Create report record (guest rows carry null user_id + is_guest flag;
+    // purged after 24h by POST /api/cron/purge-guests)
     const { data: report, error: reportError } = await adminDb
       .from("reports")
       .insert({
-        user_id: user.id,
+        user_id: user ? user.id : null,
+        is_guest: !user,
         file_name: file.name,
         file_url: fileName,
         status: "processing",
@@ -220,10 +185,11 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    if (reportError) {
+    if (reportError || !report) {
       console.error("Report insert error:", reportError);
+      await adminDb.storage.from("brsr-reports").remove([fileName]).catch(() => {});
       return NextResponse.json(
-        { error: "Failed to create report" },
+        { error: "Failed to create report", detail: reportError?.message },
         { status: 500 }
       );
     }
@@ -233,7 +199,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       body: JSON.stringify({
         report_id: report.id,
-        user_id: user.id,
+        user_id: user ? user.id : null,
         file_url: fileName,
       }),
       headers: {
@@ -249,7 +215,7 @@ export async function POST(request: NextRequest) {
         method: "POST",
         body: JSON.stringify({
           report_id: report.id,
-          user_id: user.id,
+          user_id: user ? user.id : null,
           file_url: fileName,
         }),
         headers: {
@@ -295,15 +261,50 @@ export async function POST(request: NextRequest) {
     }
 
     if (!extractionDone) {
-      // Still processing — return reportId so user can check later
+      // Still processing — worker continues in background
       return NextResponse.json({
         reportId: report.id,
-        message: "Extraction in progress. Check your reports page for results.",
+        status: "processing",
+        message: user
+          ? "Extraction in progress. Check your reports page for results."
+          : "Extraction in progress. Please wait and try again shortly.",
+      }, { status: 202 });
+    }
+
+    // Guest: return inline results (nothing persisted for the client to
+    // fetch later — viewer reads sessionStorage via /results/guest)
+    if (!user) {
+      const { data: done } = await adminDb
+        .from("reports")
+        .select("status, extracted_data, confidence_scores, gap_analysis, datapoints_stats, benchmark, company_name, financial_year")
+        .eq("id", report.id)
+        .single();
+      if (!done || done.status !== "completed") {
+        return NextResponse.json(
+          { error: "Extraction failed. Please try again." },
+          { status: 422 }
+        );
+      }
+      const full = done.extracted_data || {};
+      return NextResponse.json({
+        reportId: "guest",
+        message: "Extraction complete.",
+        results: {
+          status: "completed",
+          report_id: "guest",
+          extracted_data: full,
+          confidence_scores: done.confidence_scores || {},
+          gap_analysis: done.gap_analysis || full.gap_analysis,
+          datapoints_stats: done.datapoints_stats || full.datapoints_stats,
+          benchmark: done.benchmark || full.benchmark,
+          company_name: done.company_name,
+          financial_year: done.financial_year,
+        },
       });
     }
 
-    // Deduct credit + increment monthly counter (skip for founders)
-    if (!isFounder) {
+    // Deduct credit + increment monthly counter (authenticated only, skip for founders)
+    if (user && !isFounder) {
       const { data: profile } = await adminDb
         .from("profiles")
         .select("credits_remaining, extractions_this_month")
@@ -321,7 +322,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Send post-extraction email notification
+    // Send post-extraction email notification (authenticated only)
+    if (!user) {
+      return NextResponse.json({
+        reportId: report.id,
+        message: "Extraction complete.",
+      });
+    }
     try {
       const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
       await fetch(`${backendUrl}/api/notify/extraction-complete`, {
@@ -347,6 +354,52 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("POST /api/extract failed:", message, err);
+    return NextResponse.json(
+      { error: "Internal server error", detail: message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: NextRequest) {
+  // Guest recovery poll: report ids are unguessable UUIDs; service role
+  // reads the row (guest rows are purged after 24h).
+  const reportId = request.nextUrl.searchParams.get("report_id");
+  if (!reportId) {
+    return NextResponse.json({ error: "report_id required" }, { status: 400 });
+  }
+  try {
+    const adminDb = getAdminClient();
+    const { data: row } = await adminDb
+      .from("reports")
+      .select("status, extracted_data, confidence_scores, gap_analysis, datapoints_stats, benchmark, company_name, financial_year")
+      .eq("id", reportId)
+      .single();
+    if (!row) {
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    }
+    if (row.status !== "completed") {
+      return NextResponse.json({ reportId, status: row.status || "processing" }, { status: 202 });
+    }
+    const full = row.extracted_data || {};
+    return NextResponse.json({
+      reportId: "guest",
+      message: "Extraction complete.",
+      results: {
+        status: "completed",
+        report_id: "guest",
+        extracted_data: full,
+        confidence_scores: row.confidence_scores || {},
+        gap_analysis: row.gap_analysis || full.gap_analysis,
+        datapoints_stats: row.datapoints_stats || full.datapoints_stats,
+        benchmark: row.benchmark || full.benchmark,
+        company_name: row.company_name,
+        financial_year: row.financial_year,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("GET /api/extract failed:", message);
     return NextResponse.json(
       { error: "Internal server error", detail: message },
       { status: 500 }

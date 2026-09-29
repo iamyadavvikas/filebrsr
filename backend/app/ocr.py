@@ -42,25 +42,63 @@ _OCR_PROMPT = (
 )
 
 
+# Upper bound for a single rendered bitmap (RGBA bytes). A poster-size
+# scanned page at 150 DPI can exceed 0.5 GB — enough to OOM-kill the
+# container when several render concurrently. DPI is dropped to fit.
+MAX_BITMAP_BYTES = 64 * 1024 * 1024
+
+
 def _render_page_png(content: bytes, page_number: int, *, dpi: int = 150) -> bytes:
     """
     Render a single PDF page (1-indexed) to PNG bytes via pypdfium2.
 
+    DPI is adaptive: pages whose bitmap at the requested DPI would exceed
+    MAX_BITMAP_BYTES are downscaled (text stays legible to ~75 DPI).
+    Native bitmap/PIL objects are explicitly released before return so
+    peak RSS stays flat across long OCR runs.
+
     Raises IndexError if page_number is out of range.
     """
+    import gc
+
     pdf = pdfium.PdfDocument(content)
     try:
         if page_number < 1 or page_number > len(pdf):
             raise IndexError(f"page {page_number} out of range (1..{len(pdf)})")
         # pypdfium2 uses 0-indexed page access
         page = pdf[page_number - 1]
+        width_pt, height_pt = page.get_size()
+        scale = dpi / 72
+        # RGBA = 4 bytes/px; shrink scale until the bitmap fits the budget
+        while (width_pt * scale) * (height_pt * scale) * 4 > MAX_BITMAP_BYTES and scale > 0.5:
+            scale /= 2
+        if scale != dpi / 72:
+            logger.info(
+                "OCR page %d downscaled to ~%d DPI (large page %.0fx%.0f pt)",
+                page_number, round(scale * 72), width_pt, height_pt,
+            )
         # scale = DPI / 72 (PDF default)
-        bitmap = page.render(scale=dpi / 72)
-        pil_image = bitmap.to_pil()
-        buf = io.BytesIO()
-        # PNG keeps text crisp; quality matters more than file size here
-        pil_image.save(buf, format="PNG", optimize=True)
-        return buf.getvalue()
+        bitmap = page.render(scale=scale)
+        try:
+            pil_image = bitmap.to_pil()
+            try:
+                buf = io.BytesIO()
+                # PNG keeps text crisp; quality matters more than file size here
+                pil_image.save(buf, format="PNG", optimize=True)
+                return buf.getvalue()
+            finally:
+                try:
+                    pil_image.close()
+                except Exception:
+                    pass
+                del pil_image
+        finally:
+            try:
+                bitmap.close()
+            except Exception:
+                pass
+            del bitmap
+            gc.collect()
     finally:
         pdf.close()
 

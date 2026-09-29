@@ -133,6 +133,34 @@ export default function UploadPage() {
         return;
       }
 
+      // Worker still going (202 edge on huge files) — poll status endpoint
+      if (data.status === "processing" && data.reportId && !data.results) {
+        setProgress("Still extracting — checking again...");
+        const pendingId = data.reportId as string;
+        for (let i = 0; i < 60; i++) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          try {
+            const poll = await fetch(`/api/extract?report_id=${encodeURIComponent(pendingId)}`);
+            const pdata = await poll.json().catch(() => ({}));
+            if (pdata.results) {
+              sessionStorage.setItem("guestResults", JSON.stringify(pdata.results));
+              setSuccess("Extraction complete! Redirecting...");
+              setProgress("");
+              setTimeout(() => { router.push("/results/guest"); }, 1200);
+              setUploading(false);
+              return;
+            }
+            if (pdata.error) break;
+          } catch {
+            // keep polling
+          }
+        }
+        setError("Extraction is taking longer than expected. Please try again in a few minutes.");
+        setUploading(false);
+        setProgress("");
+        return;
+      }
+
       setSuccess(data.results ? "Extraction complete! Redirecting..." : "Report submitted! Redirecting...");
       setProgress("");
       trackEvent("extraction_complete", { has_results: !!data.results, report_id: data.reportId });

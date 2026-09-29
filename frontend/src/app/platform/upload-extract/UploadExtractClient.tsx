@@ -121,6 +121,41 @@ export default function UploadExtractClient({ userId, initialReports }: { userId
         return;
       }
 
+      // Worker still going (202 edge on huge files) — keep polling the
+      // status endpoint instead of stranding the user
+      if (data.status === "processing" && data.reportId) {
+        setProgress("Still extracting — checking again...");
+        const pendingId = data.reportId as string;
+        for (let i = 0; i < 60; i++) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          try {
+            const poll = await fetch(`/api/extract?report_id=${encodeURIComponent(pendingId)}`);
+            const pdata = await poll.json().catch(() => ({}));
+            if (pdata.results) {
+              track("extraction_completed", "extraction", { report_id: "guest" });
+              setSuccess(true);
+              setProgress("");
+              sessionStorage.setItem("guestResults", JSON.stringify(pdata.results));
+              setReportId("guest");
+              setUploading(false);
+              return;
+            }
+            if (pdata.error) {
+              setError(pdata.error);
+              setUploading(false);
+              setProgress("");
+              return;
+            }
+          } catch {
+            // keep polling
+          }
+        }
+        setError("Extraction is taking longer than expected. Please try again in a few minutes.");
+        setUploading(false);
+        setProgress("");
+        return;
+      }
+
       // Success - store report ID for navigation
       track("extraction_completed", "extraction", { report_id: data.reportId });
       setSuccess(true);
