@@ -194,6 +194,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Verify the row is actually readable before queueing work against it —
+    // a silent write/read split here strands polling clients with 404s.
+    const { data: verifyRow, error: verifyError } = await adminDb
+      .from("reports")
+      .select("id")
+      .eq("id", report.id)
+      .single();
+    if (verifyError || !verifyRow) {
+      console.error("Report verify-read failed:", verifyError, "id:", report.id);
+      return NextResponse.json(
+        { error: "Failed to create report", detail: `write ok but re-read failed: ${verifyError?.message || "no-row"}` },
+        { status: 500 }
+      );
+    }
+
     // Call backend to queue extraction (returns immediately)
     const backendRes = await backendFetch("queue", `${backendUrl}/api/extract-queue`, {
       method: "POST",
@@ -370,13 +385,30 @@ export async function GET(request: NextRequest) {
   }
   try {
     const adminDb = getAdminClient();
-    const { data: row } = await adminDb
+    const { data: row, error: rowError } = await adminDb
       .from("reports")
       .select("status, extracted_data, confidence_scores, gap_analysis, datapoints_stats, benchmark, company_name, financial_year")
       .eq("id", reportId)
       .single();
     if (!row) {
-      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+      // Cross-check the backend: if IT knows this report, frontend and
+      // backend are talking to different databases (split-brain env config).
+      let backendSays = "unknown";
+      try {
+        const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+        const st = await fetch(`${backendUrl}/api/extract-status/${encodeURIComponent(reportId)}`, {
+          headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
+          signal: AbortSignal.timeout(8000),
+        });
+        backendSays = st.ok ? JSON.stringify(await st.json()).slice(0, 200) : `http-${st.status}`;
+      } catch (e) {
+        backendSays = e instanceof Error ? e.message : String(e);
+      }
+      console.error(`GET /api/extract: report ${reportId.slice(0, 8)}… missing (db: ${rowError?.message || "no-row"}; backend: ${backendSays})`);
+      return NextResponse.json(
+        { error: "Report not found", detail: `backend status for this report: ${backendSays}` },
+        { status: 404 }
+      );
     }
     if (row.status !== "completed") {
       return NextResponse.json({ reportId, status: row.status || "processing" }, { status: 202 });
