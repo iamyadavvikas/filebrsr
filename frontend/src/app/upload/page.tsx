@@ -150,7 +150,12 @@ export default function UploadPage() {
               setUploading(false);
               return;
             }
-            if (pdata.error) break;
+            if (pdata.error) {
+              setError([pdata.error, pdata.detail].filter(Boolean).join(" — ") || "Upload failed. Please try again.");
+              setUploading(false);
+              setProgress("");
+              return;
+            }
           } catch {
             // keep polling
           }

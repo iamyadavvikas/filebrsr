@@ -141,7 +141,7 @@ export default function UploadExtractClient({ userId, initialReports }: { userId
               return;
             }
             if (pdata.error) {
-              setError(pdata.error);
+              setError([pdata.error, pdata.detail].filter(Boolean).join(" — "));
               setUploading(false);
               setProgress("");
               return;
