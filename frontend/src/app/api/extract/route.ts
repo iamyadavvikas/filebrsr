@@ -289,11 +289,18 @@ export async function POST(request: NextRequest) {
     // Guest: return inline results (nothing persisted for the client to
     // fetch later — viewer reads sessionStorage via /results/guest)
     if (!user) {
-      const { data: done } = await adminDb
+      const { data: done, error: doneError } = await adminDb
         .from("reports")
-        .select("status, extracted_data, confidence_scores, gap_analysis, datapoints_stats, benchmark, company_name, financial_year")
+        .select("status, extracted_data, confidence_scores, company_name, financial_year")
         .eq("id", report.id)
         .single();
+      if (doneError) {
+        console.error(`POST /api/extract: read-back failed for ${report.id}: ${doneError.message}`);
+        return NextResponse.json(
+          { error: "Could not read extraction results", detail: doneError.message },
+          { status: 500 }
+        );
+      }
       if (!done || done.status !== "completed") {
         return NextResponse.json(
           { error: "Extraction failed. Please try again." },
@@ -309,9 +316,9 @@ export async function POST(request: NextRequest) {
           report_id: "guest",
           extracted_data: full,
           confidence_scores: done.confidence_scores || {},
-          gap_analysis: done.gap_analysis || full.gap_analysis,
-          datapoints_stats: done.datapoints_stats || full.datapoints_stats,
-          benchmark: done.benchmark || full.benchmark,
+          gap_analysis: full.gap_analysis,
+          datapoints_stats: full.datapoints_stats,
+          benchmark: full.benchmark,
           company_name: done.company_name,
           financial_year: done.financial_year,
         },
@@ -387,9 +394,16 @@ export async function GET(request: NextRequest) {
     const adminDb = getAdminClient();
     const { data: row, error: rowError } = await adminDb
       .from("reports")
-      .select("status, extracted_data, confidence_scores, gap_analysis, datapoints_stats, benchmark, company_name, financial_year")
+      .select("status, extracted_data, confidence_scores, company_name, financial_year")
       .eq("id", reportId)
       .single();
+    if (rowError) {
+      console.error(`GET /api/extract: read failed for ${reportId}: ${rowError.message}`);
+      return NextResponse.json(
+        { error: "Could not read extraction results", detail: rowError.message },
+        { status: 500 }
+      );
+    }
     if (!row) {
       // Cross-check the backend: if IT knows this report, frontend and
       // backend are talking to different databases (split-brain env config).
@@ -404,7 +418,7 @@ export async function GET(request: NextRequest) {
       } catch (e) {
         backendSays = e instanceof Error ? e.message : String(e);
       }
-      console.error(`GET /api/extract: report ${reportId.slice(0, 8)}… missing (db: ${rowError?.message || "no-row"}; backend: ${backendSays})`);
+      console.error(`GET /api/extract: report ${reportId.slice(0, 8)}… missing (db: no-row; backend: ${backendSays})`);
       return NextResponse.json(
         { error: "Report not found", detail: `backend status for this report: ${backendSays}` },
         { status: 404 }
@@ -422,9 +436,9 @@ export async function GET(request: NextRequest) {
         report_id: "guest",
         extracted_data: full,
         confidence_scores: row.confidence_scores || {},
-        gap_analysis: row.gap_analysis || full.gap_analysis,
-        datapoints_stats: row.datapoints_stats || full.datapoints_stats,
-        benchmark: row.benchmark || full.benchmark,
+        gap_analysis: full.gap_analysis,
+        datapoints_stats: full.datapoints_stats,
+        benchmark: full.benchmark,
         company_name: row.company_name,
         financial_year: row.financial_year,
       },
